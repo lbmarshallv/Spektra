@@ -276,7 +276,7 @@ public:
 	void DrawDecalsForMirror(HWDrawInfo *di, FRenderState &state, TArray<HWDecal *> &decals);
 
 public:
-	void Process(HWDrawInfo *di, seg_t *seg, sector_t *frontsector, sector_t *backsector);
+	void Process(HWDrawInfo *di, seg_t *seg, sector_t *frontsector, sector_t *backsector, bool isculled = false);
 	void ProcessLowerMiniseg(HWDrawInfo *di, seg_t *seg, sector_t *frontsector, sector_t *backsector);
 
 	float PointOnSide(float x,float y)

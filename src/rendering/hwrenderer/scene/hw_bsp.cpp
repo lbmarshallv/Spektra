@@ -212,10 +212,9 @@ EXTERN_CVAR(Float, r_line_distance_cull)
 
 inline bool IsDistanceCulled(seg_t *line)
 {
-	if (r_line_distance_cull <= 0)
-		return false;
-	
 	double dist3 = r_line_distance_cull * r_line_distance_cull;
+	if (dist3 <= 0.0)
+		return false;
 
 	double dist1 = (line->v1->fPos() - r_viewpoint.Pos).LengthSquared();
 	double dist2 = (line->v2->fPos() - r_viewpoint.Pos).LengthSquared();
@@ -305,8 +304,16 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	currentsubsector->flags |= SSECMF_DRAWN;
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
-
-	if (IsDistanceCulled(seg)) { clipper.SafeAddClipRange(startAngle, endAngle); return; }
+	if (!portalclip && IsDistanceCulled(seg))
+	{
+		if(!gl_multithread){
+			HWWall wall;
+			wall.sub = currentsubsector;
+			wall.Process(this, seg, seg->frontsector, seg->backsector, true);
+		}
+		clipper.SafeAddClipRange(startAngle, endAngle);
+		return;
+	}
 	
 	if (!seg->backsector)
 	{
