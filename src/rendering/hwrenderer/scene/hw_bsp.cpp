@@ -208,9 +208,22 @@ void HWDrawInfo::WorkerThread()
 	}
 }
 
+EXTERN_CVAR(Float, r_line_distance_cull)
 
-
-
+inline bool IsDistanceCulled(DVector3 vp,seg_t *line)
+{
+	double dist3 = r_line_distance_cull * r_line_distance_cull;
+	if (dist3 <= 0.0)
+		return false;
+	//only lines outside (with sky flat) get culled
+	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum  && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
+		return false;
+	double dist1 = (line->v1->fPos() - vp).LengthSquared();
+	double dist2 = (line->v2->fPos() - vp).LengthSquared();
+	if ((dist1 > dist3) && (dist2 > dist3))
+		return true;
+	return false;
+}
 
 EXTERN_CVAR(Bool, gl_render_segs)
 
@@ -273,7 +286,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	{
 		return;
 	}
-
+	bool considerCull = this->mCurrentPortal == nullptr && !portalclip;
 	if (seg->sidedef == nullptr)
 	{
 		if (!(currentsubsector->flags & SSECMF_DRAWN))
@@ -294,6 +307,17 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
 
+	if (IsDistanceCulled(Viewpoint.Pos,seg))
+	{
+		if(!gl_multithread){
+			HWWall wall;
+			wall.sub = currentsubsector;
+			wall.Process(this, seg, seg->frontsector, seg->backsector, true);
+		}
+		clipper.SafeAddClipRange(startAngle, endAngle);
+		return;
+	}
+	
 	if (!seg->backsector)
 	{
 		clipper.SafeAddClipRange(startAngle, endAngle);
