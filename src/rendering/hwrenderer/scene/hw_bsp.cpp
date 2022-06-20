@@ -210,14 +210,16 @@ void HWDrawInfo::WorkerThread()
 
 EXTERN_CVAR(Float, r_line_distance_cull)
 
-inline bool IsDistanceCulled(seg_t *line)
+inline bool IsDistanceCulled(DVector3 vp,seg_t *line)
 {
 	double dist3 = r_line_distance_cull * r_line_distance_cull;
 	if (dist3 <= 0.0)
 		return false;
-
-	double dist1 = (line->v1->fPos() - r_viewpoint.Pos).LengthSquared();
-	double dist2 = (line->v2->fPos() - r_viewpoint.Pos).LengthSquared();
+	//only lines outside (with sky flat) get culled
+	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum  && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
+		return false;
+	double dist1 = (line->v1->fPos() - vp).LengthSquared();
+	double dist2 = (line->v2->fPos() - vp).LengthSquared();
 	if ((dist1 > dist3) && (dist2 > dist3))
 		return true;
 	return false;
@@ -284,7 +286,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	{
 		return;
 	}
-
+	bool considerCull = this->mCurrentPortal == nullptr && !portalclip;
 	if (seg->sidedef == nullptr)
 	{
 		if (!(currentsubsector->flags & SSECMF_DRAWN))
@@ -304,7 +306,8 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	currentsubsector->flags |= SSECMF_DRAWN;
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
-	if (!portalclip && IsDistanceCulled(seg))
+
+	if (IsDistanceCulled(Viewpoint.Pos,seg))
 	{
 		if(!gl_multithread){
 			HWWall wall;
