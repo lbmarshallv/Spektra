@@ -133,6 +133,7 @@ void HWDrawInfo::StartScene(FRenderViewpoint &parentvp, HWViewpointUniforms *uni
 
 	Viewpoint = parentvp;
 	lightmode = Level->lightMode;
+	linecullmode = Level->linecullmode;
 	if (uniforms)
 	{
 		VPUniforms = *uniforms;

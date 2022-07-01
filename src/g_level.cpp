@@ -1865,6 +1865,7 @@ void FLevelLocals::Init()
 
 	DefaultEnvironment = info->DefaultEnvironment;
 
+	linecullmode = info->linecullmode;
 	lightMode = info->lightmode == ELightMode::NotSet? (ELightMode)*gl_lightmode : info->lightmode;
 	brightfog = info->brightfog < 0? gl_brightfog : !!info->brightfog;
 	lightadditivesurfaces = info->lightadditivesurfaces < 0 ? gl_lightadditivesurfaces : !!info->lightadditivesurfaces;

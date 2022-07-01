@@ -298,6 +298,7 @@ void level_info_t::Reset()
 
 	brightfog = -1;
 	lightmode = ELightMode::NotSet;
+	linecullmode = ELineCullMode::OutDoorCulling;
 	notexturefill = -1;
 	lightadditivesurfaces = -1;
 	skyrotatevector = FVector3(0, 0, 1);
@@ -1493,6 +1494,21 @@ DEFINE_MAP_OPTION(lightmode, false)
 	else
 	{
 		parse.sc.ScriptMessage("Invalid light mode %d", parse.sc.Number);
+	}
+}
+
+DEFINE_MAP_OPTION(linecullmode, false)
+{
+	parse.ParseAssign();
+	parse.sc.MustGetNumber();
+
+	if (parse.sc.Number >= -1 && parse.sc.Number <= 1)
+	{
+		info->linecullmode = ELineCullMode(parse.sc.Number);
+	}
+	else
+	{
+		parse.sc.ScriptMessage("Invalid line culling mode %d", parse.sc.Number);
 	}
 }
 

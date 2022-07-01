@@ -286,7 +286,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	{
 		return;
 	}
-	bool considerCull = this->mCurrentPortal == nullptr && !portalclip;
+
 	if (seg->sidedef == nullptr)
 	{
 		if (!(currentsubsector->flags & SSECMF_DRAWN))
@@ -307,7 +307,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
 
-	if (IsDistanceCulled(Viewpoint.Pos,seg))
+	if (!isNoLineCullMode() && IsDistanceCulled(Viewpoint.Pos,seg))
 	{
 		if(!gl_multithread){
 			HWWall wall;

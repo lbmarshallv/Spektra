@@ -53,4 +53,12 @@ enum class ELightMode : int8_t
 	DoomSoftware = 16
 };
 
+enum class ELineCullMode : int8_t
+{
+	NoCulling = -1,
+	GlobalCulling = 0,
+	OutDoorCulling = 1
+	
+};
+
 #endif

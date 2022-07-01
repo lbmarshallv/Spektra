@@ -682,6 +682,7 @@ public:
 	float		MusicVolume;
 
 	// Hardware render stuff that can either be set via CVAR or MAPINFO
+	ELineCullMode	linecullmode;
 	ELightMode	lightMode;
 	bool		brightfog;
 	bool		lightadditivesurfaces;

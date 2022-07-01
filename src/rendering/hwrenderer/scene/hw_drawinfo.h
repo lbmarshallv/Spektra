@@ -135,6 +135,7 @@ struct HWDrawInfo
     
 	HWDrawList drawlists[GLDL_TYPES];
 	int vpIndex;
+	ELineCullMode linecullmode;
 	ELightMode lightmode;
 
 	FLevelLocals *Level;
@@ -336,6 +337,22 @@ public:
 	{
 		lightmode = ELightMode::Doom;
 	}
+
+	bool isNoLineCullMode() const
+	{
+		return linecullmode == ELineCullMode::NoCulling;
+	}
+
+	bool isOutDoorLineCullMode() const
+	{
+		return linecullmode == ELineCullMode::OutDoorCulling;
+	}
+
+	bool isGlobalLineCullMode() const
+	{
+		return linecullmode == ELineCullMode::OutDoorCulling;
+	}
+
 
 };
 

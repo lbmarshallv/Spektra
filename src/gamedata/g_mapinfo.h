@@ -395,6 +395,7 @@ struct level_info_t
 	
 	TArray<FString> EventHandlers;
 
+	ELineCullMode	linecullmode;
 	ELightMode	lightmode;
 	int8_t		brightfog;
 	int8_t		lightadditivesurfaces;
