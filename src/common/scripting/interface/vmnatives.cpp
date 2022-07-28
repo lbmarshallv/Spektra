@@ -552,6 +552,15 @@ DEFINE_ACTION_FUNCTION_NATIVE(_TexMan, UseGamePalette, UseGamePalette)
 	ACTION_RETURN_INT(UseGamePalette(texid));
 }
 
+FCanvas* GetTextureCanvas(const FString& texturename);
+
+DEFINE_ACTION_FUNCTION(_TexMan, GetCanvas)
+{
+	PARAM_PROLOGUE;
+	PARAM_STRING(texturename);
+	ACTION_RETURN_POINTER(GetTextureCanvas(texturename));
+}
+
 //=====================================================================================
 //
 // FFont exports
@@ -968,6 +977,18 @@ DEFINE_ACTION_FUNCTION(_Console, Printf)
 
 	FString s = FStringFormat(VM_ARGS_NAMES);
 	Printf("%s\n", s.GetChars());
+	return 0;
+}
+
+DEFINE_ACTION_FUNCTION(_Console, PrintfEx)
+{
+	PARAM_PROLOGUE;
+	PARAM_INT(printlevel);
+	PARAM_VA_POINTER(va_reginfo)	// Get the hidden type information array
+
+	FString s = FStringFormat(VM_ARGS_NAMES,1);
+
+	Printf(printlevel,"%s\n", s.GetChars());
 	return 0;
 }
 
