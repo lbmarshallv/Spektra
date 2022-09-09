@@ -6,6 +6,7 @@
 ** Copyright 1998-2009 Randy Heit
 ** Copyright (C) 2007-2012 Skulltag Development Team
 ** Copyright (C) 2007-2016 Zandronum Development Team
+** Copyright (C) 2017-2022 GZDoom Development Team
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -49,9 +50,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdexcept>
 #include <process.h>
 #include <time.h>
 #include <map>
+#include <codecvt>
 
 #include <stdarg.h>
 
@@ -61,6 +64,8 @@
 #include <richedit.h>
 #include <wincrypt.h>
 #include <shlwapi.h>
+
+#include <shellapi.h>
 
 #include "hardware.h"
 #include "printf.h"
@@ -447,12 +452,10 @@ BOOL CALLBACK IWADBoxCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 			vid_fullscreen = SendDlgItemMessage( hDlg, IDC_WELCOME_FULLSCREEN, BM_GETCHECK, 0, 0 ) == BST_CHECKED;
 #ifdef HAVE_GLES2
 			if (SendDlgItemMessage(hDlg, IDC_WELCOME_VULKAN4, BM_GETCHECK, 0, 0) == BST_CHECKED)
-				vid_preferbackend = 3;
+				vid_preferbackend = 2;
 			else 
 #endif
-			if (SendDlgItemMessage(hDlg, IDC_WELCOME_VULKAN3, BM_GETCHECK, 0, 0) == BST_CHECKED)
-				vid_preferbackend = 2;
-			else if (SendDlgItemMessage(hDlg, IDC_WELCOME_VULKAN2, BM_GETCHECK, 0, 0) == BST_CHECKED)
+			if (SendDlgItemMessage(hDlg, IDC_WELCOME_VULKAN2, BM_GETCHECK, 0, 0) == BST_CHECKED)
 				vid_preferbackend = 1;
 			else if (SendDlgItemMessage(hDlg, IDC_WELCOME_VULKAN1, BM_GETCHECK, 0, 0) == BST_CHECKED)
 				vid_preferbackend = 0;
@@ -957,3 +960,43 @@ void I_SetThreadNumaNode(std::thread &thread, int numaNode)
 		SetThreadAffinityMask(handle, (DWORD_PTR)numaNodes[numaNode].affinityMask);
 	}
 }
+
+FString I_GetCWD()
+{
+	auto len = GetCurrentDirectoryW(0, nullptr);
+	TArray<wchar_t> curdir(len + 1, true);
+	if (!GetCurrentDirectoryW(len + 1, curdir.Data()))
+	{
+		return "";
+	}
+	FString returnv(curdir.Data());
+	FixPathSeperator(returnv);
+	return returnv;
+}
+
+bool I_ChDir(const char* path)
+{
+	return SetCurrentDirectoryW(WideString(path).c_str());
+}
+
+
+void I_OpenShellFolder(const char* infolder)
+{
+	auto len = GetCurrentDirectoryW(0, nullptr);
+	TArray<wchar_t> curdir(len + 1, true);
+	if (!GetCurrentDirectoryW(len + 1, curdir.Data()))
+	{
+		Printf("Unable to retrieve current directory\n");
+	}
+	else if (SetCurrentDirectoryW(WideString(infolder).c_str()))
+	{
+		Printf("Opening folder: %s\n", infolder);
+		ShellExecuteW(NULL, L"open", L"explorer.exe", L".", NULL, SW_SHOWNORMAL);
+		SetCurrentDirectoryW(curdir.Data());
+	}
+	else
+	{
+		Printf("Unable to open directory '%s\n", infolder);
+	}
+}
+
