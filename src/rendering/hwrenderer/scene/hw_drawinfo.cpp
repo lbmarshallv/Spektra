@@ -595,10 +595,17 @@ void HWDrawInfo::DrawCorona(FRenderState& state, ACorona* corona, double dist)
 	float screenX = halfViewportWidth + clipPos.X * invW * halfViewportWidth;
 	float screenY = halfViewportHeight - clipPos.Y * invW * halfViewportHeight;
 
-	float alpha = corona->CoronaFade * float(corona->Alpha);
-
+	float alpha =float(corona->Alpha);
+	float alphaMin =float(corona->AlphaMin);
+	float alphaMax =float(corona->AlphaMax);
+	
+	if(alphaMin >= alphaMax){
+		alphaMin = 0.25f;
+		alphaMax = 1.0f;
+	}
+	
 	// distance-based fade - looks better IMO
-	float distNearFadeStart = float(corona->RenderRadius()) * 0.1f;
+	float distNearFadeStart = float(corona->radius);
 	float distFarFadeStart = float(corona->RenderRadius()) * 0.5f;
 	float distFade = 1.0f;
 
@@ -607,7 +614,7 @@ void HWDrawInfo::DrawCorona(FRenderState& state, ACorona* corona, double dist)
 	else if (float(dist) >= distFarFadeStart)
 		distFade -= (float(dist) - distFarFadeStart) / distFarFadeStart;
 
-	alpha *= distFade;
+	alpha =  clamp<float>(alpha * distFade,float(dist) >= distFarFadeStart ? 0.0f : alphaMin, alphaMax);
 
 	state.SetColorAlpha(0xffffff, alpha, 0);
 	if (isSoftwareLighting()) state.SetSoftLightLevel(255);

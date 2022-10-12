@@ -35,4 +35,6 @@ public:
 	void Tick();
 
 	float CoronaFade = 0.0f;
+	double AlphaMin;
+	double AlphaMax;
 };

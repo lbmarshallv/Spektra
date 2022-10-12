@@ -54,6 +54,7 @@
 #include "p_spec.h"
 #include "actorinlines.h"
 #include "p_enemy.h"
+#include "a_corona.h"
 #include "gi.h"
 
 DVector2 AM_GetPosition();
@@ -2084,3 +2085,7 @@ DEFINE_FIELD_X(FLineTraceData, FLineTraceData, LineSide);
 DEFINE_FIELD_X(FLineTraceData, FLineTraceData, LinePart);
 DEFINE_FIELD_X(FLineTraceData, FLineTraceData, SectorPlane);
 DEFINE_FIELD_X(FLineTraceData, FLineTraceData, HitType);
+
+
+DEFINE_FIELD(ACorona, AlphaMin);
+DEFINE_FIELD(ACorona, AlphaMax);
