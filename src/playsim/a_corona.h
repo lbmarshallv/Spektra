@@ -27,7 +27,6 @@ EXTERN_CVAR(Bool, gl_coronas)
 
 class AActor;
 
-#if 0
 class ACorona : public AActor
 {
 	DECLARE_CLASS(ACorona, AActor)
@@ -39,4 +38,3 @@ public:
 	double AlphaMin;
 	double AlphaMax;
 };
-#endif
