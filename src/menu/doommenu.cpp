@@ -584,6 +584,7 @@ void M_StartupEpisodeMenu(FNewGameStartup *gs)
 			
 			int posx = (int)ld->mXpos;
 			int posy = (int)ld->mYpos;
+			int vwidth = ld->mCustomSizeSet ? (int)ld->mVirtWidth : 320;
 			int topy = posy;
 
 			// Get lowest y coordinate of any static item in the menu
@@ -638,7 +639,7 @@ void M_StartupEpisodeMenu(FNewGameStartup *gs)
 					if (*c == '$') c = GStrings(c + 1);
 					int textwidth = ld->mFont->StringWidth(c);
 					int textright = posx + textwidth;
-					if (posx + textright > 320) posx = max(0, 320 - textright);
+					if (posx + textright > vwidth) posx = max(0, vwidth - textright);
 				}
 
 				for(unsigned i = 0; i < AllEpisodes.Size(); i++)
@@ -1096,6 +1097,7 @@ void M_StartupSkillMenu(FNewGameStartup *gs)
 			DListMenuDescriptor *ld = static_cast<DListMenuDescriptor*>(*desc);
 			int posx = (int)ld->mXpos;
 			int y = (int)ld->mYpos;
+			int vwidth = ld->mCustomSizeSet ? (int)ld->mVirtWidth : 320;
 
 			// Delete previous contents
 			for(unsigned i=0; i<ld->mItems.Size(); i++)
@@ -1182,7 +1184,7 @@ void M_StartupSkillMenu(FNewGameStartup *gs)
 				if (*c == '$') c = GStrings(c + 1);
 				int textwidth = ld->mFont->StringWidth(c);
 				int textright = posx + textwidth;
-				if (posx + textright > 320) posx = max(0, 320 - textright);
+				if (posx + textright > vwidth) posx = max(0, vwidth - textright);
 			}
 
 			unsigned firstitem = ld->mItems.Size();
