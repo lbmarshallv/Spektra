@@ -652,6 +652,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 
 			if ((rover->flags&(FF_EXISTS | FF_RENDERPLANES | FF_THISINSIDE)) == (FF_EXISTS | FF_RENDERPLANES))
 			{
+				if (rover->alpha == 0)continue;
 				if (rover->flags&FF_FOG && di->isFullbrightScene()) continue;
 				if (!rover->top.copied && rover->flags&(FF_INVERTPLANES | FF_BOTHPLANES))
 				{
@@ -692,6 +693,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 
 			if ((rover->flags&(FF_EXISTS | FF_RENDERPLANES | FF_THISINSIDE)) == (FF_EXISTS | FF_RENDERPLANES))
 			{
+				if (rover->alpha == 0)continue;
 				if (rover->flags&FF_FOG && di->isFullbrightScene()) continue;
 				if (!rover->bottom.copied && rover->flags&(FF_INVERTPLANES | FF_BOTHPLANES))
 				{
