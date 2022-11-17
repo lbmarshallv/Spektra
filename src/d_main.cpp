@@ -31,10 +31,6 @@
 #include <direct.h>
 #endif
 
-#ifdef HAVE_FPU_CONTROL
-#include <fpu_control.h>
-#endif
-
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
 #endif
@@ -235,6 +231,7 @@ CUSTOM_CVAR(Float, i_timescale, 1.0f, CVAR_NOINITCALL | CVAR_VIRTUAL)
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
+#ifndef NO_SWRENDERER
 CUSTOM_CVAR(Int, vid_rendermode, 4, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL)
 {
 	if (self < 0 || self > 4)
@@ -255,6 +252,7 @@ CUSTOM_CVAR(Int, vid_rendermode, 4, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOIN
 
 	// No further checks needed. All this changes now is which scene drawer the render backend calls.
 }
+#endif
 
 CUSTOM_CVAR (Int, fraglimit, 0, CVAR_SERVERINFO)
 {
@@ -1181,7 +1179,7 @@ void D_DoomLoop ()
 	Subtitle = nullptr;
 	Advisory.SetInvalid();
 
-	vid_cursor.Callback();
+	vid_cursor->Callback();
 
 	for (;;)
 	{
@@ -1972,21 +1970,21 @@ static void AddAutoloadFiles(const char *autoname, TArray<FString>& allwads)
 	LumpFilterIWAD.Format("%s.", autoname);	// The '.' is appened to simplify parsing the string 
 
 	// [SP] Dialog reaction - load lights.pk3 and brightmaps.pk3 based on user choices
-	if (!(gameinfo.flags & GI_SHAREWARE))
+	if (!(gameinfo.flags & GI_SHAREWARE) && !(Args->CheckParm("-noextras")))
 	{
-		if (GameStartupInfo.LoadLights == 1 || (GameStartupInfo.LoadLights != 0 && autoloadlights))
+		if ((GameStartupInfo.LoadLights == 1 || (GameStartupInfo.LoadLights != 0 && autoloadlights)) && !(Args->CheckParm("-nolights")))
 		{
 			const char *lightswad = BaseFileSearch ("lights.pk3", NULL, true, GameConfig);
 			if (lightswad)
 				D_AddFile (allwads, lightswad, true, -1, GameConfig);
 		}
-		if (GameStartupInfo.LoadBrightmaps == 1 || (GameStartupInfo.LoadBrightmaps != 0 && autoloadbrightmaps))
+		if ((GameStartupInfo.LoadBrightmaps == 1 || (GameStartupInfo.LoadBrightmaps != 0 && autoloadbrightmaps)) && !(Args->CheckParm("-nobrightmaps")))
 		{
 			const char *bmwad = BaseFileSearch ("brightmaps.pk3", NULL, true, GameConfig);
 			if (bmwad)
 				D_AddFile (allwads, bmwad, true, -1, GameConfig);
 		}
-		if (GameStartupInfo.LoadWidescreen == 1 || (GameStartupInfo.LoadWidescreen != 0 && autoloadwidescreen))
+		if ((GameStartupInfo.LoadWidescreen == 1 || (GameStartupInfo.LoadWidescreen != 0 && autoloadwidescreen)) && !(Args->CheckParm("-nowidescreen")))
 		{
 			const char *wswad = BaseFileSearch ("game_widescreen_gfx.pk3", NULL, true, GameConfig);
 			if (wswad)
@@ -3025,6 +3023,7 @@ static FILE* D_GetHashFile()
 
 static int D_InitGame(const FIWADInfo* iwad_info, TArray<FString>& allwads, TArray<FString>& pwads)
 {
+	SavegameFolder = iwad_info->Autoname;
 	gameinfo.gametype = iwad_info->gametype;
 	gameinfo.flags = iwad_info->flags;
 	gameinfo.nokeyboardcheats = iwad_info->nokeyboardcheats;
@@ -3432,10 +3431,12 @@ static int D_InitGame(const FIWADInfo* iwad_info, TArray<FString>& allwads, TArr
 		v = Args->CheckValue ("-loadgame");
 		if (v)
 		{
-			FString file(v);
-			FixPathSeperator (file);
-			DefaultExtension (file, "." SAVEGAME_EXT);
-			G_LoadGame (file);
+			FString file = G_BuildSaveName(v);
+			if (!FileExists(file))
+			{
+				I_FatalError("Cannot find savegame %s", file.GetChars());
+			}
+			G_LoadGame(file);
 		}
 
 		v = Args->CheckValue("-playdemo");
@@ -3511,7 +3512,6 @@ static int D_InitGame(const FIWADInfo* iwad_info, TArray<FString>& allwads, TArr
 
 static int D_DoomMain_Internal (void)
 {
-	const char *v;
 	const char *wad;
 	FIWadManager *iwad_man;
 
@@ -3612,19 +3612,6 @@ static int D_DoomMain_Internal (void)
 	// Now that we have the IWADINFO, initialize the autoload ini sections.
 	GameConfig->DoAutoloadSetup(iwad_man);
 
-	// Prevent the game from starting if the savegame passed to -loadgame is invalid
-	v = Args->CheckValue("-loadgame");
-	if (v)
-	{
-		FString file(v);
-		FixPathSeperator(file);
-		DefaultExtension(file, "." SAVEGAME_EXT);
-		if (!FileExists(file))
-		{
-			I_FatalError("Cannot find savegame %s", file.GetChars());
-		}
-	}
-
 	// reinit from here
 
 	do
@@ -3697,7 +3684,7 @@ int GameMain()
 		G_GetUserCVar,
 		[]() { return gamestate != GS_FULLCONSOLE && gamestate != GS_STARTUP; }
 	};
-
+	C_InitCVars(0);
 	C_InstallHandlers(&cb);
 	SetConsoleNotifyBuffer();
 
@@ -3728,6 +3715,7 @@ int GameMain()
 	I_ShutdownInput();
 	M_SaveDefaultsFinal();
 	DeleteStartupScreen();
+	C_UninitCVars(); // must come last so that nothing will access the CVARs anymore after deletion.
 	delete Args;
 	Args = nullptr;
 	return ret;

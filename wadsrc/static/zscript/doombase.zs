@@ -474,6 +474,7 @@ struct LevelLocals native
 	native vector3, int PickPlayerStart(int pnum, int flags = 0);
 	native int isFrozen() const;
 	native void setFrozen(bool on);
+	native string LookupString(uint index);
 
 	native clearscope Sector PointInSector(Vector2 pt) const;
 
@@ -511,6 +512,9 @@ struct LevelLocals native
 	native void ExitLevel(int position, bool keepFacing);
 	native void SecretExitLevel(int position);
 	native void ChangeLevel(string levelname, int position = 0, int flags = 0, int skill = -1);
+
+	native String GetClusterName();
+	native String GetEpisodeName();
 }
 
 // a few values of this need to be readable by the play code.

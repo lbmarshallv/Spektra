@@ -237,6 +237,12 @@ struct TVector2
 	{
 		return X*X + Y*Y;
 	}
+	
+	double Sum() const
+	{
+		return abs(X) + abs(Y);
+	}
+
 
 	// Return a unit vector facing the same direction as this one
 	TVector2 Unit() const
@@ -265,6 +271,19 @@ struct TVector2
 		return *this;
 	}
 
+	TVector2 Resized(double len) const
+	{
+		double vlen = Length();
+		if (vlen != 0.)
+		{
+			double scale = len / vlen;
+			return{ vec_t(X * scale), vec_t(Y * scale) };
+		}
+		else
+		{
+			return *this;
+		}
+	}
 
 	// Dot product
 	vec_t operator | (const TVector2 &other) const
@@ -304,13 +323,13 @@ struct TVector2
 	}
 
 	// Returns a vector rotated 90 degrees clockwise.
-	TVector2 Rotated90CW()
+	TVector2 Rotated90CW() const
 	{
 		return TVector2(Y, -X);
 	}
 
 	// Returns a vector rotated 90 degrees counterclockwise.
-	TVector2 Rotated90CCW()
+	TVector2 Rotated90CCW() const
 	{
 		return TVector2(-Y, X);
 	}
@@ -601,6 +620,12 @@ struct TVector3
 	{
 		return X*X + Y*Y + Z*Z;
 	}
+	
+	double Sum() const
+	{
+		return abs(X) + abs(Y) + abs(Z);
+	}
+
 
 	// Return a unit vector facing the same direction as this one
 	TVector3 Unit() const
@@ -632,7 +657,7 @@ struct TVector3
 		return *this;
 	}
 
-	TVector3 Resized(double len)
+	TVector3 Resized(double len) const
 	{
 		double vlen = Length();
 		if (vlen != 0.)
@@ -650,6 +675,11 @@ struct TVector3
 	vec_t operator | (const TVector3 &other) const
 	{
 		return X*other.X + Y*other.Y + Z*other.Z;
+	}
+
+	vec_t dot (const TVector3& other) const
+	{
+		return X * other.X + Y * other.Y + Z * other.Z;
 	}
 
 	// Cross product
@@ -816,6 +846,22 @@ struct TVector4
 		return TVector4(v.X * scalar, v.Y * scalar, v.Z * scalar, v.W * scalar);
 	}
 
+	// Multiply as Quaternion
+	TVector4& operator*= (const TVector4& v)
+	{
+		*this = *this * v;
+		return *this;
+	}
+
+	friend TVector4 operator* (const TVector4& v1, const TVector4& v2)
+	{
+		return TVector4(v2.W * v1.X + v2.X * v1.W + v2.Y * v1.Z - v1.Z * v1.Y,
+			v2.W * v1.Y + v2.Y * v1.W + v2.Z * v1.X - v2.X * v1.Z,
+			v2.W * v1.Z + v2.Z * v1.W + v2.X * v1.Y - v2.Y * v1.X,
+			v2.W * v1.W - v2.X * v1.X - v2.Y * v1.Y - v2.Z * v1.Z
+		);
+	}
+
 	// Scalar division
 	TVector4 &operator/= (vec_t scalar)
 	{
@@ -900,6 +946,12 @@ struct TVector4
 	{
 		return X*X + Y*Y + Z*Z + W*W;
 	}
+	
+	double Sum() const
+	{
+		return abs(X) + abs(Y) + abs(Z) + abs(W);
+	}
+	
 
 	// Return a unit vector facing the same direction as this one
 	TVector4 Unit() const
@@ -932,7 +984,7 @@ struct TVector4
 		return *this;
 	}
 
-	TVector4 Resized(double len)
+	TVector4 Resized(double len) const 
 	{
 		double vlen = Length();
 		if (vlen != 0.)
@@ -1245,12 +1297,7 @@ public:
 		return TAngle(f * (90. / 0x40000000));
 	}
 
-	static constexpr TAngle fromBuild(int bang)
-	{
-		return TAngle(bang * (90. / 512));
-	}
-
-	static constexpr TAngle fromBuildf(double bang)
+	static constexpr TAngle fromBuild(double bang)
 	{
 		return TAngle(bang * (90. / 512));
 	}
@@ -1305,6 +1352,11 @@ public:
 	constexpr TAngle operator* (vec_t other) const
 	{
 		return Degrees_ * other;
+	}
+
+	constexpr TAngle operator* (TAngle other) const
+	{
+		return Degrees_ * other.Degrees_;
 	}
 
 	constexpr TAngle operator/ (vec_t other) const
@@ -1606,7 +1658,7 @@ struct TRotator
 	TRotator &operator/= (const Angle &scalar)
 	{
 		Angle mul(1 / scalar.Degrees_);
-		Pitch *= scalar, Yaw *= scalar, Roll *= scalar;
+		Pitch *= mul, Yaw *= mul, Roll *= mul;
 		return *this;
 	}
 
@@ -1693,6 +1745,8 @@ constexpr DAngle nullAngle = DAngle::fromDeg(0.);
 constexpr DAngle minAngle = DAngle::fromDeg(1. / 65536.);
 constexpr FAngle nullFAngle = FAngle::fromDeg(0.);
 
+constexpr DAngle DAngle1 = DAngle::fromDeg(1);
+constexpr DAngle DAngle15 = DAngle::fromDeg(15);
 constexpr DAngle DAngle22_5 = DAngle::fromDeg(22.5);
 constexpr DAngle DAngle45 = DAngle::fromDeg(45);
 constexpr DAngle DAngle60 = DAngle::fromDeg(60);
