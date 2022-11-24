@@ -646,6 +646,7 @@ public:
 	double      avg_velocity;
 
 	double		gravity;
+	double		compassadjustment;
 	double		aircontrol;
 	double		airfriction;
 	int			airsupply;

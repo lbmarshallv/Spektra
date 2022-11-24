@@ -352,6 +352,7 @@ struct level_info_t
 	int			cdtrack;
 	unsigned int cdid;
 	double		gravity;
+	double		compassadjustment;
 	double		aircontrol;
 	int			WarpTrans;
 	int			airsupply;

@@ -417,6 +417,7 @@ struct LevelLocals native
 	native int total_monsters;
 	native int killed_monsters;
 	native play double gravity;
+	native play double compassadjustment;
 	native play double aircontrol;
 	native play double airfriction;
 	native play int airsupply;

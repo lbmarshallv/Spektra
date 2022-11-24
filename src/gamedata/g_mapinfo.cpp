@@ -266,6 +266,7 @@ void level_info_t::Reset()
 	cdtrack = 0;
 	cdid = 0;
 	gravity = 0.f;
+	compassadjustment = 0.f;
 	aircontrol = 0.f;
 	WarpTrans = 0;
 	airsupply = 20;
@@ -1174,6 +1175,13 @@ DEFINE_MAP_OPTION(gravity, true)
 	parse.ParseAssign();
 	parse.sc.MustGetFloat();
 	info->gravity = parse.sc.Float;
+}
+
+DEFINE_MAP_OPTION(compassadjustment, true)
+{
+	parse.ParseAssign();
+	parse.sc.MustGetFloat();
+	info->compassadjustment = parse.sc.Float;
 }
 
 DEFINE_MAP_OPTION(aircontrol, true)

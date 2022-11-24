@@ -1862,6 +1862,7 @@ void FLevelLocals::Init()
 	brightfog = info->brightfog < 0? gl_brightfog : !!info->brightfog;
 	lightadditivesurfaces = info->lightadditivesurfaces < 0 ? gl_lightadditivesurfaces : !!info->lightadditivesurfaces;
 	notexturefill = info->notexturefill < 0 ? gl_notexturefill : !!info->notexturefill;
+	compassadjustment = info->compassadjustment;
 }
 
 //==========================================================================
