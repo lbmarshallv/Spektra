@@ -209,13 +209,13 @@ extend class PlayerPawn
 			for (i = 0; i < AllActorClasses.Size(); ++i)
 			{
 				type = (class<Inventory>)(AllActorClasses[i]);
-				if (type!= null)
+				if (type!= null && !type.isAbstract())
 				{
 					let def = GetDefaultByType (type);
 					if (def.Icon.isValid() && (def.MaxAmount > 1 || def.bAutoActivate == false) && CheckArtifact(type))
 					{
 						// Do not give replaced items unless using "give everything"
-						if (giveall == ALL_YESYES || GetReplacement(type) == type)
+						if (giveall == ALL_YESYES || (!def.bCheatNotItem && GetReplacement(type) == type))
 						{
 							GiveInventory(type, amount <= 0 ? def.MaxAmount : amount, true);
 						}

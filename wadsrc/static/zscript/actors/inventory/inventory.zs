@@ -65,6 +65,7 @@ class Inventory : Actor
 	flagdef IsHealth: ItemFlags, 22;
 	flagdef AlwaysPickup: ItemFlags, 23;
 	flagdef Unclearable: ItemFlags, 24;
+	flagdef CheatNotItem: ItemFlags, 900;
 
 	flagdef ForceRespawnInSurvival: none, 0;
 	flagdef PickupFlash: none, 6;
