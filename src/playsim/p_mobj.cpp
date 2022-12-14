@@ -6244,8 +6244,11 @@ foundone:
 		&& Terrains[terrainnum].DamageOnLand
 		&& Terrains[terrainnum].DamageAmount
 		&& (thing->Level->time & Terrains[terrainnum].DamageTimeMask);
-	if (dealDamageOnLand)
+	if (dealDamageOnLand){
 		P_DamageMobj(thing, nullptr, nullptr, Terrains[terrainnum].DamageAmount, Terrains[terrainnum].DamageMOD);
+		S_Sound(thing, CHAN_ITEM, 0, Terrains[terrainnum].DamageSound,
+			1, ATTN_IDLE);
+	}
 
 	// don't splash when touching an underwater floor
 	if (thing->waterlevel >= 1 && pos.Z <= thing->floorz) return Terrains[terrainnum].IsLiquid;

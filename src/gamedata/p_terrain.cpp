@@ -81,6 +81,7 @@ enum ETerrainKeywords
 	TR_RUNNINGSTEPTIME,
 	TR_LEFTSTEPSOUNDS,
 	TR_RIGHTSTEPSOUNDS,
+	TR_DAMAGESOUND,
 	TR_LIQUID,
 	TR_FRICTION,
 	TR_ALLOWPROTECTION
@@ -183,6 +184,7 @@ static const char *TerrainKeywords[] =
 	"runningsteptime",
 	"leftstepsounds",
 	"rightstepsounds",
+	"damagesound",
 	"liquid",
 	"friction",
 	"allowprotection",
@@ -219,6 +221,7 @@ static FGenericParse TerrainParser[] =
 	{ GEN_Time,   {myoffsetof(FTerrainDef, RunStepTics)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, LeftStepSound)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, RightStepSound)} },
+	{ GEN_Sound,  {myoffsetof(FTerrainDef, DamageSound)} },
 	{ GEN_Bool,   {myoffsetof(FTerrainDef, IsLiquid)} },
 	{ GEN_Custom, {(size_t)ParseFriction} },
 	{ GEN_Bool,   {myoffsetof(FTerrainDef, AllowProtection)} },
@@ -272,6 +275,7 @@ static void MakeDefaultTerrain ()
 	def.Name = "Solid";
 	def.Splash = -1;
 	def.DamageTimeMask = 31;
+	def.DamageSound = 0;
 	Terrains.Push (def);
 }
 
@@ -742,6 +746,7 @@ DEFINE_FIELD(FTerrainDef, WalkStepTics)
 DEFINE_FIELD(FTerrainDef, RunStepTics)
 DEFINE_FIELD(FTerrainDef, LeftStepSound)
 DEFINE_FIELD(FTerrainDef, RightStepSound)
+DEFINE_FIELD(FTerrainDef, DamageSound)
 DEFINE_FIELD(FTerrainDef, IsLiquid)
 DEFINE_FIELD(FTerrainDef, AllowProtection)
 DEFINE_FIELD(FTerrainDef, DamageOnLand)

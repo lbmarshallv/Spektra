@@ -113,6 +113,7 @@ struct FTerrainDef
 	int RunStepTics;
 	FSoundID LeftStepSound;
 	FSoundID RightStepSound;
+	FSoundID DamageSound;
 	bool IsLiquid;
 	bool AllowProtection;
 	bool DamageOnLand;
