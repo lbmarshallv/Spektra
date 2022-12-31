@@ -275,7 +275,7 @@ static void MakeDefaultTerrain ()
 	def.Name = "Solid";
 	def.Splash = -1;
 	def.DamageTimeMask = 31;
-	def.DamageSound = 0;
+	def.DamageSound = FSoundID::fromInt(0);
 	Terrains.Push (def);
 }
 
