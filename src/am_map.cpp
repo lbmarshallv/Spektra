@@ -89,6 +89,7 @@ static const double M_ZOOMIN = 2; // how much zoom-in per second
 static const double M_ZOOMOUT = 0.2; // how much zoom-out per second
 static const double M_OLDZOOMIN = (1.02); // for am_zoom
 static const double M_OLDZOOMOUT = (1 / 1.02);
+static const double M_TAGWIDTH = 360;
 
 static FTextureID marknums[AM_NUMMARKPOINTS]; // numbers used for marking by the automap
 bool automapactive = false;
@@ -995,8 +996,8 @@ class DAutomap :public DAutomapBase
 	void calcMinMaxMtoF();
 
 	void DrawMarker(FGameTexture *tex, double x, double y, int yadjust,
-		INTBOOL flip, double xscale, double yscale, int translation, double alpha, uint32_t fillcolor, FRenderStyle renderstyle);
-
+		INTBOOL flip, double xscale, double yscale, int translation, double alpha, uint32_t fillcolor, FRenderStyle renderstyle);	
+	void DrawTag(FString *text, FFont *font, double x, double y);
 	void rotatePoint(double *x, double *y);
 	void rotate(double *x, double *y, DAngle an);
 	void doFollowPlayer();
@@ -3093,6 +3094,26 @@ void DAutomap::drawMarks ()
 }
 
 //=============================================================================
+// 
+//
+//
+//=============================================================================
+
+void DAutomap::DrawTag(FString* text, FFont* font, double x, double y)
+{
+	if (am_rotate == 1 || (am_rotate == 2 && viewactive))
+	{
+		rotatePoint(&x, &y);
+	}
+	auto lines = V_BreakLines(font, M_TAGWIDTH, text->GetChars());
+	for (const FBrokenLines& line : lines)
+	{
+		DrawText(twod, font, am_markcolor, CXMTOF(x - FTOM(line.Width/2.)), CYMTOF(y), line.Text,TAG_DONE);
+		y -= FTOM(font->GetHeight());
+	}
+}
+
+//=============================================================================
 //
 //
 //
@@ -3105,6 +3126,8 @@ void DAutomap::drawAuthorMarkers ()
 	// Otherwise, its sprite is drawn at the location of any actors whose TIDs match args[0].
 	auto it = Level->GetThinkerIterator<AActor>(NAME_MapMarker, STAT_MAPMARKER);
 	AActor *mark;
+	FFont* font;
+	bool fontloaded = false;
 
 	while ((mark = it.Next()) != nullptr)
 	{
@@ -3115,6 +3138,7 @@ void DAutomap::drawAuthorMarkers ()
 
 		FTextureID picnum;
 		FGameTexture *tex;
+		FString *tag = mark->Tag;
 		uint16_t flip = 0;
 
 		if (mark->picnum.isValid())
@@ -3133,7 +3157,9 @@ void DAutomap::drawAuthorMarkers ()
 			spritedef_t *sprdef = &sprites[mark->sprite];
 			if (mark->frame >= sprdef->numframes)
 			{
-				continue;
+				if(tag == nullptr || tag->IsEmpty()){
+					continue;
+				}
 			}
 			else
 			{
@@ -3159,8 +3185,22 @@ void DAutomap::drawAuthorMarkers ()
 		{
 			if (mark->args[1] == 0 || (mark->args[1] == 1 && (marked->subsector->flags & SSECMF_DRAWN)))
 			{
-				DrawMarker (tex, marked->X(), marked->Y(), 0, flip, xscale, yscale, mark->Translation,
-					mark->Alpha, mark->fillcolor, mark->RenderStyle);
+				double mx = marked->X();
+				double my = marked->Y();
+				if (tex != nullptr) {
+					DrawMarker(tex, mx, my, 0, flip, xscale, yscale, mark->Translation,
+						mark->Alpha, mark->fillcolor, mark->RenderStyle);
+					mx += FTOM(tex->GetDisplayWidth());
+					my -= FTOM(tex->GetDisplayHeight());
+				}
+				if (tag != nullptr && tag->IsNotEmpty()) {
+					if (!fontloaded)
+					{
+						font = stricmp(*am_markfont, DEFAULT_FONT_NAME) == 0 ? nullptr : V_GetFont(am_markfont);
+						fontloaded = true;
+					}
+					DrawTag(mark->Tag, font, marked->X(), my);
+				}
 			}
 			marked = mark->args[0] != 0 ? it.Next() : nullptr;
 		}
