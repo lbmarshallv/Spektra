@@ -154,7 +154,7 @@ class Actor : Thinker native
 	native Actor LastLookActor;
 	native int ReactionTime;
 	native int Threshold;
-	native readonly int DefThreshold;
+	native int DefThreshold;
 	native vector3 SpawnPoint;
 	native uint16 SpawnAngle;
 	native int StartHealth;

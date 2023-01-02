@@ -3129,6 +3129,8 @@ void DAutomap::drawAuthorMarkers ()
 	FFont* font;
 	bool fontloaded = false;
 
+	double threshold = scale_ftom;
+
 	while ((mark = it.Next()) != nullptr)
 	{
 		if (mark->flags2 & MF2_DORMANT)
@@ -3136,9 +3138,14 @@ void DAutomap::drawAuthorMarkers ()
 			continue;
 		}
 
+		if (mark->threshold > 0 && mark->threshold < threshold) {
+			continue;
+		}
+
 		FTextureID picnum;
 		FGameTexture *tex;
 		FString *tag = mark->Tag;
+		int32_t tagthresh = mark->DefThreshold;
 		uint16_t flip = 0;
 
 		if (mark->picnum.isValid())
@@ -3193,12 +3200,13 @@ void DAutomap::drawAuthorMarkers ()
 					mx += FTOM(tex->GetDisplayWidth());
 					my -= FTOM(tex->GetDisplayHeight());
 				}
-				if (tag != nullptr && tag->IsNotEmpty()) {
+				if (tag != nullptr && tag->IsNotEmpty() && (tagthresh <= 0 || tagthresh >= threshold)) {
 					if (!fontloaded)
 					{
 						font = stricmp(*am_markfont, DEFAULT_FONT_NAME) == 0 ? nullptr : V_GetFont(am_markfont);
 						fontloaded = true;
 					}
+					//FString l = FStringf("%s\nscale: %f max_scale: %f min_scale: %f", mark->Tag->GetChars(), scale_ftom,max_scale_mtof,min_scale_mtof);
 					DrawTag(mark->Tag, font, marked->X(), my);
 				}
 			}
