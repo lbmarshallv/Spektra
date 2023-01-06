@@ -1995,6 +1995,8 @@ void DAutomap::drawSubsectors()
 		// For lighting and texture determination
 		sector_t *sec = AM_FakeFlat(players[consoleplayer].camera, sub->render_sector, &tempsec);
 		floorlight = sec->GetFloorLight();
+		bool outside = sec->GetTexture(sector_t::ceiling) == skyflatnum;
+		floorlight = outside ? 255 : sec->GetFloorLight();
 		// Find texture origin.
 		originpt.x = -sec->GetXOffset(sector_t::floor);
 		originpt.y = sec->GetYOffset(sector_t::floor);
@@ -2008,7 +2010,7 @@ void DAutomap::drawSubsectors()
 		scalex = sec->GetXScale(sector_t::floor);
 		scaley = sec->GetYScale(sector_t::floor);
 
-		if (sec->e->XFloor.ffloors.Size())
+		if (!outside && sec->e->XFloor.ffloors.Size())
 		{
 			secplane_t *floorplane = &sec->floorplane;
 
@@ -2146,7 +2148,7 @@ void DAutomap::drawSubsectors()
 				fadelevel = 1. - clamp(floorlight, 0, 255) / 255.f;
 			}
 
-			twod->AddPoly(TexMan.GetGameTexture(maptex, true),
+			twod->AddPoly(TexMan.GetGameTexture(maptex, false),
 				&points[0], points.Size(),
 				originx, originy,
 				scale / scalex,
