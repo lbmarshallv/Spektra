@@ -230,6 +230,7 @@ class Actor : Thinker native
 	native double MaxDropoffHeight;
 	native double MaxStepHeight;
 	native double MaxSlopeSteepness;
+	native double MaxFloorClip;
 	native int16 PainChance;
 	native name PainType;
 	native name DeathType;
@@ -337,6 +338,7 @@ class Actor : Thinker native
 	property MaxStepHeight: MaxStepHeight;
 	property MaxDropoffHeight: MaxDropoffHeight;
 	property MaxSlopeSteepness: MaxSlopeSteepness;
+	property MaxFloorClip: MaxFloorClip;
 	property PoisonDamageType: PoisonDamageType;
 	property RadiusDamageFactor: RadiusDamageFactor;
 	property SelfDamageFactor: SelfDamageFactor;

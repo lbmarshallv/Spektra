@@ -1073,6 +1073,7 @@ public:
 	ActorFlags7		flags7;			// WHO WANTS TO BET ON 8!?
 	ActorFlags8		flags8;			// I see your 8, and raise you a bet for 9.
 	double			Floorclip;		// value to use for floor clipping
+	double			MaxFloorclip;	// maximum floor clipping permitted
 	double			radius, Height;		// for movement checking
 
 	FAngle			VisibleStartAngle;

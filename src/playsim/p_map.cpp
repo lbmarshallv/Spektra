@@ -2421,6 +2421,17 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				}
 			}
 		}
+		if (!(thing->flags & (MF_FLOAT | MF_MISSILE)) && thing->MaxFloorclip > 0 && tm.floorterrain && thing->floorsector != tm.floorsector) {
+			double footclip = Terrains[tm.floorterrain].FootClip;
+			if(footclip > thing->Floorclip && footclip > thing->MaxFloorclip)
+			{
+				thing->SetZ(oldz);
+				thing->flags6 &= ~MF6_INTRYMOVE;
+				return false;
+			}
+
+		}
+
 		if (thing->flags2 & MF2_CANTLEAVEFLOORPIC
 			&& (tm.floorpic != thing->floorpic
 			|| tm.floorz - thing->Z() != 0))
@@ -2844,6 +2855,15 @@ bool P_CheckMove(AActor *thing, const DVector2 &pos, FCheckPosition& tm, int fla
 			&& (tm.floorpic != thing->floorpic
 			|| tm.floorz - newz != 0))
 		{ // must stay within a sector of a certain floor type
+			return false;
+		}
+		if (!(thing->flags & (MF_FLOAT | MF_MISSILE)) && thing->MaxFloorclip > 0 &&
+			thing->Floorclip <= thing->MaxFloorclip && tm.floorterrain &&
+			Terrains[tm.floorterrain].FootClip > thing->Floorclip && Terrains[tm.floorterrain].FootClip > thing->MaxFloorclip)
+		{
+			//thing->Vel.X = thing->Vel.Y = 0;
+			//thing->SetZ(oldz);
+			thing->flags6 &= ~MF6_INTRYMOVE;
 			return false;
 		}
 	}
