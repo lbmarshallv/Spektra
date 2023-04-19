@@ -257,7 +257,7 @@ class Actor : Thinker native
 	native int RenderRequired;
 	native int FriendlySeeBlocks;
 	native int16 lightlevel;
-	native readonly int8 DynLightLevel; // maximum light level from dynamic lights
+	native readonly uint8 DynLightLevel; // maximum light level from dynamic lights
 	native readonly int SpawnTime;
 	private native int InventoryID;	// internal counter.
 	native uint freezetics;

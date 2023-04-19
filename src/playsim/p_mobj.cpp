@@ -3405,6 +3405,18 @@ DEFINE_ACTION_FUNCTION(AActor, SetShade)
 	return 0;
 }
 
+void AActor::SetDynLightLevel (float r, float g, float b)
+{
+	float m = g;
+	if(r > m){
+		m = r;
+	}
+	if (b > m){
+		m = g;
+	}
+	DynLightLevel = uint8_t(m*255.0f);
+}
+
 // [MC] Helper function for Set(View)Pitch. 
 DAngle AActor::ClampPitch(DAngle p)
 {	

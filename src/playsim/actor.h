@@ -857,6 +857,8 @@ public:
 	// Set the alphacolor field properly
 	void SetShade (uint32_t rgb);
 	void SetShade (int r, int g, int b);
+	
+	void SetDynLightLevel (float r, float g, float b);
 
 	// Plays a conversation animation
 	void ConversationAnimation (int animnum);
