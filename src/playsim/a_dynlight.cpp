@@ -253,6 +253,14 @@ void FDynamicLight::Tick()
 		return;
 	}
 
+	auto p = Level->GetConsolePlayer();
+	double dist = 0;
+	int fade = GetFade();
+	if (p != NULL && p->camera != NULL)
+	{
+		dist = target->Distance2D(p->camera);
+	}
+
 	if (owned)
 	{
 		if (!target->state)
@@ -265,6 +273,21 @@ void FDynamicLight::Tick()
 			m_active = false;
 			return;
 		}
+		int fade = GetFade();
+		if (fade > 0) {
+			auto p = Level->GetConsolePlayer();
+			if (p != NULL && p->camera != NULL)
+			{
+				double dist = target->Distance2D(p->camera);
+				if (dist > GetFade()) {
+					UnlinkLight();
+					return;
+				}
+				else {
+					LinkLight();
+				}
+			}
+		}	
 		visibletoplayer = target->IsVisibleToPlayer();	// cache this value for the renderer to speed up calculations.
 	}
 
@@ -353,7 +376,11 @@ void FDynamicLight::Tick()
 		m_currentRadius = float(GetIntensity());
 		break;
 	}
-	if (m_currentRadius <= 0) m_currentRadius = 1;
+	if (fade > 0 && dist > 0) {
+		float scale = clamp<float>(float(fade - dist)/ float(fade),0.f,1.f);
+		m_currentRadius *= scale;
+	}
+	if(m_currentRadius <= 0) m_currentRadius = 1;
 	UpdateLocation();
 }
 

@@ -30,6 +30,7 @@ enum
 	LIGHT_BLUE = 2,
 	LIGHT_INTENSITY = 3,
 	LIGHT_SECONDARY_INTENSITY = 4,
+	LIGHT_FADE = 5,
 };
 
 enum LightFlag
@@ -116,7 +117,7 @@ public:
 
 protected:
 	FName m_Name = NAME_None;
-	int m_Args[5] = { 0,0,0,0,0 };
+	int m_Args[6] = { 0,0,0,0,0,0 };
 	double m_Param = 0;
 	DVector3 m_Pos = { 0,0,0 };
 	int m_type;
@@ -206,7 +207,7 @@ struct FDynamicLight
 
 	bool ShouldLightActor(AActor *check)
 	{
-		return visibletoplayer && IsActive() && 
+		return visibletoplayer && IsActive() && GetRadius() > 0 && 
 				(!((*pLightFlags) & LF_DONTLIGHTSELF) || target != check) &&
 				(!((*pLightFlags) & LF_DONTLIGHTOTHERS) || target == check) && 
 				(!((*pLightFlags) & LF_DONTLIGHTACTORS));
@@ -225,6 +226,7 @@ struct FDynamicLight
 	int GetBlue() const { return pArgs[LIGHT_BLUE]; }
 	int GetIntensity() const { return pArgs[LIGHT_INTENSITY]; }
 	int GetSecondaryIntensity() const { return pArgs[LIGHT_SECONDARY_INTENSITY]; }
+	int GetFade() const { return pArgs[LIGHT_FADE]; }
 
 	bool IsSubtractive() const { return !!((*pLightFlags) & LF_SUBTRACTIVE); }
 	bool IsAdditive() const { return !!((*pLightFlags) & LF_ADDITIVE); }

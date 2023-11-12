@@ -80,6 +80,7 @@ void AddLightToList(FDynLightData &dld, int group, FDynamicLight * light, bool f
 
 	DVector3 pos = light->PosRelative(group);
 	float radius = light->GetRadius();
+	int fade = light->GetFade();
 
 	float cs;
 	if (light->IsAdditive()) 
@@ -151,7 +152,7 @@ void AddLightToList(FDynLightData &dld, int group, FDynamicLight * light, bool f
 	data[11] = lightType;
 	data[12] = spotInnerAngle;
 	data[13] = spotOuterAngle;
-	data[14] = 0.0f; // unused
+	data[14] = fade;
 	data[15] = 0.0f; // unused
 }
 

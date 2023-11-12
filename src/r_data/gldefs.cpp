@@ -191,6 +191,7 @@ static const char *LightTags[]=
    "noshadowmap",
    "dontlightothers",
    "dontlightmap",
+   "fade",
    nullptr
 };
 
@@ -217,6 +218,7 @@ enum {
    LIGHTTAG_NOSHADOWMAP,
    LIGHTTAG_DONTLIGHTOTHERS,
    LIGHTTAG_DONTLIGHTMAP,
+   LIGHTTAG_FADE,
 };
 
 //==========================================================================
@@ -496,6 +498,9 @@ class GLDefsParser
 					intVal = clamp<int>(ParseInt(sc), 1, 1024);
 					defaults->SetArg(LIGHT_INTENSITY, intVal);
 					break;
+				case LIGHTTAG_FADE:
+					defaults->SetArg(LIGHT_FADE, ParseInt(sc));
+					break;
 				case LIGHTTAG_SUBTRACTIVE:
 					defaults->SetSubtractive(ParseInt(sc) != 0);
 					break;
@@ -596,6 +601,9 @@ class GLDefsParser
 				case LIGHTTAG_SECSIZE:
 					intVal = clamp<int>(ParseInt(sc), 1, 1024);
 					defaults->SetArg(LIGHT_SECONDARY_INTENSITY, intVal);
+					break;
+				case LIGHTTAG_FADE:
+					defaults->SetArg(LIGHT_FADE, ParseInt(sc));
 					break;
 				case LIGHTTAG_INTERVAL:
 					floatVal = ParseFloat(sc);
@@ -702,6 +710,9 @@ class GLDefsParser
 					intVal = clamp<int>(ParseInt(sc), 1, 1024);
 					defaults->SetArg(LIGHT_SECONDARY_INTENSITY, intVal);
 					break;
+				case LIGHTTAG_FADE:
+					defaults->SetArg(LIGHT_FADE, ParseInt(sc));
+					break;
 				case LIGHTTAG_CHANCE:
 					floatVal = ParseFloat(sc);
 					defaults->SetParameter(floatVal*360.);
@@ -801,6 +812,9 @@ class GLDefsParser
 				case LIGHTTAG_SIZE:
 					intVal = clamp<int>(ParseInt(sc), 1, 1024);
 					defaults->SetArg(LIGHT_INTENSITY, intVal);
+					break;
+				case LIGHTTAG_FADE:
+					defaults->SetArg(LIGHT_FADE, ParseInt(sc));
 					break;
 				case LIGHTTAG_SECSIZE:
 					intVal = clamp<int>(ParseInt(sc), 1, 1024);
@@ -910,6 +924,9 @@ class GLDefsParser
 				case LIGHTTAG_SCALE:
 					floatVal = ParseFloat(sc);
 					defaults->SetArg(LIGHT_INTENSITY, clamp((int)(floatVal * 255), 1, 1024));
+					break;
+				case LIGHTTAG_FADE:
+					defaults->SetArg(LIGHT_FADE, ParseInt(sc));
 					break;
 				case LIGHTTAG_SUBTRACTIVE:
 					defaults->SetSubtractive(ParseInt(sc) != 0);
