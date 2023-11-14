@@ -330,7 +330,6 @@ FImageSource *PCXImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *TGAImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *StbImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *QOIImage_TryCreate(FileReader &, int lumpnum);
-FImageSource *WebPImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *AnmImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *RawPageImage_TryCreate(FileReader &, int lumpnum);
 FImageSource *FlatImage_TryCreate(FileReader &, int lumpnum);
@@ -351,7 +350,6 @@ FImageSource * FImageSource::GetImage(int lumpnum, bool isflat)
 		{ PCXImage_TryCreate,			false },
 		{ StbImage_TryCreate,			false },
 		{ QOIImage_TryCreate, 			false },
-		{ WebPImage_TryCreate,			false },
 		{ TGAImage_TryCreate,			false },
 		{ AnmImage_TryCreate,			false },
 		{ StartupPageImage_TryCreate,	false },
