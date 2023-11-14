@@ -131,7 +131,7 @@ public:
 	void SetMusicVolume (float volume)
 	{
 	}
-	SoundHandle LoadSound(uint8_t *sfxdata, int length)
+	SoundHandle LoadSound(uint8_t *sfxdata, int length, int def_loop_start, int def_loop_end)
 	{
 		SoundHandle retval = { NULL };
 		return retval;
@@ -248,7 +248,7 @@ public:
 
 void I_InitSound ()
 {
-	FModule_SetProgDir(progdir);
+	FModule_SetProgDir(progdir.GetChars());
 	/* Get command line options: */
 	nosound = !!Args->CheckParm ("-nosound");
 	nosfx = !!Args->CheckParm ("-nosfx");

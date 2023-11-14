@@ -109,7 +109,7 @@ static FString CalcProgramBinaryChecksum(const FString &vertex, const FString &f
 static FString CreateProgramCacheName(bool create)
 {
 	FString path = M_GetCachePath(create);
-	if (create) CreatePath(path);
+	if (create) CreatePath(path.GetChars());
 	path << "/shadercache.zdsc";
 	return path;
 }
@@ -125,7 +125,7 @@ static void LoadShaders()
 	{
 		FString path = CreateProgramCacheName(false);
 		FileReader fr;
-		if (!fr.OpenFile(path))
+		if (!fr.OpenFile(path.GetChars()))
 			I_Error("Could not open shader file");
 
 		char magic[4];
@@ -166,7 +166,7 @@ static void LoadShaders()
 static void SaveShaders()
 {
 	FString path = CreateProgramCacheName(true);
-	std::unique_ptr<FileWriter> fw(FileWriter::Open(path));
+	std::unique_ptr<FileWriter> fw(FileWriter::Open(path.GetChars()));
 	if (fw)
 	{
 		uint32_t count = (uint32_t)ShaderCache.size();
@@ -375,11 +375,9 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 
 	int vp_lump = fileSystem.CheckNumForFullName(vert_prog_lump, 0);
 	if (vp_lump == -1) I_Error("Unable to load '%s'", vert_prog_lump);
-	FileData vp_data = fileSystem.ReadFile(vp_lump);
 
 	int fp_lump = fileSystem.CheckNumForFullName(frag_prog_lump, 0);
 	if (fp_lump == -1) I_Error("Unable to load '%s'", frag_prog_lump);
-	FileData fp_data = fileSystem.ReadFile(fp_lump);
 
 
 
@@ -391,25 +389,17 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	assert(screen->mLights != NULL);
 	assert(screen->mBones != NULL);
 
-	bool lightbuffertype = screen->mLights->GetBufferType();
-	unsigned int lightbuffersize = screen->mLights->GetBlockSize();
-	if (!lightbuffertype)
-	{
-		vp_comb.Format("#version 330 core\n#define NUM_UBO_LIGHTS %d\n#define NUM_UBO_BONES %d\n", lightbuffersize, screen->mBones->GetBlockSize());
-	}
-	else
-	{
-		// This differentiation is for Intel which do not seem to expose the full extension, even if marked as required.
-		if (gl.glslversion < 4.3f)
-			vp_comb = "#version 400 core\n#extension GL_ARB_shader_storage_buffer_object : require\n#define SHADER_STORAGE_LIGHTS\n#define SHADER_STORAGE_BONES\n";
-		else
-			vp_comb = "#version 430 core\n#define SHADER_STORAGE_LIGHTS\n#define SHADER_STORAGE_BONES\n";
-	}
 
 	if ((gl.flags & RFL_SHADER_STORAGE_BUFFER) && screen->allowSSBO())
-	{
-		vp_comb << "#define SUPPORTS_SHADOWMAPS\n";
-	}
+		vp_comb << "#version 430 core\n#define SUPPORTS_SHADOWMAPS\n";
+	else 
+		vp_comb << "#version 330 core\n";
+
+	bool lightbuffertype = screen->mLights->GetBufferType();
+	if (!lightbuffertype)
+		vp_comb.AppendFormat("#define NUM_UBO_LIGHTS %d\n#define NUM_UBO_BONES %d\n", screen->mLights->GetBlockSize(), screen->mBones->GetBlockSize());
+	else
+		vp_comb << "#define SHADER_STORAGE_LIGHTS\n#define SHADER_STORAGE_BONES\n";
 
 	FString fp_comb = vp_comb;
 	vp_comb << defines << i_data.GetChars();
@@ -418,8 +408,8 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	vp_comb << "#line 1\n";
 	fp_comb << "#line 1\n";
 
-	vp_comb << RemoveLayoutLocationDecl(vp_data.GetString(), "out").GetChars() << "\n";
-	fp_comb << RemoveLayoutLocationDecl(fp_data.GetString(), "in").GetChars() << "\n";
+	vp_comb << RemoveLayoutLocationDecl(GetStringFromLump(vp_lump), "out").GetChars() << "\n";
+	fp_comb << RemoveLayoutLocationDecl(GetStringFromLump(fp_lump), "in").GetChars() << "\n";
 	FString placeholder = "\n";
 
 	if (proc_prog_lump != NULL)
@@ -431,27 +421,25 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 			int pp_lump = fileSystem.CheckNumForFullName(proc_prog_lump, 0);	// if it's a core shader, ignore overrides by user mods.
 			if (pp_lump == -1) pp_lump = fileSystem.CheckNumForFullName(proc_prog_lump);
 			if (pp_lump == -1) I_Error("Unable to load '%s'", proc_prog_lump);
-			FileData pp_data = fileSystem.ReadFile(pp_lump);
+			FString pp_data = GetStringFromLump(pp_lump);
 
-			if (pp_data.GetString().IndexOf("ProcessMaterial") < 0 && pp_data.GetString().IndexOf("SetupMaterial") < 0)
+			if (pp_data.IndexOf("ProcessMaterial") < 0 && pp_data.IndexOf("SetupMaterial") < 0)
 			{
 				// this looks like an old custom hardware shader.
 
-				if (pp_data.GetString().IndexOf("GetTexCoord") >= 0)
+				if (pp_data.IndexOf("GetTexCoord") >= 0)
 				{
 					int pl_lump = fileSystem.CheckNumForFullName("shaders/glsl/func_defaultmat2.fp", 0);
 					if (pl_lump == -1) I_Error("Unable to load '%s'", "shaders/glsl/func_defaultmat2.fp");
-					FileData pl_data = fileSystem.ReadFile(pl_lump);
-					fp_comb << "\n" << pl_data.GetString().GetChars();
+					fp_comb << "\n" << GetStringFromLump(pl_lump);
 				}
 				else
 				{
 					int pl_lump = fileSystem.CheckNumForFullName("shaders/glsl/func_defaultmat.fp", 0);
 					if (pl_lump == -1) I_Error("Unable to load '%s'", "shaders/glsl/func_defaultmat.fp");
-					FileData pl_data = fileSystem.ReadFile(pl_lump);
-					fp_comb << "\n" << pl_data.GetString().GetChars();
+					fp_comb << "\n" << GetStringFromLump(pl_lump);
 
-					if (pp_data.GetString().IndexOf("ProcessTexel") < 0)
+					if (pp_data.IndexOf("ProcessTexel") < 0)
 					{
 						// this looks like an even older custom hardware shader.
 						// We need to replace the ProcessTexel call to make it work.
@@ -460,7 +448,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 					}
 				}
 
-				if (pp_data.GetString().IndexOf("ProcessLight") >= 0)
+				if (pp_data.IndexOf("ProcessLight") >= 0)
 				{
 					// The ProcessLight signatured changed. Forward to the old one.
 					fp_comb << "\nvec4 ProcessLight(vec4 color);\n";
@@ -468,19 +456,18 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 				}
 			}
 
-			fp_comb << RemoveLegacyUserUniforms(pp_data.GetString()).GetChars();
+			fp_comb << RemoveLegacyUserUniforms(pp_data).GetChars();
 			fp_comb.Substitute("gl_TexCoord[0]", "vTexCoord");	// fix old custom shaders.
 
-			if (pp_data.GetString().IndexOf("ProcessLight") < 0)
+			if (pp_data.IndexOf("ProcessLight") < 0)
 			{
 				int pl_lump = fileSystem.CheckNumForFullName("shaders/glsl/func_defaultlight.fp", 0);
 				if (pl_lump == -1) I_Error("Unable to load '%s'", "shaders/glsl/func_defaultlight.fp");
-				FileData pl_data = fileSystem.ReadFile(pl_lump);
-				fp_comb << "\n" << pl_data.GetString().GetChars();
+				fp_comb << "\n" << GetStringFromLump(pl_lump);
 			}
 
 			// ProcessMaterial must be considered broken because it requires the user to fill in data they possibly cannot know all about.
-			if (pp_data.GetString().IndexOf("ProcessMaterial") >= 0 && pp_data.GetString().IndexOf("SetupMaterial") < 0)
+			if (pp_data.IndexOf("ProcessMaterial") >= 0 && pp_data.IndexOf("SetupMaterial") < 0)
 			{
 				// This reactivates the old logic and disables all features that cannot be supported with that method.
 				placeholder << "#define LEGACY_USER_SHADER\n";
@@ -498,8 +485,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	{
 		int pp_lump = fileSystem.CheckNumForFullName(light_fragprog, 0);
 		if (pp_lump == -1) I_Error("Unable to load '%s'", light_fragprog);
-		FileData pp_data = fileSystem.ReadFile(pp_lump);
-		fp_comb << pp_data.GetString().GetChars() << "\n";
+		fp_comb << GetStringFromLump(pp_lump) << "\n";
 	}
 
 	if (gl.flags & RFL_NO_CLIP_PLANES)
@@ -851,9 +837,9 @@ bool FShaderCollection::CompileNextShader()
 	}
 	else if (mCompileState == 2)
 	{
-		FString name = ExtractFileBase(usershaders[i].shader);
+		FString name = ExtractFileBase(usershaders[i].shader.GetChars());
 		FString defines = defaultshaders[usershaders[i].shaderType].Defines + usershaders[i].defines;
-		FShader *shc = Compile(name, usershaders[i].shader, defaultshaders[usershaders[i].shaderType].lightfunc, defines, true, mPassType);
+		FShader *shc = Compile(name.GetChars(), usershaders[i].shader.GetChars(), defaultshaders[usershaders[i].shaderType].lightfunc, defines.GetChars(), true, mPassType);
 		mMaterialShaders.Push(shc);
 		mCompileIndex++;
 		if (mCompileIndex >= (int)usershaders.Size())

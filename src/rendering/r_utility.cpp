@@ -528,7 +528,7 @@ void R_InterpolateView (FRenderViewpoint &viewpoint, player_t *player, double Fr
 						nviewz -= totalzdiff - zdiff;
 						oviewangle += adiff;
 						nviewangle -= totaladiff - adiff;
-						DVector2 viewpos = start.pos + (fragfrac * (end.pos - start.pos));
+						DVector2 viewpos = start.pos.XY() + (fragfrac * (end.pos - start.pos).XY());
 						viewpoint.Pos = { viewpos, oviewz + Frac * (nviewz - oviewz) };
 						break;
 					}
@@ -843,7 +843,7 @@ void R_SetupFrame (FRenderViewpoint &viewpoint, FViewWindow &viewwindow, AActor 
 	}
 
 	// [MR] Get the input fraction, even if we don't need it this frame. Must run every frame.
-	const auto scaleAdjust = I_GetInputFrac(false);
+	const auto scaleAdjust = I_GetInputFrac();
 
 	// [MR] Process player angle changes if permitted to do so.
 	if (player && (player->cheats & CF_SCALEDNOLERP) && P_NoInterpolation(player, viewpoint.camera))

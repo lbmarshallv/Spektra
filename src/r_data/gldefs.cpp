@@ -76,7 +76,7 @@ static void do_uniform_set(float value, ExtraUniformCVARData* data)
 		for (unsigned int i = 0; i < PostProcessShaders.Size(); i++)
 		{
 			PostProcessShader& shader = PostProcessShaders[i];
-			if (strcmp(shader.Name, data->Shader) == 0)
+			if (strcmp(shader.Name.GetChars(), data->Shader.GetChars()) == 0)
 			{
 				data->vec4 = shader.Uniforms[data->Uniform].Values;
 			}
@@ -154,7 +154,7 @@ static void ParseVavoomSkybox()
 		sb->SetSize();
 		if (!error)
 		{
-			TexMan.AddGameTexture(MakeGameTexture(sb, s, ETextureType::Override));
+			TexMan.AddGameTexture(MakeGameTexture(sb, s.GetChars(), ETextureType::Override));
 		}
 	}
 }
@@ -1014,7 +1014,7 @@ class GLDefsParser
 					break;
 				case LIGHTTAG_LIGHT:
 					ParseString(sc);
-					AddLightAssociation(name, frameName, sc.String);
+					AddLightAssociation(name.GetChars(), frameName.GetChars(), sc.String);
 					break;
 				default:
 					sc.ScriptError("Unknown tag: %s\n", sc.String);
@@ -1089,7 +1089,7 @@ class GLDefsParser
 		sc.MustGetString();
 
 		FString s = sc.String;
-		FSkyBox * sb = new FSkyBox(s);
+		FSkyBox * sb = new FSkyBox(s.GetChars());
 		if (sc.CheckString("fliptop"))
 		{
 			sb->fliptop = true;
@@ -1109,7 +1109,7 @@ class GLDefsParser
 			sc.ScriptError("%s: Skybox definition requires either 3 or 6 faces", s.GetChars());
 		}
 		sb->SetSize();
-		TexMan.AddGameTexture(MakeGameTexture(sb, s, ETextureType::Override));
+		TexMan.AddGameTexture(MakeGameTexture(sb, s.GetChars(), ETextureType::Override));
 	}
 
 	//===========================================================================
@@ -1581,7 +1581,7 @@ class GLDefsParser
 					if (is_cvar)
 					{
 						addedcvars = true;
-						if (!shaderdesc.Name.GetChars())
+						if (shaderdesc.Name.IsEmpty())
 							sc.ScriptError("Shader must have a name to use cvar uniforms");
 
 						ECVarType cvartype = CVAR_Dummy;
@@ -1605,7 +1605,7 @@ class GLDefsParser
 						}
 						sc.MustGetString();
 						cvarname = sc.String;
-						cvar = FindCVar(cvarname, NULL);
+						cvar = FindCVar(cvarname.GetChars(), NULL);
 
 						UCVarValue oldval;
 						UCVarValue val;
@@ -1623,7 +1623,7 @@ class GLDefsParser
 						{
 							if (!cvar)
 							{
-								cvar = C_CreateCVar(cvarname, cvartype, cvarflags);
+								cvar = C_CreateCVar(cvarname.GetChars(), cvartype, cvarflags);
 							}
 							else if (cvar && (((cvar->GetFlags()) & CVAR_MOD) == CVAR_MOD))
 							{
@@ -1643,7 +1643,7 @@ class GLDefsParser
 							{
 								oldval.Float = cvar->GetGenericRep(CVAR_Float).Float;
 								delete cvar;
-								cvar = C_CreateCVar(cvarname, cvartype, cvarflags);
+								cvar = C_CreateCVar(cvarname.GetChars(), cvartype, cvarflags);
 								oldextra = (ExtraUniformCVARData*)cvar->GetExtraDataPointer();
 							}
 
@@ -1921,7 +1921,7 @@ public:
 			if (!sc.GetToken ())
 			{
 				if (addedcvars)
-					GameConfig->DoModSetup (gameinfo.ConfigName);
+					GameConfig->DoModSetup (gameinfo.ConfigName.GetChars());
 				return;
 			}
 			type = sc.MatchString(CoreKeywords);

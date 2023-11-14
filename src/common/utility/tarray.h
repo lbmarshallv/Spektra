@@ -54,6 +54,7 @@
 #include <new>
 #include <utility>
 #include <iterator>
+#include <algorithm>
 
 #if !defined(_WIN32)
 #include <inttypes.h>		// for intptr_t
@@ -222,9 +223,9 @@ public:
 	explicit TArray (size_t max, bool reserve = false)
 	{
 		Most = (unsigned)max;
-		Count = (unsigned)(reserve? max : 0);
-		Array = (T *)M_Malloc (sizeof(T)*max);
-		if (reserve && Count > 0)
+		Count = (unsigned)(reserve ? max : 0);
+		Array = max > 0 ? (T *)M_Malloc (sizeof(T)*max) : nullptr;
+		if (Count > 0)
 		{
 			ConstructEmpty(0, Count - 1);
 		}
@@ -327,9 +328,10 @@ public:
 	}
 
 	// returns address of first element
-	T *Data() const
+	T *Data(size_t index = 0) const
 	{
-		return &Array[0];
+		assert(index <= Count);
+		return &Array[index];
 	}
 
 	unsigned IndexOf(const T& elem) const
@@ -397,9 +399,16 @@ public:
 		Grow(item.Size());
 		Count += item.Size();
 
-		for (unsigned i = 0; i < item.Size(); i++)
+		if constexpr (std::is_trivially_copyable<T>::value)
 		{
-			new(&Array[start + i]) T(item[i]);
+			memcpy(Array + start,item.Array,item.Size() * sizeof(T));
+		}
+		else
+		{
+			for (unsigned i = 0; i < item.Size(); i++)
+			{
+				new(&Array[start + i]) T(item[i]);
+			}
 		}
 		return start;
 	}
@@ -411,12 +420,46 @@ public:
 		Grow(item.Size());
 		Count += item.Size();
 
-		for (unsigned i = 0; i < item.Size(); i++)
+		if constexpr (std::is_trivially_copyable<T>::value)
 		{
-			new(&Array[start + i]) T(std::move(item[i]));
+			memcpy(Array + start,item.Array,item.Size() * sizeof(T));
+		}
+		else
+		{
+			for (unsigned i = 0; i < item.Size(); i++)
+			{
+				new(&Array[start + i]) T(std::move(item[i]));
+			}
 		}
 		item.Clear();
 		return start;
+	}
+
+	unsigned AppendFill(const T& val, unsigned append_count)
+	{
+		unsigned start = Count;
+
+		Grow(append_count);
+		Count += append_count;
+		if constexpr (std::is_trivially_copyable<T>::value)
+		{
+			std::fill(Array + start, Array + Count, val);
+		}
+		else
+		{
+			for (unsigned i = 0; i < append_count; i++)
+			{
+				new(&Array[start + i]) T(val);
+			}
+		}
+		return start;
+	}
+
+	unsigned AddUnique(const T& obj)
+	{
+		auto f = Find(obj);
+		if (f == Size()) Push(obj);
+		return f;
 	}
 
 	bool Pop ()
@@ -453,6 +496,8 @@ public:
 
 	void Delete (unsigned int index, int deletecount)
 	{
+        if(index >= Count) return;
+        
 		if (index + deletecount > Count)
 		{
 			deletecount = Count - index;
@@ -577,6 +622,10 @@ public:
 	unsigned int Size () const
 	{
 		return Count;
+	}
+	int SSize() const
+	{
+		return (int)Count;
 	}
 	unsigned int Max () const
 	{

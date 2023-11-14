@@ -924,9 +924,15 @@ void M_Init (void)
 	}
 	catch (CVMAbortException &err)
 	{
+		menuDelegate = nullptr;
 		err.MaybePrintMessage();
 		Printf(PRINT_NONOTIFY | PRINT_BOLD, "%s", err.stacktrace.GetChars());
 		I_FatalError("Failed to initialize menus");
+	}
+	catch (...)
+	{
+		menuDelegate = nullptr;
+		throw;
 	}
 	M_CreateMenus();
 }
@@ -1203,7 +1209,7 @@ bool DMenuItemBase::GetString(int i, char *s, int len)
 		FString retstr;
 		VMReturn ret[2]; ret[0].IntAt(&retval); ret[1].StringAt(&retstr);
 		VMCall(func, params, countof(params), ret, 2);
-		strncpy(s, retstr, len);
+		strncpy(s, retstr.GetChars(), len);
 		return !!retval;
 	}
 	return false;

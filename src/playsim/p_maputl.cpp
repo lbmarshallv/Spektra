@@ -889,7 +889,7 @@ void FMultiBlockLinesIterator::Reset()
 //===========================================================================
 
 FBlockThingsIterator::FBlockThingsIterator(FLevelLocals *l)
-: DynHash(0)
+: DynHash()
 {
 	Level = l;
 	minx = maxx = 0;
@@ -899,7 +899,7 @@ FBlockThingsIterator::FBlockThingsIterator(FLevelLocals *l)
 }
 
 FBlockThingsIterator::FBlockThingsIterator(FLevelLocals *l, int _minx, int _miny, int _maxx, int _maxy)
-: DynHash(0)
+: DynHash()
 {
 	Level = l;
 	minx = _minx;
@@ -1686,7 +1686,7 @@ FPathTraverse::~FPathTraverse()
 //
 int P_CheckFov(AActor* t1, AActor* t2, double fov)
 {
-	return absangle(t1->AngleTo(t2), t1->Angles.Yaw) <= DAngle::fromDeg(fov);
+	return absangle(t1->AngleTo(PARAM_NULLCHECK(t2,t2)), t1->Angles.Yaw) <= DAngle::fromDeg(fov);
 }
 
 DEFINE_ACTION_FUNCTION_NATIVE(AActor, CheckFov, P_CheckFov)

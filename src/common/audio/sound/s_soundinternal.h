@@ -90,6 +90,7 @@ constexpr FSoundID INVALID_SOUND = FSoundID::fromInt(-1);
 	 float		DefPitchMax = 0.f;					// Randomized range with stronger control over pitch itself.
 
 	 int16_t		NearLimit = 4;						// 0 means unlimited.
+	 int16_t		UserVal = 0;					// repurpose this gap for something useful
 	 uint8_t		PitchMask = 0;
 	 bool		bRandomHeader = false;
 	 bool		bLoadRAW = false;
@@ -97,17 +98,18 @@ constexpr FSoundID INVALID_SOUND = FSoundID::fromInt(-1);
 	 bool		bUsed = false;
 	 bool		bSingular = false;
 	 bool		bTentative = true;
-
-	 TArray<int> UserData;
+	 bool		bExternal = false;
 
 	 int			RawRate = 0;				// Sample rate to use when bLoadRAW is true
 	 int			LoopStart = -1;				// -1 means no specific loop defined
+	 int			LoopEnd = -1;				// -1 means no specific loop defined
+	 float		Attenuation = 1.f;			// Multiplies the attenuation passed to S_Sound.
 
 	 FSoundID link = NO_LINK;
 	 constexpr static FSoundID NO_LINK = FSoundID::fromInt(-1);
 
+	 TArray<int> UserData;
 	 FRolloffInfo	Rolloff{};
-	 float		Attenuation = 1.f;			// Multiplies the attenuation passed to S_Sound.
  };
 
 
@@ -214,7 +216,7 @@ private:
 
 	// Checks if a copy of this sound is already playing.
 	bool CheckSingular(FSoundID sound_id);
-	virtual TArray<uint8_t> ReadSound(int lumpnum) = 0;
+	virtual std::vector<uint8_t> ReadSound(int lumpnum) = 0;
 
 protected:
 	virtual bool CheckSoundLimit(sfxinfo_t* sfx, const FVector3& pos, int near_limit, float limit_range, int sourcetype, const void* actor, int channel, float attenuation);
@@ -422,6 +424,11 @@ inline FSoundID S_FindSoundByResID(int ndx)
 inline FSoundID S_FindSound(const char* name)
 {
 	return soundEngine->FindSound(name);
+}
+
+inline FSoundID S_FindSound(const FString& name)
+{
+	return soundEngine->FindSound(name.GetChars());
 }
 
 int SoundEnabled();

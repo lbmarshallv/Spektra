@@ -51,7 +51,6 @@
 
 #include "vm.h"
 
-#include "doomstat.h"
 
 
 struct FLatchedValue
@@ -210,12 +209,12 @@ FBaseCVar::~FBaseCVar ()
 	{
 		FBaseCVar *var, *prev;
 
-		var = FindCVar (VarName, &prev);
+		var = FindCVar (VarName.GetChars(), &prev);
 
 		if (var == this)
 		{
 			cvarMap.Remove(var->VarName);
-			C_RemoveTabCommand(VarName);
+			C_RemoveTabCommand(VarName.GetChars());
 		}
 	}
 }
@@ -398,7 +397,7 @@ const char *FBaseCVar::ToString (UCVarValue value, ECVarType type)
 
 	case CVAR_Float:
 		IGNORE_FORMAT_PRE
-		mysnprintf (cstrbuf, countof(cstrbuf), "%H", value.Float);
+		mysnprintf (cstrbuf, countof(cstrbuf), "%g", value.Float);
 		IGNORE_FORMAT_POST
 		break;
 
@@ -490,7 +489,7 @@ UCVarValue FBaseCVar::FromFloat (float value, ECVarType type)
 
 	case CVAR_String:
 		IGNORE_FORMAT_PRE
-		mysnprintf (cstrbuf, countof(cstrbuf), "%H", value);
+		mysnprintf (cstrbuf, countof(cstrbuf), "%g", value);
 		IGNORE_FORMAT_POST
 		ret.String = cstrbuf;
 		break;
@@ -865,27 +864,27 @@ ECVarType FStringCVar::GetRealType () const
 
 UCVarValue FStringCVar::GetGenericRep (ECVarType type) const
 {
-	return FromString (mValue, type);
+	return FromString (mValue.GetChars(), type);
 }
 
 UCVarValue FStringCVar::GetFavoriteRep (ECVarType *type) const
 {
 	UCVarValue ret;
 	*type = CVAR_String;
-	ret.String = mValue;
+	ret.String = mValue.GetChars();
 	return ret;
 }
 
 UCVarValue FStringCVar::GetGenericRepDefault (ECVarType type) const
 {
-	return FromString (mDefaultValue, type);
+	return FromString (mDefaultValue.GetChars(), type);
 }
 
 UCVarValue FStringCVar::GetFavoriteRepDefault (ECVarType *type) const
 {
 	UCVarValue ret;
 	*type = CVAR_String;
-	ret.String = mDefaultValue;
+	ret.String = mDefaultValue.GetChars();
 	return ret;
 }
 
@@ -970,7 +969,7 @@ int FColorCVar::ToInt2 (UCVarValue value, ECVarType type)
 
 		if (string.IsNotEmpty())
 		{
-			ret = V_GetColorFromString (string);
+			ret = V_GetColorFromString (string.GetChars());
 		}
 		else
 		{
@@ -1395,7 +1394,7 @@ void C_RestoreCVars (void)
 {
 	for (unsigned int i = 0; i < CVarBackups.Size(); ++i)
 	{
-		cvar_set(CVarBackups[i].Name, CVarBackups[i].String);
+		cvar_set(CVarBackups[i].Name.GetChars(), CVarBackups[i].String.GetChars());
 	}
 	C_ForgetCVars();
 }

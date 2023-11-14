@@ -90,6 +90,7 @@
 #include "doommenu.h"
 #include "screenjob.h"
 #include "i_interface.h"
+#include "fs_findfile.h"
 
 
 static FRandom pr_dmspawn ("DMSpawn");
@@ -111,7 +112,6 @@ void	G_DoAutoSave ();
 void	G_DoQuickSave ();
 
 void STAT_Serialize(FSerializer &file);
-bool WriteZip(const char *filename, TArray<FString> &filenames, TArray<FCompressedBuffer> &content);
 
 CVARD_NAMED(Int, gameskill, skill, 2, CVAR_SERVERINFO|CVAR_LATCH, "sets the skill for the next newly started game")
 CVAR(Bool, save_formatted, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)	// use formatted JSON for saves (more readable but a larger files and a bit slower.
@@ -202,8 +202,6 @@ int				lookspeed[2] = {450, 512};
 #define SLOWTURNTICS	6 
 
 CVAR (Bool,		cl_run,			false,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)		// Always run?
-CVAR (Bool,		invertmouse,	false,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)		// Invert mouse look down/up?
-CVAR (Bool,		invertmousex,	false,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)		// Invert mouse look left/right?
 CVAR (Bool,		freelook,		true,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)		// Always mlook?
 CVAR (Bool,		lookstrafe,		false,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)		// Always strafe with mouse?
 CVAR (Float,	m_forward,		1.f,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
@@ -319,7 +317,8 @@ CCMD (slot)
 		}
 
 		// [Nash] Option to display the name of the weapon being switched to.
-		if ((paused || pauseext) || players[consoleplayer].playerstate != PST_LIVE) return;
+		if ((paused || pauseext) || players[consoleplayer].playerstate != PST_LIVE)
+			return;
 		if (SendItemUse != players[consoleplayer].ReadyWeapon && (displaynametags & 2) && StatusBar && SmallFont && SendItemUse)
 		{
 			StatusBar->AttachMessage(Create<DHUDMessageFadeOut>(nullptr, SendItemUse->GetTag(),
@@ -330,6 +329,8 @@ CCMD (slot)
 
 CCMD (centerview)
 {
+	if ((players[consoleplayer].cheats & CF_TOTALLYFROZEN))
+		return;
 	Net_WriteByte (DEM_CENTERVIEW);
 }
 
@@ -769,8 +770,8 @@ void G_BuildTiccmd (ticcmd_t *cmd)
 	{
 		sendsave = false;
 		Net_WriteByte (DEM_SAVEGAME);
-		Net_WriteString (savegamefile);
-		Net_WriteString (savedescription);
+		Net_WriteString (savegamefile.GetChars());
+		Net_WriteString (savedescription.GetChars());
 		savegamefile = "";
 	}
 	if (SendItemUse == (const AActor *)1)
@@ -1141,8 +1142,8 @@ void G_Ticker ()
 		{
 		case ga_recordgame:
 			G_CheckDemoStatus();
-			G_RecordDemo(newdemoname);
-			G_BeginRecording(newdemomap);
+			G_RecordDemo(newdemoname.GetChars());
+			G_BeginRecording(newdemomap.GetChars());
 			[[fallthrough]];
 		case ga_newgame2:	// Silence GCC (see above)
 		case ga_newgame:
@@ -1154,7 +1155,7 @@ void G_Ticker ()
 			G_DoLoadGame ();
 			break;
 		case ga_savegame:
-			G_DoSaveGame (true, false, savegamefile, savedescription);
+			G_DoSaveGame (true, false, savegamefile, savedescription.GetChars());
 			gameaction = ga_nothing;
 			savegamefile = "";
 			savedescription = "";
@@ -1176,7 +1177,7 @@ void G_Ticker ()
 			G_DoWorldDone ();
 			break;
 		case ga_screenshot:
-			M_ScreenShot (shotfile);
+			M_ScreenShot (shotfile.GetChars());
 			shotfile = "";
 			gameaction = ga_nothing;
 			break;
@@ -1470,7 +1471,7 @@ bool FLevelLocals::CheckSpot (int playernum, FPlayerStart *mthing)
 	//    return false;
 
 	players[playernum].mo->flags |=  MF_SOLID;
-	i = P_CheckPosition(players[playernum].mo, spot);
+	i = P_CheckPosition(players[playernum].mo, spot.XY());
 	players[playernum].mo->flags &= ~MF_SOLID;
 	players[playernum].mo->SetZ(oldz);	// [RH] Restore corpse's height
 	if (!i)
@@ -1722,7 +1723,7 @@ void FLevelLocals::DoReborn (int playernum, bool freshbot)
 	if (!multiplayer && !(flags2 & LEVEL2_ALLOWRESPAWN) && !sv_singleplayerrespawn &&
 		!G_SkillProperty(SKILLP_PlayerRespawn))
 	{
-		if (BackupSaveName.Len() > 0 && FileExists (BackupSaveName.GetChars()))
+		if (BackupSaveName.Len() > 0 && FileExists (BackupSaveName))
 		{ // Load game from the last point it was saved
 			savename = BackupSaveName;
 			gameaction = ga_autoloadgame;
@@ -1731,7 +1732,7 @@ void FLevelLocals::DoReborn (int playernum, bool freshbot)
 		{ // Reload the level from scratch
 			bool indemo = demoplayback;
 			BackupSaveName = "";
-			G_InitNew (MapName, false);
+			G_InitNew (MapName.GetChars(), false);
 			demoplayback = indemo;
 		}
 	}
@@ -1889,12 +1890,12 @@ static bool CheckSingleWad (const char *name, bool &printRequires, bool printwar
 bool G_CheckSaveGameWads (FSerializer &arc, bool printwarn)
 {
 	bool printRequires = false;
-	FString text;
 
-	arc("Game WAD", text);
+	const char *text = arc.GetString("Game WAD");
 	CheckSingleWad (text, printRequires, printwarn);
-	arc("Map WAD", text);
-	CheckSingleWad (text, printRequires, printwarn);
+	const char *text2 = arc.GetString("Map WAD");
+	// do not validate the same file twice.
+	if (text != nullptr && text2 != nullptr && stricmp(text, text2) != 0) CheckSingleWad (text2, printRequires, printwarn);
 
 	if (printRequires)
 	{
@@ -1974,13 +1975,13 @@ void G_DoLoadGame ()
 	hidecon = gameaction == ga_loadgamehidecon;
 	gameaction = ga_nothing;
 
-	std::unique_ptr<FResourceFile> resfile(FResourceFile::OpenResourceFile(savename.GetChars(), true, true));
+	std::unique_ptr<FResourceFile> resfile(FResourceFile::OpenResourceFile(savename.GetChars(), true));
 	if (resfile == nullptr)
 	{
 		LoadGameError("TXT_COULDNOTREAD");
 		return;
 	}
-	FResourceLump *info = resfile->FindLump("info.json");
+	auto info = resfile->FindLump("info.json");
 	if (info == nullptr)
 	{
 		LoadGameError("TXT_NOINFOJSON");
@@ -2015,7 +2016,7 @@ void G_DoLoadGame ()
 		}
 		else
 		{
-			LoadGameError("TXT_IOTHERENGINESG", engine.GetChars());
+			LoadGameError("TXT_OTHERENGINESG", engine.GetChars());
 		}
 		return;
 	}
@@ -2034,7 +2035,7 @@ void G_DoLoadGame ()
 			message.Substitute("%e", FStringf("%d", SAVEVER));
 		}
 		message.Substitute("%d", FStringf("%d", SaveVersion));
-		LoadGameError(message);
+		LoadGameError(message.GetChars());
 		return;
 	}
 
@@ -2106,7 +2107,7 @@ void G_DoLoadGame ()
 
 	// load a base level
 	bool demoplaybacksave = demoplayback;
-	G_InitNew(map, false);
+	G_InitNew(map.GetChars(), false);
 	demoplayback = demoplaybacksave;
 	savegamerestore = false;
 
@@ -2128,7 +2129,7 @@ void G_DoLoadGame ()
 	{
 		FString modelFilePath = smf.Left(smf.LastIndexOf("/")+1);
 		FString modelFileName = smf.Right(smf.Len() - smf.Left(smf.LastIndexOf("/") + 1).Len());
-		FindModel(modelFilePath, modelFileName);
+		FindModel(modelFilePath.GetChars(), modelFileName.GetChars());
 	}
 
 	// At this point, the GC threshold is likely a lot higher than the
@@ -2172,8 +2173,8 @@ void G_SaveGame (const char *filename, const char *description)
 CCMD(opensaves)
 {
 	FString name = G_GetSavegamesFolder();
-	CreatePath(name);
-	I_OpenShellFolder(name);
+	CreatePath(name.GetChars());
+	I_OpenShellFolder(name.GetChars());
 }
 
 CVAR (Int, autosavenum, 0, CVAR_NOSET|CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
@@ -2211,7 +2212,7 @@ void G_DoAutoSave ()
 	num.Int = nextautosave;
 	autosavenum->ForceSet (num, CVAR_Int);
 
-	file = G_BuildSaveName(FStringf("auto%02d", nextautosave));
+	file = G_BuildSaveName(FStringf("auto%02d", nextautosave).GetChars());
 
 	// The hint flag is only relevant on the primary level.
 	if (!(primaryLevel->flags2 & LEVEL2_NOAUTOSAVEHINT))
@@ -2226,7 +2227,7 @@ void G_DoAutoSave ()
 
 	readableTime = myasctime ();
 	description.Format("Autosave %s", readableTime);
-	G_DoSaveGame (false, false, file, description);
+	G_DoSaveGame (false, false, file, description.GetChars());
 }
 
 void G_DoQuickSave ()
@@ -2250,11 +2251,11 @@ void G_DoQuickSave ()
 	num.Int = lastquicksave;
 	quicksavenum->ForceSet (num, CVAR_Int);
 
-	file = G_BuildSaveName(FStringf("quick%02d", lastquicksave));
+	file = G_BuildSaveName(FStringf("quick%02d", lastquicksave).GetChars());
 
 	readableTime = myasctime ();
 	description.Format("Quicksave %s", readableTime);
-	G_DoSaveGame (true, true, file, description);
+	G_DoSaveGame (true, true, file, description.GetChars());
 }
 
 
@@ -2267,11 +2268,8 @@ static void PutSaveWads (FSerializer &arc)
 	arc.AddString("Game WAD", name);
 
 	// Name of wad the map resides in
-	if (fileSystem.GetFileContainer (primaryLevel->lumpnum) > fileSystem.GetIwadNum())
-	{
-		name = fileSystem.GetResourceFileName (fileSystem.GetFileContainer (primaryLevel->lumpnum));
-		arc.AddString("Map WAD", name);
-	}
+	name = fileSystem.GetResourceFileName (fileSystem.GetFileContainer (primaryLevel->lumpnum));
+	arc.AddString("Map WAD", name);
 }
 
 static void PutSaveComment (FSerializer &arc)
@@ -2280,7 +2278,7 @@ static void PutSaveComment (FSerializer &arc)
 
 	FString comment = myasctime();
 
-	arc.AddString("Creation Time", comment);
+	arc.AddString("Creation Time", comment.GetChars());
 
 	// Get level name
 	comment.Format("%s - %s\n", primaryLevel->MapName.GetChars(), primaryLevel->LevelName.GetChars());
@@ -2291,7 +2289,7 @@ static void PutSaveComment (FSerializer &arc)
 	comment.AppendFormat("%s: %02d:%02d:%02d", time, levelTime/3600, (levelTime%3600)/60, levelTime%60);
 
 	// Write out the comment
-	arc.AddString("Comment", comment);
+	arc.AddString("Comment", comment.GetChars());
 }
 
 static void PutSavePic (FileWriter *file, int width, int height)
@@ -2369,7 +2367,7 @@ void G_DoSaveGame (bool okForQuicksave, bool forceQuicksave, FString filename, c
 	// put some basic info into the PNG so that this isn't lost when the image gets extracted.
 	M_AppendPNGText(&savepic, "Software", buf);
 	M_AppendPNGText(&savepic, "Title", description);
-	M_AppendPNGText(&savepic, "Current Map", primaryLevel->MapName);
+	M_AppendPNGText(&savepic, "Current Map", primaryLevel->MapName.GetChars());
 	M_FinishPNG(&savepic);
 
 	int ver = SAVEVER;
@@ -2377,7 +2375,7 @@ void G_DoSaveGame (bool okForQuicksave, bool forceQuicksave, FString filename, c
 		.AddString("Engine", GAMESIG)
 		("Save Version", ver)
 		.AddString("Title", description)
-		.AddString("Current Map", primaryLevel->MapName);
+		.AddString("Current Map", primaryLevel->MapName.GetChars());
 
 
 	PutSaveWads (savegameinfo);
@@ -2407,7 +2405,7 @@ void G_DoSaveGame (bool okForQuicksave, bool forceQuicksave, FString filename, c
 	}
 
 	auto picdata = savepic.GetBuffer();
-	FCompressedBuffer bufpng = { picdata->Size(), picdata->Size(), METHOD_STORED, 0, static_cast<unsigned int>(crc32(0, &(*picdata)[0], picdata->Size())), (char*)&(*picdata)[0] };
+	FCompressedBuffer bufpng = { picdata->Size(), picdata->Size(), FileSys::METHOD_STORED, 0, static_cast<unsigned int>(crc32(0, &(*picdata)[0], picdata->Size())), (char*)&(*picdata)[0] };
 
 	savegame_content.Push(bufpng);
 	savegame_filenames.Push("savepic.png");
@@ -2415,16 +2413,17 @@ void G_DoSaveGame (bool okForQuicksave, bool forceQuicksave, FString filename, c
 	savegame_filenames.Push("info.json");
 	savegame_content.Push(savegameglobals.GetCompressedOutput());
 	savegame_filenames.Push("globals.json");
-
 	G_WriteSnapshots (savegame_filenames, savegame_content);
 	
+	for (unsigned i = 0; i < savegame_content.Size(); i++)
+		savegame_content[i].filename = savegame_filenames[i].GetChars();
 
 	bool succeeded = false;
 
-	if (WriteZip(filename, savegame_filenames, savegame_content))
+	if (WriteZip(filename.GetChars(), savegame_content.Data(), savegame_content.Size()))
 	{
 		// Check whether the file is ok by trying to open it.
-		FResourceFile *test = FResourceFile::OpenResourceFile(filename, true);
+		FResourceFile *test = FResourceFile::OpenResourceFile(filename.GetChars(), true);
 		if (test != nullptr)
 		{
 			delete test;
@@ -2593,7 +2592,7 @@ void G_BeginRecording (const char *startmap)
 
 	if (startmap == NULL)
 	{
-		startmap = primaryLevel->MapName;
+		startmap = primaryLevel->MapName.GetChars();
 	}
 	demo_p = demobuffer;
 
@@ -2618,10 +2617,12 @@ void G_BeginRecording (const char *startmap)
 	{
 		if (playeringame[i])
 		{
-			StartChunk (UINF_ID, &demo_p);
-			WriteByte ((uint8_t)i, &demo_p);
-			D_WriteUserInfoStrings (i, &demo_p);
-			FinishChunk (&demo_p);
+			StartChunk(UINF_ID, &demo_p);
+			WriteByte((uint8_t)i, &demo_p);
+			auto str = D_GetUserInfoStrings(i);
+			memcpy(demo_p, str.GetChars(), str.Len() + 1);
+			demo_p += str.Len();
+			FinishChunk(&demo_p);
 		}
 	}
 
@@ -2857,7 +2858,7 @@ void G_DoPlayDemo (void)
 	gameaction = ga_nothing;
 
 	// [RH] Allow for demos not loaded as lumps
-	demolump = fileSystem.CheckNumForFullName (defdemoname, true);
+	demolump = fileSystem.CheckNumForFullName (defdemoname.GetChars(), true);
 	if (demolump >= 0)
 	{
 		int demolen = fileSystem.FileLength (demolump);
@@ -2869,7 +2870,7 @@ void G_DoPlayDemo (void)
 		FixPathSeperator (defdemoname);
 		DefaultExtension (defdemoname, ".lmp");
 		FileReader fr;
-		if (!fr.OpenFile(defdemoname))
+		if (!fr.OpenFile(defdemoname.GetChars()))
 		{
 			I_Error("Unable to open demo '%s'", defdemoname.GetChars());
 		}
@@ -2916,7 +2917,7 @@ void G_DoPlayDemo (void)
 		demonew = true;
 		if (mapname.Len() != 0)
 		{
-			G_InitNew (mapname, false);
+			G_InitNew (mapname.GetChars(), false);
 		}
 		else if (primaryLevel->sectors.Size() == 0)
 		{
@@ -3044,14 +3045,14 @@ bool G_CheckDemoStatus (void)
 		formlen = demobuffer + 4;
 		WriteLong (int(demo_p - demobuffer - 8), &formlen);
 
-		auto fw = FileWriter::Open(demoname);
+		auto fw = FileWriter::Open(demoname.GetChars());
 		bool saved = false;
 		if (fw != nullptr)
 		{
 			const size_t size = demo_p - demobuffer;
 			saved = fw->Write(demobuffer, size) == size;
 			delete fw;
-			if (!saved) remove(demoname);
+			if (!saved) remove(demoname.GetChars());
 		}
 		M_Free (demobuffer); 
 		demorecording = false;
