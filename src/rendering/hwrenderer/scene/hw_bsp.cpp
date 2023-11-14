@@ -313,8 +313,12 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	{
 		if(!gl_multithread){
 			HWWall wall;
-			wall.sub = currentsubsector;
-			wall.Process(this, seg, seg->frontsector, seg->backsector, true);
+			HWWallDispatcher disp(this);
+			SetupWall.Clock();
+			wall.sub = seg->Subsector;
+			wall.Process(&disp, seg, currentsector, backsector,true);
+			rendered_lines++;
+			SetupWall.Unclock();
 		}
 		clipper.SafeAddClipRange(startAngle, endAngle);
 		return;

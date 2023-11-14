@@ -997,7 +997,7 @@ class DAutomap :public DAutomapBase
 	void calcMinMaxMtoF();
 
 	void DrawMarker(FGameTexture *tex, double x, double y, int yadjust,
-		INTBOOL flip, double xscale, double yscale, int translation, double alpha, uint32_t fillcolor, FRenderStyle renderstyle);
+		INTBOOL flip, double xscale, double yscale, FTranslationID translation, double alpha, uint32_t fillcolor, FRenderStyle renderstyle);
 	void DrawTag(FString *text, FFont *font, double x, double y);
 	void rotatePoint(double *x, double *y);
 	void rotate(double *x, double *y, DAngle an);
@@ -3165,7 +3165,7 @@ void DAutomap::DrawTag(FString* text, FFont* font, double x, double y)
 	auto lines = V_BreakLines(font, M_TAGWIDTH, text->GetChars());
 	for (const FBrokenLines& line : lines)
 	{
-		DrawText(twod, font, am_markcolor, CXMTOF(x - FTOM(line.Width/2.)), CYMTOF(y), line.Text,TAG_DONE);
+		DrawText(twod, font, am_markcolor, CXMTOF(x - FTOM(line.Width/2.)), CYMTOF(y), line.Text.GetChars(),TAG_DONE);
 		y -= FTOM(font->GetHeight());
 	}
 }
