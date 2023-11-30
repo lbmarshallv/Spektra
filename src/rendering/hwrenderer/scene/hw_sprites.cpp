@@ -784,20 +784,14 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		if (fabs(viewpos.X - vp.Pos.X) < 32 && fabs(viewpos.Y - vp.Pos.Y) < 32) return;
 	}
 
+	modelframe = isPicnumOverride ? nullptr : FindModelFrame(thing, spritenum, thing->frame, !!(thing->flags & MF_DROPPED));
+
 	// Too close to the camera. This doesn't look good if it is a sprite.
-	if (fabs(thingpos.X - vp.Pos.X) < 2 && fabs(thingpos.Y - vp.Pos.Y) < 2)
+	if (fabs(thingpos.X - vp.Pos.X) < 2 && fabs(thingpos.Y - vp.Pos.Y) < 2
+		&& vp.Pos.Z >= thingpos.Z - 2 && vp.Pos.Z <= thingpos.Z + thing->Height + 2
+		&& !thing->Vel.isZero() && !modelframe) // exclude vertically moving objects from this check.
 	{
-		if (vp.Pos.Z >= thingpos.Z - 2 && vp.Pos.Z <= thingpos.Z + thing->Height + 2)
-		{
-			// exclude vertically moving objects from this check.
-			if (!thing->Vel.isZero())
-			{
-				if (!FindModelFrame(thing->GetClass(), spritenum, thing->frame, false))
-				{
-					return;
-				}
-			}
-		}
+		return;
 	}
 
 	// don't draw first frame of a player missile
@@ -856,8 +850,6 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		float fz = thing->GetBobOffset(vp.TicFrac);
 		z += fz;
 	}
-
-	modelframe = isPicnumOverride ? nullptr : FindModelFrame(thing->modelData != nullptr ? thing->modelData->modelDef != NAME_None ? PClass::FindActor(thing->modelData->modelDef) : thing->GetClass() : thing->GetClass(), spritenum, thing->frame, !!(thing->flags & MF_DROPPED));
 
 	// don't bother drawing sprite shadows if this is a model (it will never look right)
 	if (modelframe && isSpriteShadow)
@@ -1261,7 +1253,7 @@ void HWSprite::ProcessParticle (HWDrawInfo *di, particle_t *particle, sector_t *
 	if (!particle || particle->alpha <= 0)
 		return;
 
-	DZSprite *spr = particle->sprite;
+	DVisualThinker *spr = particle->sprite;
 	if (spr && spr->Texture.isNull())
 		return;
 
@@ -1327,7 +1319,7 @@ void HWSprite::ProcessParticle (HWDrawInfo *di, particle_t *particle, sector_t *
 	const auto& vp = di->Viewpoint;
 
 	if (spr)
-		AdjustZSprite(di, spr, sector);
+		AdjustVisualThinker(di, spr, sector);
 	else
 	{
 		bool has_texture = !particle->texture.isNull();
@@ -1368,6 +1360,9 @@ void HWSprite::ProcessParticle (HWDrawInfo *di, particle_t *particle, sector_t *
 		float xvf = (particle->Vel.X) * timefrac;
 		float yvf = (particle->Vel.Y) * timefrac;
 		float zvf = (particle->Vel.Z) * timefrac;
+
+		offx = 0.f;
+		offy = 0.f;
 
 		x = float(particle->Pos.X) + xvf;
 		y = float(particle->Pos.Y) + yvf;
@@ -1411,10 +1406,10 @@ void HWSprite::ProcessParticle (HWDrawInfo *di, particle_t *particle, sector_t *
 	rendered_sprites++;
 }
 
-// [MC] ZSprites are to be rendered akin to actor sprites. The reason this whole system
+// [MC] VisualThinkers are to be rendered akin to actor sprites. The reason this whole system
 // is hitching a ride on particle_t is because of the large number of checks with 
 // HWSprite elsewhere in the draw lists.
-void HWSprite::AdjustZSprite(HWDrawInfo* di, DZSprite* spr, sector_t* sector)
+void HWSprite::AdjustVisualThinker(HWDrawInfo* di, DVisualThinker* spr, sector_t* sector)
 {
 	translation = spr->Translation;
 	texture = TexMan.GetGameTexture(spr->Texture, true);
