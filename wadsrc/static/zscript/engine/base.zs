@@ -891,8 +891,8 @@ struct StringStruct native
 	native String Mid(int pos = 0, int len = 2147483647) const;
 	native void Truncate(int newlen);
 	native void Remove(int index, int remlen);
-	deprecated("4.1", "use Left() or Mid() instead") native String CharAt(int pos) const;
-	deprecated("4.1", "use ByteAt() instead") native int CharCodeAt(int pos) const;
+	native String CharAt(int pos) const;
+	native int CharCodeAt(int pos) const;
 	native int ByteAt(int pos) const;
 	native String Filter();
 	native int IndexOf(String substr, int startIndex = 0) const;
