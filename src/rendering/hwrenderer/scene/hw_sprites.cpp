@@ -85,6 +85,7 @@ CVAR(Float, gl_sclipfactor, 1.8f, CVAR_ARCHIVE)
 CVAR(Int, gl_particles_style, 2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // 0 = square, 1 = round, 2 = smooth
 CVAR(Int, gl_billboard_mode, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, gl_billboard_faces_camera, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, hw_force_cambbpref, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, gl_billboard_particles, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CUSTOM_CVAR(Int, gl_fuzztype, 0, CVAR_ARCHIVE)
 {
@@ -389,7 +390,10 @@ bool HWSprite::CalculateVertices(HWDrawInfo *di, FVector3 *v, DVector3 *vp)
 		//&& di->mViewActor != nullptr
 		&& (gl_billboard_mode == 1 || (actor && actor->renderflags & RF_FORCEXYBILLBOARD))));
 
-	const bool drawBillboardFacingCamera = gl_billboard_faces_camera;
+	const bool drawBillboardFacingCamera = hw_force_cambbpref ? gl_billboard_faces_camera :
+		(gl_billboard_faces_camera && (actor && !(actor->renderflags2 & RF2_BILLBOARDNOFACECAMERA)))
+		|| !!(actor && actor->renderflags2 & RF2_BILLBOARDFACECAMERA);
+
 	// [Nash] has +ROLLSPRITE
 	const bool drawRollSpriteActor = (actor != nullptr && actor->renderflags & RF_ROLLSPRITE);
 
@@ -423,11 +427,10 @@ bool HWSprite::CalculateVertices(HWDrawInfo *di, FVector3 *v, DVector3 *vp)
 		// want those calculations here. Credit to PhantomBeta for this.
 		if (offx || offy)
 		{
-			FAngle zero = FAngle::fromDeg(0);
 			FQuaternion quat = FQuaternion::FromAngles(FAngle::fromDeg(270) - di->Viewpoint.HWAngles.Yaw, di->Viewpoint.HWAngles.Pitch, FAngle::fromDeg(0));
 			FVector3 sideVec = quat * FVector3(0, 1, 0);
 			FVector3 upVec = quat * FVector3(0, 0, 1);
-			FVector3 res = sideVec * offx + upVec * offy;
+			FVector3 res = sideVec * -offx + upVec * offy;
 			mat.Translate(res.X, res.Z, res.Y);
 		}
 
@@ -1136,7 +1139,11 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		// This is a non-translucent sprite (i.e. STYLE_Normal or equivalent)
 		trans = 1.f;
 
-		if (!gl_sprite_blend || modelframe || (thing->renderflags & (RF_FLATSPRITE | RF_WALLSPRITE)) || gl_billboard_faces_camera)
+		if (!gl_sprite_blend || modelframe ||
+			(thing->renderflags & (RF_FLATSPRITE | RF_WALLSPRITE)) ||
+			(hw_force_cambbpref ? gl_billboard_faces_camera :
+			(gl_billboard_faces_camera && !(thing->renderflags2 & RF2_BILLBOARDNOFACECAMERA)) ||
+			thing->renderflags2 & RF2_BILLBOARDFACECAMERA))
 		{
 			RenderStyle.SrcAlpha = STYLEALPHA_One;
 			RenderStyle.DestAlpha = STYLEALPHA_Zero;

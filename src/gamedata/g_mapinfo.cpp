@@ -2623,7 +2623,7 @@ void G_ParseMapInfo (FString basemapinfo)
 		if (comp >= 0)
 		{
 			auto complvl = fileSystem.ReadFile(comp);
-			auto data = complvl.GetString();
+			auto data = complvl.string();
 			int length = fileSystem.FileLength(comp);
 			if (length == 7 && !strnicmp("vanilla", data, 7))
 			{
