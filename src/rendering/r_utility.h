@@ -33,6 +33,8 @@ struct FRenderViewpoint
 	double			Sin;			// sin(Angles.Yaw)
 	double			TanCos;			// FocalTangent * cos(Angles.Yaw)
 	double			TanSin;			// FocalTangent * sin(Angles.Yaw)
+	double			PitchCos;			// cos(Angles.Pitch)
+	double			PitchSin;			// sin(Angles.Pitch)
 
 	AActor			*camera;		// camera actor
 	sector_t		*sector;		// [RH] keep track of sector viewing from
@@ -44,7 +46,7 @@ struct FRenderViewpoint
 	int				extralight;		// extralight to be added to this viewpoint
 	bool			showviewer;		// show the camera actor?
 	bool			NoPortalPath;	// Disable portal interpolation path for actor viewpos.
-
+	bool			noviewer;		// Force camera sprite off for first person.
 	void SetViewAngle(const FViewWindow &viewwindow);
 
 };

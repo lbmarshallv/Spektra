@@ -194,7 +194,7 @@ public:
 	AActor *SpawnMapThing(int index, FMapThing *mt, int position);
 	AActor *SpawnPlayer(FPlayerStart *mthing, int playernum, int flags = 0);
 	void StartLightning();
-	void ForceLightning(int mode);
+	void ForceLightning(int mode, FSoundID tempSound = NO_SOUND);
 	void ClearDynamic3DFloorData();
 	void WorldDone(void);
 	void AirControlChanged();
@@ -631,6 +631,7 @@ public:
 	uint32_t		hazardcolor;			// what color strife hazard blends the screen color as
 	uint32_t		hazardflash;			// what color strife hazard flashes the screen color as
 
+	FString		LightningSound = "world/thunder";
 	FString		Music;
 	int			musicorder;
 	int			cdtrack;
@@ -664,6 +665,8 @@ public:
 	double		airfriction;
 	int			airsupply;
 	int			DefaultEnvironment;		// Default sound environment.
+	float		isocam_pitch;
+	float		iso_dist;
 
 	DSeqNode *SequenceListHead;
 
@@ -752,6 +755,17 @@ public:
 		if (dmflags & DF_YES_FREELOOK)
 			return true;
 		return !(flags & LEVEL_FREELOOK_NO);
+	}
+
+	//==========================================================================
+	//
+	//
+	//==========================================================================
+
+	bool IsIsometricMode() const
+	{
+		return (flags3 & LEVEL3_ISOMETRICMODE);
+		// What to do about multiplayer flags? Add a dmflags3 bit?
 	}
 
 	node_t		*HeadNode() const

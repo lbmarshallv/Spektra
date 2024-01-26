@@ -513,6 +513,23 @@ class Actor : Thinker native
 		return true;
 	}
 
+	// [AA] Called by inventory items in CallTryPickup to see if this actor needs 
+	// to process them in some way before they're received. Gets called before 
+	// the item's TryPickup, allowing fully customized handling of all items.
+	virtual bool CanReceive(Inventory item)
+	{
+		return true;
+	}
+
+	// [AA] Called by inventory items at the end of CallTryPickup to let actors
+	// do something with the items they've received. 'Item' might be null for
+	// items that disappear on pickup.
+	virtual void HasReceived(Inventory item) {}
+
+  // Called in TryMove if the mover ran into another Actor. This isn't called on players
+	// if they're currently predicting. Guarantees collisions unlike CanCollideWith.
+	virtual void CollidedWith(Actor other, bool passive) {}
+
 	// Called by PIT_CheckThing to check if two actors actually can collide.
 	virtual bool CanCollideWith(Actor other, bool passive)
 	{
@@ -755,6 +772,7 @@ class Actor : Thinker native
 	native bool LineTrace(double angle, double distance, double pitch, int flags = 0, double offsetz = 0., double offsetforward = 0., double offsetside = 0., out FLineTraceData data = null);
 	native bool CheckSight(Actor target, int flags = 0);
 	native bool IsVisible(Actor other, bool allaround, LookExParams params = null);
+	native bool, Actor, double PerformShadowChecks (Actor other, Vector3 pos);
 	native bool HitFriend();
 	native bool MonsterMove();
 	
@@ -784,6 +802,7 @@ class Actor : Thinker native
 	native bool CheckMissileRange();
 	native bool SetState(state st, bool nofunction = false);
 	clearscope native state FindState(statelabel st, bool exact = false) const;
+	clearscope native state FindStateByString(string st, bool exact = false) const;
 	bool SetStateLabel(statelabel st, bool nofunction = false) { return SetState(FindState(st), nofunction); }
 	native action state ResolveState(statelabel st);	// this one, unlike FindState, is context aware.
 	native void LinkToWorld(LinkContext ctx = null);
@@ -1285,6 +1304,40 @@ class Actor : Thinker native
 
 	native version("4.12") void SetAnimationFrameRate(double framerate);
 	native version("4.12") ui void SetAnimationFrameRateUI(double framerate);
+
+	native version("4.12") void SetModelFlag(int flag);
+	native version("4.12") void ClearModelFlag(int flag);
+	native version("4.12") void ResetModelFlags();
+    
+    
+	action version("4.12") void A_SetAnimation(Name animName, double framerate = -1, int startFrame = -1, int loopFrame= -1, int interpolateTics = -1, int flags = 0)
+	{
+		invoker.SetAnimation(animName, framerate, startFrame, loopFrame, interpolateTics, flags);
+	}
+
+	action version("4.12") void A_SetAnimationFrameRate(double framerate)
+	{
+		invoker.SetAnimationFrameRate(framerate);
+	}
+
+	action version("4.12") void A_SetModelFlag(int flag)
+	{
+		invoker.SetModelFlag(flag);
+	}
+	
+	action version("4.12") void A_ClearModelFlag(int flag)
+	{
+		invoker.ClearModelFlag(flag);
+	}
+    
+	action version("4.12") void A_ResetModelFlags()
+	{
+		invoker.ResetModelFlags();
+	}
+    
+    
+    
+    
 
 	int ACS_NamedExecute(name script, int mapnum=0, int arg1=0, int arg2=0, int arg3=0)
 	{

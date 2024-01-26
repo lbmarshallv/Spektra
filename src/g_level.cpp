@@ -1320,7 +1320,7 @@ IMPLEMENT_CLASS(DAutosaver, false, false)
 
 void DAutosaver::Tick ()
 {
-	Net_WriteByte (DEM_CHECKAUTOSAVE);
+	Net_WriteInt8 (DEM_CHECKAUTOSAVE);
 	Destroy ();
 }
 
@@ -1803,6 +1803,8 @@ void FLevelLocals::Init()
 	flags3 = 0;
 	ImpactDecalCount = 0;
 	frozenstate = 0;
+	isocam_pitch = 30.f;
+	iso_dist = 300.f;
 
 	info = FindLevelInfo (MapName.GetChars());
 
@@ -1833,6 +1835,12 @@ void FLevelLocals::Init()
 		if (info->gravity == DBL_MAX) gravity = 0;
 		else gravity = info->gravity * 35/TICRATE;
 	}
+	if (info->isocam_pitch < 0.f) isocam_pitch = 0.f;
+	else if (info->isocam_pitch > 89.f) isocam_pitch = 89.f;
+	else isocam_pitch = info->isocam_pitch;
+	if (info->iso_dist < 1.f) iso_dist = 1.f;
+	if (info->iso_dist > 1000.f) iso_dist = 1000.f;
+	else iso_dist = info->iso_dist;
 	if (info->aircontrol != 0.f)
 	{
 		aircontrol = info->aircontrol;
@@ -1854,6 +1862,7 @@ void FLevelLocals::Init()
 	flags2 |= info->flags2;
 	flags3 |= info->flags3;
 	levelnum = info->levelnum;
+	LightningSound = info->LightningSound;
 	Music = info->Music;
 	musicorder = info->musicorder;
 	MusicVolume = 1.f;

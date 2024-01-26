@@ -1695,6 +1695,22 @@ DEFINE_ACTION_FUNCTION_NATIVE(_Sector, SetXOffset, SetXOffset)
  }
  
  //==========================================================================
+ //
+ //
+ //==========================================================================
+
+ static int IsIsometricMode(FLevelLocals *self)
+ {
+	 return self->IsIsometricMode();
+ }
+
+ DEFINE_ACTION_FUNCTION_NATIVE(FLevelLocals, IsIsometricMode, IsIsometricMode)
+ {
+	 PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
+	 ACTION_RETURN_BOOL(self->IsIsometricMode());
+ }
+
+ //==========================================================================
 //
 // ZScript counterpart to ACS ChangeSky, uses TextureIDs
 //
@@ -2764,6 +2780,7 @@ DEFINE_FIELD_X(LevelInfo, level_info_t, flags)
 DEFINE_FIELD_X(LevelInfo, level_info_t, flags2)
 DEFINE_FIELD_X(LevelInfo, level_info_t, flags3)
 DEFINE_FIELD_X(LevelInfo, level_info_t, Music)
+DEFINE_FIELD_X(LevelInfo, level_info_t, LightningSound)
 DEFINE_FIELD_X(LevelInfo, level_info_t, LevelName)
 DEFINE_FIELD_X(LevelInfo, level_info_t, AuthorName)
 DEFINE_FIELD_X(LevelInfo, level_info_t, musicorder)
@@ -2808,6 +2825,7 @@ DEFINE_FIELD(FLevelLocals, NextSecretMap)
 DEFINE_FIELD(FLevelLocals, F1Pic)
 DEFINE_FIELD(FLevelLocals, AuthorName)
 DEFINE_FIELD(FLevelLocals, maptype)
+DEFINE_FIELD(FLevelLocals, LightningSound)
 DEFINE_FIELD(FLevelLocals, Music)
 DEFINE_FIELD(FLevelLocals, musicorder)
 DEFINE_FIELD(FLevelLocals, skytexture1)

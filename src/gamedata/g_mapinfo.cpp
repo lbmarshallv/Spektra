@@ -250,6 +250,7 @@ void level_info_t::Reset()
 	else
 		flags2 = LEVEL2_LAXMONSTERACTIVATION;
 	flags3 = 0;
+	LightningSound = "world/thunder";
 	Music = "";
 	LevelName = "";
 	AuthorName = "";
@@ -295,6 +296,8 @@ void level_info_t::Reset()
 	outsidefogdensity = 0;
 	skyfog = 0;
 	pixelstretch = 1.2f;
+	isocam_pitch = 30.f;
+	iso_dist = 300.f;
 
 	specialactions.Clear();
 	DefaultEnvironment = 0;
@@ -999,6 +1002,13 @@ DEFINE_MAP_OPTION(next, true)
 	parse.ParseNextMap(info->NextMap);
 }
 
+DEFINE_MAP_OPTION(lightningsound, true)
+{
+	parse.ParseAssign();
+	parse.sc.MustGetString();
+	info->LightningSound = parse.sc.String;
+}
+
 DEFINE_MAP_OPTION(author, true)
 {
 	parse.ParseAssign();
@@ -1215,6 +1225,20 @@ DEFINE_MAP_OPTION(compassadjustment, true)
 	parse.ParseAssign();
 	parse.sc.MustGetFloat();
 	info->compassadjustment = parse.sc.Float;
+}
+
+DEFINE_MAP_OPTION(isocam_pitch, true)
+{
+	parse.ParseAssign();
+	parse.sc.MustGetFloat();
+	info->isocam_pitch = parse.sc.Float;
+}
+
+DEFINE_MAP_OPTION(iso_dist, true)
+{
+	parse.ParseAssign();
+	parse.sc.MustGetFloat();
+	info->iso_dist = parse.sc.Float;
 }
 
 DEFINE_MAP_OPTION(nogravity, true)
@@ -1835,6 +1859,9 @@ MapFlagHandlers[] =
 	{ "disableskyboxao",				MITYPE_CLRFLAG3,	LEVEL3_SKYBOXAO, 0 },
 	{ "avoidmelee",						MITYPE_SETFLAG3,	LEVEL3_AVOIDMELEE, 0 },
 	{ "attenuatelights",				MITYPE_SETFLAG3,	LEVEL3_ATTENUATE, 0 },
+	{ "isometricmode",				MITYPE_SETFLAG3,	LEVEL3_ISOMETRICMODE, 0 },
+	{ "orthographic",				MITYPE_SETFLAG3,	LEVEL3_ORTHOGRAPHIC, 0 },
+	{ "isometricsprites",				MITYPE_SETFLAG3,	LEVEL3_ISOMETRICSPRITES, 0 },
 	{ "nobotnodes",						MITYPE_IGNORE,	0, 0 },		// Skulltag option: nobotnodes
 	{ "nopassover",						MITYPE_COMPATFLAG, COMPATF_NO_PASSMOBJ, 0 },
 	{ "passover",						MITYPE_CLRCOMPATFLAG, COMPATF_NO_PASSMOBJ, 0 },

@@ -598,8 +598,16 @@ class Inventory : Actor
 		// unmorphed versions of a currently morphed actor cannot pick up anything. 
 		if (bUnmorphed) return false, null;
 
-		bool res;
-		if (CanPickup(toucher))
+		//[AA] starting with true, so that CanReceive can unset it,
+		// if necessary:
+		bool res = true;
+		// [AA] CanReceive lets the actor receiving the item process it first.
+		if (!toucher.CanReceive(self))
+		{
+			res = false;
+		}
+		// CanPickup processes restrictions by player class.
+		else if (CanPickup(toucher))
 		{
 			res = TryPickup(toucher);
 		}
@@ -638,6 +646,8 @@ class Inventory : Actor
 					}
 				}
 			}
+			// [AA] Let the toucher do something with the item they've just received:
+			toucher.HasReceived(self);
 		}
 		return res, toucher;
 	}
