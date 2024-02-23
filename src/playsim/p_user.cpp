@@ -1006,7 +1006,8 @@ void P_CheckPlayerSprite(AActor *actor, int &spritenum, DVector2 &scale)
 		}
 		else if (player->playerstate != PST_DEAD && player->crouchfactor < 0.75)
 		{
-			scale.Y *= 0.5;
+			//NO squash :)
+			//scale.Y *= 0.5;
 		}
 	}
 }
