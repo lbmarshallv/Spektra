@@ -2144,6 +2144,7 @@ DEFINE_FIELD(AActor, LightLevel)
 DEFINE_FIELD(AActor, DynLightLevel)
 DEFINE_FIELD(AActor, ShadowAimFactor)
 DEFINE_FIELD(AActor, ShadowPenaltyFactor)
+DEFINE_FIELD(AActor, AutomapOffsets)
 
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, thing);
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, pos);

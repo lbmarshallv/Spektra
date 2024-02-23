@@ -411,7 +411,7 @@ struct LevelLocals native
 	native Array<@Side> Sides;
 	native readonly Array<@Vertex> Vertexes;
 	native readonly Array<@LinePortal> LinePortals;
-	native internal Array<@SectorPortal> SectorPortals;
+	native internal readonly Array<@SectorPortal> SectorPortals;
 	
 	native readonly int time;
 	native readonly int maptime;
@@ -491,7 +491,6 @@ struct LevelLocals native
 	native bool IsJumpingAllowed() const;
 	native bool IsCrouchingAllowed() const;
 	native bool IsFreelookAllowed() const;
-	native bool IsIsometricMode() const;
 	native void StartIntermission(Name type, int state) const;
 	native play SpotState GetSpotState(bool create = true);
 	native int FindUniqueTid(int start = 0, int limit = 0);
@@ -585,10 +584,10 @@ struct State native
 	native readonly bool bCanRaise;
 	native readonly bool bDehacked;
 	
-	native int DistanceTo(state other);
-	native bool ValidateSpriteFrame();
-	native TextureID, bool, Vector2 GetSpriteTexture(int rotation, int skin = 0, Vector2 scale = (0,0), int spritenum = -1, int framenum = -1);
-	native bool InStateSequence(State base);
+	native int DistanceTo(state other) const;
+	native bool ValidateSpriteFrame() const;
+	native TextureID, bool, Vector2 GetSpriteTexture(int rotation, int skin = 0, Vector2 scale = (0,0), int spritenum = -1, int framenum = -1) const;
+	native bool InStateSequence(State base) const;
 }
 
 struct TerrainDef native

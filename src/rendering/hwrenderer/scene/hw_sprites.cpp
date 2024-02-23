@@ -1,4 +1,4 @@
-//
+// 
 //---------------------------------------------------------------------------
 //
 // Copyright(C) 2002-2016 Christoph Oelckers
@@ -94,7 +94,7 @@ CUSTOM_CVAR(Int, gl_fuzztype, 0, CVAR_ARCHIVE)
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -103,7 +103,7 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 	bool additivefog = false;
 	bool foglayer = false;
 	int rel = fullbright ? 0 : getExtraLight();
-	auto &vp = di->Viewpoint;
+	auto &vp = di->Viewpoint;	
 
 	if (translucent)
 	{
@@ -339,7 +339,7 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -394,7 +394,7 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 
 		return true;
 	}
-
+	
 	// [BB] Billboard stuff
 	const bool drawWithXYBillboard = ((particle && gl_billboard_particles && !(particle->flags & SPF_NO_XY_BILLBOARD)) || (!(actor && actor->renderflags & RF_FORCEYBILLBOARD)
 		//&& di->mViewActor != nullptr
@@ -456,7 +456,7 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 		float rollDegrees = doRoll ? Angles.Roll.Degrees() : 0;
 		float angleRad = (FAngle::fromDeg(270.) - HWAngles.Yaw).Radians();
 
-		// [fgsfds] Rotate the sprite about the sight vector (roll)
+		// [fgsfds] Rotate the sprite about the sight vector (roll) 
 		if (isWallSprite)
 		{
 			float yawvecX = Angles.Yaw.Cos();
@@ -480,9 +480,7 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 			// Rotate the sprite about the vector starting at the center of the sprite
 			// triangle strip and with direction orthogonal to where the player is looking
 			// in the x/y plane.
-		        if(r_isocam || (di->Level->flags3 & LEVEL3_ISOMETRICMODE)) mat.Translate(0.0, z2 - center.Z, 0.0);
 			mat.Rotate(-sin(angleRad), 0, cos(angleRad), -HWAngles.Pitch.Degrees());
-			if(r_isocam || (di->Level->flags3 & LEVEL3_ISOMETRICMODE)) mat.Translate(0.0, center.Z - z2, 0.0);
 		}
 
 		mat.Translate(-center.X, -center.Z, -center.Y); // retreat from sprite center
@@ -500,7 +498,7 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 
 			if (!offset.isZero())
 				HandleSpriteOffsets(&mat, &HWAngles, &offset, false);
-
+			
 			if (doRoll)
 			{
 				// Compute center of sprite
@@ -516,7 +514,7 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 			v[1] = mat * FVector3(x2, z1, y2);
 			v[2] = mat * FVector3(x1, z2, y1);
 			v[3] = mat * FVector3(x2, z2, y2);
-
+			
 		}
 		else
 		{
@@ -525,14 +523,14 @@ bool HWSprite::CalculateVertices(HWDrawInfo* di, FVector3* v, DVector3* vp)
 			v[2] = FVector3(x1, z2, y1);
 			v[3] = FVector3(x2, z2, y2);
 		}
-
+		
 	}
 	return false;
 }
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -557,7 +555,7 @@ inline void HWSprite::PutSprite(HWDrawInfo *di, bool translucent)
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -582,7 +580,7 @@ void HWSprite::CreateVertices(HWDrawInfo *di)
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -621,7 +619,7 @@ void HWSprite::SplitSprite(HWDrawInfo *di, sector_t * frontsector, bool transluc
 			}
 
 			z1=copySprite.z2=lightbottom;
-			vt=copySprite.vb=copySprite.vt+
+			vt=copySprite.vb=copySprite.vt+ 
 				(lightbottom-copySprite.z1)*(copySprite.vb-copySprite.vt)/(z2-copySprite.z1);
 			copySprite.PutSprite(di, translucent);
 			put=true;
@@ -631,7 +629,7 @@ void HWSprite::SplitSprite(HWDrawInfo *di, sector_t * frontsector, bool transluc
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -716,7 +714,7 @@ void HWSprite::PerformSpriteClipAdjustment(AActor *thing, const DVector2 &thingp
 				z1 -= difft;
 			}
 		}
-		if (diffb <= (0 - (float)gl_sclipthreshold))	// such a large displacement can't be correct!
+		if (diffb <= (0 - (float)gl_sclipthreshold))	// such a large displacement can't be correct! 
 		{
 			// for living monsters standing on the floor allow a little more.
 			if (!(thing->flags3&MF3_ISMONSTER) || (thing->flags&MF_NOGRAVITY) || (thing->flags&MF_CORPSE) || diffb < (-1.8*(float)gl_sclipthreshold))
@@ -731,7 +729,7 @@ void HWSprite::PerformSpriteClipAdjustment(AActor *thing, const DVector2 &thingp
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -808,7 +806,7 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		if (thruportal == 1) vieworigin += di->Level->Displacements.getOffset(viewmaster->Sector->PortalGroup, sector->PortalGroup);
 		if (fabs(vieworigin.X - vp.ActorPos.X) < 2 && fabs(vieworigin.Y - vp.ActorPos.Y) < 2) return;
 
-		// Necessary in order to prevent sprite pop-ins with viewpos and models.
+		// Necessary in order to prevent sprite pop-ins with viewpos and models. 
 		auto* sec = viewmaster->Sector;
 		if (sec && !sec->PortalBlocksMovement(sector_t::ceiling))
 		{
@@ -903,7 +901,6 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 	{
 		bool mirror = false;
 		DAngle ang = (thingpos - vp.Pos).Angle();
-		if(r_isocam || (di->Level->flags3 & LEVEL3_ISOMETRICMODE)) ang = vp.Angles.Yaw;
 		FTextureID patch;
 		// [ZZ] add direct picnum override
 		if (isPicnumOverride)
@@ -1023,20 +1020,6 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 			x2 = x - viewvecY*rightfac;
 			y1 = y + viewvecX*leftfac;
 			y2 = y + viewvecX*rightfac;
-			if(di->Level->flags3 & LEVEL3_ISOMETRICSPRITES && (r_isocam  || (di->Level->flags3 & LEVEL3_ISOMETRICMODE))) // If sprites are drawn from an isometric perspective
-			{
-			        float signX = 1.0;
-				float signY = 1.0;
-				if(viewvecX < 0) signX = -1.0;
-				if(viewvecY < 0) signY = -1.0;
-				if(viewvecX == 0) signX = 0.0;
-				if(viewvecY == 0) signY = 0.0;
-
-				x1 -= signX * thing->radius;
-				x2 -= signX * thing->radius;
-				y1 -= signY * thing->radius;
-				y2 -= signY * thing->radius;
-			}
 			break;
 		}
 		case RF_FLATSPRITE:
@@ -1077,7 +1060,6 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 	}
 
 	depth = (float)((x - vp.Pos.X) * vp.TanCos + (y - vp.Pos.Y) * vp.TanSin);
-	if(r_isocam || (di->Level->flags3 & LEVEL3_ISOMETRICMODE)) depth = depth * vp.PitchCos - vp.PitchSin * z2; // Helps with stacking actors with small xy offsets
 	if (isSpriteShadow) depth += 1.f/65536.f; // always sort shadows behind the sprite.
 
 	// light calculation
@@ -1305,7 +1287,7 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
@@ -1331,7 +1313,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 	this->particle = particle;
 	fullbright = particle->flags & SPF_FULLBRIGHT;
 
-	if (di->isFullbrightScene())
+	if (di->isFullbrightScene()) 
 	{
 		Colormap.Clear();
 	}
@@ -1390,7 +1372,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 	{
 		bool has_texture = particle->texture.isValid();
 		bool custom_animated_texture = (particle->flags & SPF_LOCAL_ANIM) && particle->animData.ok;
-
+		
 		int particle_style = has_texture ? 2 : gl_particles_style; // Treat custom texture the same as smooth particles
 
 		// [BB] Load the texture for round or smooth particles
@@ -1449,7 +1431,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 			float rvf = (particle->RollVel) * timefrac;
 			Angles.Roll = TAngle<double>::fromDeg(particle->Roll + rvf);
 		}
-
+	
 		float factor;
 		if (particle_style == 1) factor = 1.3f / 7.f;
 		else if (particle_style == 2) factor = 2.5f / 7.f;
@@ -1467,7 +1449,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 		z2=z+scalefac;
 
 		depth = (float)((x - vp.Pos.X) * vp.TanCos + (y - vp.Pos.Y) * vp.TanSin);
-
+	
 		// [BB] Translucent particles have to be rendered without the alpha test.
 		if (particle_style != 2 && trans>=1.0f-FLT_EPSILON) hw_styleflags = STYLEHW_Solid;
 		else hw_styleflags = STYLEHW_NoAlphaTest;
@@ -1483,7 +1465,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 }
 
 // [MC] VisualThinkers are to be rendered akin to actor sprites. The reason this whole system
-// is hitching a ride on particle_t is because of the large number of checks with
+// is hitching a ride on particle_t is because of the large number of checks with 
 // HWSprite elsewhere in the draw lists.
 void HWSprite::AdjustVisualThinker(HWDrawInfo* di, DVisualThinker* spr, sector_t* sector)
 {
@@ -1494,7 +1476,7 @@ void HWSprite::AdjustVisualThinker(HWDrawInfo* di, DVisualThinker* spr, sector_t
 
 	if (paused || spr->isFrozen())
 		timefrac = 0.;
-
+	
 	bool custom_anim = ((spr->PT.flags & SPF_LOCAL_ANIM) && spr->PT.animData.ok);
 
 	texture = TexMan.GetGameTexture(
@@ -1526,7 +1508,7 @@ void HWSprite::AdjustVisualThinker(HWDrawInfo* di, DVisualThinker* spr, sector_t
 	auto r = spi.GetSpriteRect();
 	r.Scale(spr->Scale.X, spr->Scale.Y);
 
-	if (spr->bXFlip)
+	if (spr->bXFlip)	
 	{
 		std::swap(ul,ur);
 		r.left = -r.width - r.left;	// mirror the sprite's x-offset
@@ -1553,7 +1535,7 @@ void HWSprite::AdjustVisualThinker(HWDrawInfo* di, DVisualThinker* spr, sector_t
 
 //==========================================================================
 //
-//
+// 
 //
 //==========================================================================
 
