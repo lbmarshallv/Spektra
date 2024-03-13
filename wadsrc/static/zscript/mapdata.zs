@@ -270,7 +270,7 @@ struct SecPlane native play
 	native clearscope int PointOnSide(Vector3 pos) const;
 	native clearscope double ZatPoint (Vector2 v) const;
 	native clearscope double ZatPointDist(Vector2 v, double dist) const;
-	native clearscope bool isEqual(Secplane other) const;
+	native clearscope bool isEqual(readonly<Secplane> other) const;
 	//native void ChangeHeight(double hdiff);
 	native clearscope double GetChangedHeight(double hdiff) const;
 	native clearscope double HeightDiff(double oldd, double newd = 1e37) const;
@@ -435,6 +435,7 @@ struct Sector native play
 		SECMF_UNDERWATERMASK	= 32+64,
 		SECMF_DRAWN			= 128,	// sector has been drawn at least once
 		SECMF_HIDDEN			= 256,	// Do not draw on textured automap
+		SECMF_NOPATHING			= 4096, // monsters cannot path find in these areas, saves on time and resources
 	}
 	native uint16		MoreFlags;
 	
