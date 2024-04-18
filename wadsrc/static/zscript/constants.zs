@@ -232,8 +232,6 @@ enum EMorphFlags
 	MRF_UNDOBYTIMEOUT		= 0x00001000,
 	MRF_UNDOALWAYS			= 0x00002000,
 	MRF_TRANSFERTRANSLATION = 0x00004000,
-	MRF_KEEPARMOR			= 0x00008000,
-	MRF_IGNOREINVULN		= 0x00010000,
 	MRF_STANDARDUNDOING	= MRF_UNDOBYTOMEOFPOWER | MRF_UNDOBYCHAOSDEVICE | MRF_UNDOBYTIMEOUT,
 };
 
@@ -375,6 +373,7 @@ enum ESetAnimationFlags
 {
 	SAF_INSTANT = 1 << 0,
 	SAF_LOOP = 1 << 1,
+	SAF_NOOVERRIDE = 1 << 2,
 };
 
 // Change model flags
@@ -1161,6 +1160,7 @@ enum EPlayerCheats
 	CF_INTERPVIEWANGLES	= 1 << 15,		// [MR] flag for interpolating view angles without interpolating the entire frame
 	CF_NOFOVINTERP		= 1 << 16,		// [B] Disable FOV interpolation when instantly zooming
 	CF_SCALEDNOLERP		= 1 << 17,		// [MR] flag for applying angles changes in the ticrate without interpolating the frame
+	CF_NOVIEWPOSINTERP	= 1 << 18,		// Disable view position interpolation.
 
 	CF_EXTREMELYDEAD	= 1 << 22,		// [RH] Reliably let the status bar know about extreme deaths.
 

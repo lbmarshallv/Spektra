@@ -325,6 +325,7 @@ if (HAVE_VULKAN)
 endif()
 
 list( APPEND PROJECT_LIBRARIES "zwidget" )
+list( APPEND PROJECT_LIBRARIES "webp" )
 
 # ZMUSIC
 
@@ -1330,6 +1331,7 @@ include_directories(
 	launcher
 	../libraries/ZVulkan/include
 	../libraries/ZWidget/include
+	../libraries/webp/include
 	${SYSTEM_SOURCES_DIR}
 )
 

@@ -1424,7 +1424,6 @@ void FLevelLocals::PlayerReborn (int player)
 	p->oldbuttons = ~0, p->attackdown = true; p->usedown = true;	// don't do anything immediately
 	p->original_oldbuttons = ~0;
 	p->playerstate = PST_LIVE;
-	NetworkEntityManager::SetClientNetworkEntity(p);
 
 	if (gamestate != GS_TITLELEVEL)
 	{
@@ -1606,10 +1605,20 @@ void FLevelLocals::DeathMatchSpawnPlayer (int playernum)
 	if (selections < 1)
 		I_Error ("No deathmatch starts");
 
+	bool hasSpawned = false;
+	for (int i = 0; i < MAXPLAYERS; ++i)
+	{
+		if (PlayerInGame(i) && Players[i]->mo != nullptr && Players[i]->health > 0)
+		{
+			hasSpawned = true;
+			break;
+		}
+	}
+
 	// At level start, none of the players have mobjs attached to them,
 	// so we always use the random deathmatch spawn. During the game,
 	// though, we use whatever dmflags specifies.
-	if ((dmflags & DF_SPAWN_FARTHEST) && players[playernum].mo)
+	if ((dmflags & DF_SPAWN_FARTHEST) && hasSpawned)
 		spot = SelectFarthestDeathmatchSpot (selections);
 	else
 		spot = SelectRandomDeathmatchSpot (playernum, selections);
@@ -2147,14 +2156,6 @@ void G_DoLoadGame ()
 		level.info->Snapshot.Clean();
 
 	BackupSaveName = savename;
-
-	//Push any added models from A_ChangeModel
-	for (auto& smf : savedModelFiles)
-	{
-		FString modelFilePath = smf.Left(smf.LastIndexOf("/")+1);
-		FString modelFileName = smf.Right(smf.Len() - smf.Left(smf.LastIndexOf("/") + 1).Len());
-		FindModel(modelFilePath.GetChars(), modelFileName.GetChars());
-	}
 
 	// At this point, the GC threshold is likely a lot higher than the
 	// amount of memory in use, so bring it down now by starting a

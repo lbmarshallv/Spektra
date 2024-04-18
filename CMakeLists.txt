@@ -341,6 +341,7 @@ if (HAVE_VULKAN)
 endif()
 
 add_subdirectory( libraries/ZWidget )
+add_subdirectory( libraries/webp )
 
 add_subdirectory( libraries/discordrpc EXCLUDE_FROM_ALL )
 set( DRPC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/discordrpc/include" )
