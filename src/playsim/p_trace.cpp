@@ -40,6 +40,7 @@
 #include "p_spec.h"
 #include "g_levellocals.h"
 #include "p_terrain.h"
+#include "p_3dmidtex.h"
 #include "vm.h"
 
 //==========================================================================
@@ -485,6 +486,23 @@ bool FTraceInfo::LineCheck(intercept_t *in, double dist, DVector3 hit, bool spec
 		if ((TraceFlags & TRACE_Impact) && !special3dpass)
 		{
 			P_ActivateLine(in->d.line, IgnoreThis, lineside, SPAC_Impact);
+		}
+	}
+	else if (entersector == NULL ||
+		hit.Z < bf || hit.Z > bc ||
+		(WallMask & ML_BLOCKING &&(in->d.line->flags & ML_3DMIDTEX|ML_3DMIDTEX_IMPASS)))
+	{
+		double top, bot;
+		P_GetMidTexturePosition(in->d.line, lineside, &top, &bot);
+		if (bot < hit.Z && top > hit.Z)
+		{
+			// hit the wall
+			Results->HitType = TRACE_HitWall;
+			Results->Tier = TIER_Middle;
+			if ((TraceFlags & TRACE_Impact) && !special3dpass)
+			{
+				P_ActivateLine(in->d.line, IgnoreThis, lineside, SPAC_Impact);
+			}
 		}
 	}
 	else
