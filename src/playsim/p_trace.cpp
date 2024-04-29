@@ -412,6 +412,8 @@ bool FTraceInfo::LineCheck(intercept_t *in, double dist, DVector3 hit, bool spec
 		}
 	}
 
+	side_t* side = in->d.line->sidedef[lineside];
+		
 	if (!(in->d.line->flags & ML_TWOSIDED))
 	{
 		entersector = NULL;
@@ -488,9 +490,9 @@ bool FTraceInfo::LineCheck(intercept_t *in, double dist, DVector3 hit, bool spec
 			P_ActivateLine(in->d.line, IgnoreThis, lineside, SPAC_Impact);
 		}
 	}
-	else if (entersector == NULL ||
-		hit.Z < bf || hit.Z > bc ||
-		(WallMask & ML_BLOCKING &&(in->d.line->flags & ML_3DMIDTEX|ML_3DMIDTEX_IMPASS)))
+	else if (WallMask & ML_BLOCKING &&
+		((in->d.line->flags & ML_3DMIDTEX|ML_3DMIDTEX_IMPASS) && !(side->textures[1].texture.isNull()) && !special3dpass)
+		)
 	{
 		double top, bot;
 		P_GetMidTexturePosition(in->d.line, lineside, &top, &bot);
