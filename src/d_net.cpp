@@ -2260,7 +2260,7 @@ void Net_DoCommand (int type, uint8_t **stream, int player)
 		cht_Give (&players[player], s, ReadInt32 (stream));
 		if (player != consoleplayer)
 		{
-			FString message = GStrings("TXT_X_CHEATS");
+			FString message = GStrings.GetString("TXT_X_CHEATS");
 			message.Substitute("%s", players[player].userinfo.GetName());
 			Printf("%s: give %s\n", message.GetChars(), s);
 		}
@@ -2753,6 +2753,10 @@ void Net_DoCommand (int type, uint8_t **stream, int player)
 			primaryLevel->localEventManager->NetCommand(netCmd);
 		}
 	break;
+
+	case DEM_CHANGESKILL:
+		NextSkill = ReadInt32(stream);
+		break;
 		
 	default:
 		I_Error ("Unknown net command: %d", type);
@@ -2848,6 +2852,7 @@ void Net_SkipCommand (int type, uint8_t **stream)
 		case DEM_INVUSE:
 		case DEM_FOV:
 		case DEM_MYFOV:
+		case DEM_CHANGESKILL:
 			skip = 4;
 			break;
 
@@ -2964,6 +2969,12 @@ int Net_GetLatency(int *ld, int *ad)
 	*ad = arbitratordelay;
 	return severity;
 }
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
 
 // [RH] List "ping" times
 CCMD (pings)

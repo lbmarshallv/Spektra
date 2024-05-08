@@ -217,19 +217,19 @@ CCMD(am_togglefollow)
 	am_followplayer = !am_followplayer;
 	if (primaryLevel && primaryLevel->automap)
 		primaryLevel->automap->ResetFollowLocation();
-	Printf("%s\n", GStrings(am_followplayer ? "AMSTR_FOLLOWON" : "AMSTR_FOLLOWOFF"));
+	Printf("%s\n", GStrings.GetString(am_followplayer ? "AMSTR_FOLLOWON" : "AMSTR_FOLLOWOFF"));
 }
 
 CCMD(am_togglegrid)
 {
 	am_showgrid = !am_showgrid;
-	Printf("%s\n", GStrings(am_showgrid ? "AMSTR_GRIDON" : "AMSTR_GRIDOFF"));
+	Printf("%s\n", GStrings.GetString(am_showgrid ? "AMSTR_GRIDON" : "AMSTR_GRIDOFF"));
 }
 
 CCMD(am_toggletexture)
 {
 	am_textured = !am_textured;
-	Printf("%s\n", GStrings(am_textured ? "AMSTR_TEXON" : "AMSTR_TEXOFF"));
+	Printf("%s\n", GStrings.GetString(am_textured ? "AMSTR_TEXON" : "AMSTR_TEXOFF"));
 }
 
 CCMD(am_setmark)
@@ -239,7 +239,7 @@ CCMD(am_setmark)
 		int m = primaryLevel->automap->addMark();
 		if (m >= 0)
 		{
-			Printf("%s %d\n", GStrings("AMSTR_MARKEDSPOT"), m);
+			Printf("%s %d\n", GStrings.GetString("AMSTR_MARKEDSPOT"), m);
 		}
 	}
 }
@@ -248,7 +248,7 @@ CCMD(am_clearmarks)
 {
 	if (primaryLevel && primaryLevel->automap && primaryLevel->automap->clearMarks())
 	{
-		Printf("%s\n", GStrings("AMSTR_MARKSCLEARED"));
+		Printf("%s\n", GStrings.GetString("AMSTR_MARKSCLEARED"));
 	}
 }
 
@@ -2883,7 +2883,8 @@ void DAutomap::drawPlayers ()
 
 		if (p->mo != nullptr)
 		{
-			DVector3 pos = p->mo->PosRelative(MapPortalGroup);
+			DVector2 pos = p->mo->InterpolatedPosition(r_viewpoint.TicFrac).XY();
+			pos += Level->Displacements.getOffset(Level->PointInSector(pos)->PortalGroup, MapPortalGroup);
 			pt.x = pos.X;
 			pt.y = pos.Y;
 

@@ -95,6 +95,10 @@ extern	int 			nodeforplayer[MAXPLAYERS];
 extern	ticcmd_t		netcmds[MAXPLAYERS][BACKUPTICS];
 extern	int 			ticdup;
 
+class player_t;
+class DObject;
+
+
 // [RH]
 // New generic packet structure:
 //

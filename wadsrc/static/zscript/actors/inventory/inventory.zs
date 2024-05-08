@@ -262,6 +262,11 @@ class Inventory : Actor
 		}
 	}
 
+	virtual bool ShouldShareItem(Actor giver)
+	{
+		return false;
+	}
+
 	protected void ShareItemWithPlayers(Actor giver)
 	{
 		if (bSharingItem)
@@ -415,7 +420,10 @@ class Inventory : Actor
 	{
 		Inventory copy;
 
-		Amount = MIN(Amount, MaxAmount);
+		// Clamping this on local copy creation presents too many possible
+		// pitfalls (e.g. Health items).
+		if (!IsCreatingLocalCopy())
+			Amount = MIN(Amount, MaxAmount);
 		if (GoAway ())
 		{
 			copy = Inventory(Spawn (GetClass()));
@@ -693,7 +701,7 @@ class Inventory : Actor
 			toucher.HasReceived(self);
 
 			// If the item can be shared, make sure every player gets a copy.
-			if (multiplayer && !deathmatch && sv_coopsharekeys && bIsKeyItem)
+			if (multiplayer && !deathmatch && ShouldShareItem(toucher))
 				ShareItemWithPlayers(toucher);
 		}
 		return res, toucher;
@@ -1047,7 +1055,7 @@ class Inventory : Actor
 
 	protected bool GoAway ()
 	{
-		if (bCreatingCopy)
+		if (IsCreatingLocalCopy())
 			return true;
 
 		// Dropped items never stick around
@@ -1130,6 +1138,11 @@ class Inventory : Actor
 		bCreatingCopy = false;
 
 		return item;
+	}
+
+	protected clearscope bool IsCreatingLocalCopy() const
+	{
+		return bCreatingCopy;
 	}
 	
 	//===========================================================================
