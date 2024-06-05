@@ -1442,6 +1442,17 @@ class Actor : Thinker native
 		}
 	}
 
+	virtual void PlayerSquatView(Actor onmobj)
+	{
+		if (!self.player)
+			return;
+
+		if (self.player.mo == self)
+		{
+			self.player.deltaviewheight = self.Vel.Z / 8.;
+		}
+	}
+
 	//----------------------------------------------------------------------------
 	//
 	// PROC A_CheckSkullDone

@@ -272,19 +272,18 @@ class Inventory : Actor
 		if (bSharingItem)
 			return;
 
-		class<Inventory> type = GetClass();
 		int skip = giver && giver.player ? giver.PlayerNumber() : -1;
-
 		for (int i; i < MAXPLAYERS; ++i)
 		{
 			if (!playerInGame[i] || i == skip)
 				continue;
 
-			let item = Inventory(Spawn(type));
-			if (!item)
+			let item = CreateLocalCopy(players[i].mo);
+			if (!item || item == self)
 				continue;
 
 			item.bSharingItem = true;
+			item.bDropped = item.bNeverLocal = true;
 			if (!item.CallTryPickup(players[i].mo))
 			{
 				item.Destroy();
@@ -294,14 +293,13 @@ class Inventory : Actor
 
 			if (!bQuiet)
 			{
-				PlayPickupSound(players[i].mo);
+				PrintPickupMessage(i == consoleplayer, item.PickupMessage());
+
+				item.PlayPickupSound(players[i].mo);
 				if (!bNoScreenFlash && players[i].PlayerState != PST_DEAD)
 					players[i].BonusCount = BONUSADD;
 			}
 		}
-
-		if (!bQuiet && consoleplayer != skip)
-			PrintPickupMessage(true, PickupMessage());
 	}
 
 	//===========================================================================
@@ -701,7 +699,7 @@ class Inventory : Actor
 			toucher.HasReceived(self);
 
 			// If the item can be shared, make sure every player gets a copy.
-			if (multiplayer && !deathmatch && ShouldShareItem(toucher))
+			if (multiplayer && !deathmatch && !bDropped && ShouldShareItem(toucher))
 				ShareItemWithPlayers(toucher);
 		}
 		return res, toucher;
@@ -870,13 +868,13 @@ class Inventory : Actor
 
 		if (!bQuiet)
 		{
-			PrintPickupMessage(localview, PickupMessage ());
+			PrintPickupMessage(localview, give.PickupMessage ());
 
 			// Special check so voodoo dolls picking up items cause the
 			// real player to make noise.
 			if (player != NULL)
 			{
-				PlayPickupSound (player.mo);
+				give.PlayPickupSound (player.mo);
 				if (!bNoScreenFlash && player.playerstate != PST_DEAD)
 				{
 					player.bonuscount = BONUSADD;
@@ -884,7 +882,7 @@ class Inventory : Actor
 			}
 			else
 			{
-				PlayPickupSound (toucher);
+				give.PlayPickupSound (toucher);
 			}
 		}							
 
