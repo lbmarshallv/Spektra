@@ -491,7 +491,7 @@ bool FTraceInfo::LineCheck(intercept_t *in, double dist, DVector3 hit, bool spec
 		}
 	}
 	else if (WallMask & ML_BLOCKING &&
-		((in->d.line->flags & ML_3DMIDTEX|ML_3DMIDTEX_IMPASS) && !(side->textures[1].texture.isNull()) && !special3dpass)
+		((in->d.line->flags & ML_3DMIDTEX) && !(side->textures[1].texture.isNull()) && !special3dpass)
 		)
 	{
 		double top, bot;
