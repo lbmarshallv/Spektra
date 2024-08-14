@@ -1454,7 +1454,7 @@ FSerializer &Serialize(FSerializer &arc, const char *key, struct AnimOverride &a
 	arc("flags", ao.flags);
 	arc("framerate", ao.framerate);
 	arc("startTic", ao.startTic);
-	arc("switchTic", ao.switchTic);
+	arc("switchOffset", ao.switchOffset);
 	arc.EndObject();
 	return arc;
 }
@@ -2938,7 +2938,7 @@ void AActor::CallFallAndSink(double grav, double oldfloorz)
 	}
 	else
 	{
-	FallAndSink(grav, oldfloorz);
+		FallAndSink(grav, oldfloorz);
 	}
 }
 
@@ -3874,6 +3874,12 @@ void AActor::Tick ()
 			{
 				special2++;
 			}
+
+			if(flags9 & MF9_DECOUPLEDANIMATIONS && modelData && !(modelData->curAnim.flags & ANIMOVERRIDE_NONE))
+			{
+				modelData->curAnim.startTic += 1;
+			}
+
 			return;
 		}
 
@@ -3921,6 +3927,12 @@ void AActor::Tick ()
 			{
 				special2++;
 			}
+
+			if(flags9 & MF9_DECOUPLEDANIMATIONS && modelData && !(modelData->curAnim.flags & ANIMOVERRIDE_NONE))
+			{
+				modelData->curAnim.startTic += 1;
+			}
+
 			return;
 		}
 
@@ -4617,6 +4629,23 @@ void AActor::SplashCheck()
 
 //==========================================================================
 //
+// AActor::PlayDiveOrSurfaceSounds
+//
+// Plays diving or surfacing sounds for the player
+//
+//==========================================================================
+
+void AActor::PlayDiveOrSurfaceSounds(int oldlevel)
+{
+	IFVIRTUAL(AActor, PlayDiveOrSurfaceSounds)
+	{
+		VMValue params[2] = { (DObject *)this, oldlevel };
+		VMCall(func, params, 2, nullptr, 0);
+	}
+}
+
+//==========================================================================
+//
 // AActor::UpdateWaterLevel
 //
 // Returns true if actor should splash
@@ -4638,21 +4667,7 @@ bool AActor::UpdateWaterLevel(bool dosplash)
 
 	if (player != nullptr)
 	{
-		if (oldlevel < 3 && waterlevel == 3)
-		{
-			// Our head just went under.
-			S_Sound(this, CHAN_VOICE, 0, "*dive", 1, ATTN_NORM);
-		}
-		else if (oldlevel == 3 && waterlevel < 3)
-		{
-			// Our head just came up.
-			if (player->air_finished > Level->maptime)
-			{
-				// We hadn't run out of air yet.
-				S_Sound(this, CHAN_VOICE, 0, "*surface", 1, ATTN_NORM);
-			}
-			// If we were running out of air, then ResetAirSupply() will play *gasp.
-		}
+		PlayDiveOrSurfaceSounds(oldlevel);
 	}
 
 	return false;	// we did the splash ourselves
@@ -5358,6 +5373,42 @@ int MorphPointerSubstitution(AActor* from, AActor* to)
 		return false;
 	}
 
+	// [MC] Had to move this here since ObtainInventory was also moved as well. Should be called
+	// before any transference of items since that's what was intended when introduced.
+	if (!from->alternative) // Morphing into
+	{
+		{
+			IFVIRTUALPTR(from, AActor, PreMorph)
+			{
+				VMValue params[] = { from, to, false };
+				VMCall(func, params, 3, nullptr, 0);
+			}
+		}
+		{
+			IFVIRTUALPTR(to, AActor, PreMorph)
+			{
+				VMValue params[] = { to, from, true };
+				VMCall(func, params, 3, nullptr, 0);
+			}
+		}
+	}
+	else // Unmorphing back
+	{
+		{
+			IFVIRTUALPTR(from, AActor, PreUnmorph)
+			{
+				VMValue params[] = { from, to, false };
+				VMCall(func, params, 3, nullptr, 0);
+			}
+		}
+		{
+			IFVIRTUALPTR(to, AActor, PreUnmorph)
+			{
+				VMValue params[] = { to, from, true };
+				VMCall(func, params, 3, nullptr, 0);
+			}
+		}
+	}
 	// Since the check is good, move the inventory items over. This should always be done when
 	// morphing to emulate Heretic/Hexen's behavior since those stored the inventory in their
 	// player structs.
