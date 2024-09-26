@@ -225,19 +225,67 @@ void HWDrawInfo::WorkerThread()
 
 EXTERN_CVAR(Float, r_line_distance_cull)
 
-inline bool IsDistanceCulled(DVector3 vp,seg_t *line)
+
+inline double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
+	//calcuate the distance between the viewpoint and any point on the line
+	double x1, y1, x2, y2, a, b, c;
+	x1 = line->v1->fPos().X;
+	y1 = line->v1->fPos().Y;
+	x2 = line->v2->fPos().X;
+	y2 = line->v2->fPos().Y;
+	a = y1 - y2;
+	b = x2 - x1;
+	c = x1 * y2 - x2 * y1;
+	double dist = abs(a * vp.Pos.X + b * vp.Pos.Y + c) / sqrt(a * a + b * b);
+	return dist;
+}
+
+inline bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 {
-	double dist3 = r_line_distance_cull * r_line_distance_cull;
-	if (dist3 <= 0.0)
+	double cullDist = r_line_distance_cull;
+	if (cullDist <= 0.0)
 		return false;
 	//only lines outside (with sky flat) get culled
 	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum  && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
 		return false;
-	double dist1 = (line->v1->fPos() - vp).LengthSquared();
-	double dist2 = (line->v2->fPos() - vp).LengthSquared();
-	if ((dist1 > dist3) && (dist2 > dist3))
-		return true;
-	return false;
+	return DistanceToLine(vp, line) > cullDist;
+}
+
+inline bool IsDistanceCulled(double dist, seg_t* line)
+{
+	double cullDist = r_line_distance_cull;
+	if (cullDist <= 0.0)
+		return false;
+	//only lines outside (with sky flat) get culled
+	if (line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
+		return false;
+	return dist > cullDist;
+}
+
+inline bool IsPointInFOV(FRenderViewpoint vp, const DVector3 point)
+{
+	double fov = vp.FieldOfView.Degrees();
+	DVector3 cameraPos = vp.Pos;
+	DVector3 cameraDir = DVector3(vp.Angles.Pitch.Radians(), vp.Angles.Yaw.Radians(), vp.Angles.Roll.Radians());
+
+	// Vector from camera to the point
+	DVector3 toPoint = point - cameraPos;
+
+	// Normalize the direction vectors
+	DVector3 toPointDir = toPoint.normalize();
+	DVector3 camDirNormalized = cameraDir.normalize();
+
+	// Calculate the dot product (cosine of the angle between the two vectors)
+	float dotProduct = camDirNormalized.dot(toPointDir);
+
+	// Calculate the angle between the camera direction and the point direction
+	float angleToPoint = std::acos(dotProduct);
+
+	// Convert FOV to radians and compute half of the FOV
+	float halfFOV = (fov * 0.5f) * (M_PI / 180.0f);
+
+	// The point is within the FOV if the angle to the point is less than or equal to half the FOV
+	return angleToPoint <= halfFOV;
 }
 
 EXTERN_CVAR(Bool, gl_render_segs)
@@ -366,19 +414,20 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
 
-	if (!isNoLineCullMode() && IsDistanceCulled(Viewpoint.Pos,seg))
+	if (!gl_multithread && !isNoLineCullMode())
 	{
-		if(!gl_multithread){
+		double dist = DistanceToLine(Viewpoint, seg);
+		if (IsDistanceCulled(dist, seg)) {
 			HWWall wall;
 			HWWallDispatcher disp(this);
 			SetupWall.Clock();
 			wall.sub = seg->Subsector;
-			wall.Process(&disp, seg, currentsector, backsector,true);
+			wall.Process(&disp, seg, currentsector, backsector, true);
 			rendered_lines++;
 			SetupWall.Unclock();
+			clipper.SafeAddClipRange(startAngle, endAngle);
+			return;
 		}
-		clipper.SafeAddClipRange(startAngle, endAngle);
-		return;
 	}
 	
 	if (!seg->backsector)

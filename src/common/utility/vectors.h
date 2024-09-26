@@ -392,6 +392,15 @@ struct TVector3
 		return X == 0 && Y == 0 && Z == 0;
 	}
 
+	constexpr float length() const {
+		return sqrt(X * X + Y * Y + Z * Z);
+	}
+
+	constexpr TVector3 normalize() const {
+		float len = length();
+		return { X / len, Y / len, Z / len };
+	}
+
 	constexpr TVector3 plusZ(double z) const
 	{
 		return { X, Y, Z + z };
