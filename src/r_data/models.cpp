@@ -290,7 +290,7 @@ void calcFrame(const ModelAnim &anim, double tic, ModelAnimFrameInterp &inter)
 
 	inter.frame2 = int(ceil(frame));
 
-	int startFrame = (looped ? anim.startFrame : anim.loopFrame);
+	int startFrame = (looped ? anim.loopFrame : anim.startFrame);
 
 	if(inter.frame1 < startFrame) inter.frame1 = anim.lastFrame;
 	if(inter.frame2 > anim.lastFrame) inter.frame2 = startFrame;
@@ -538,7 +538,7 @@ void RenderFrameModels(FModelRenderer *renderer, FLevelLocals *Level, const FSpr
 				if (animationid >= 0)
 				{
 					animation = Models[animationid];
-					const TArray<TRS>* animationData = animation->AttachAnimationData();
+					animationData = animation->AttachAnimationData();
 				}
 
 				if(is_decoupled)
