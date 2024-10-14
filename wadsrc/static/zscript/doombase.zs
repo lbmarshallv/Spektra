@@ -614,6 +614,7 @@ struct TerrainDef native
 	native bool DamageOnLand;
 	native double Friction;
 	native double MoveFactor;
+	native Sound StepSound;
 };
 
 enum EPickStart
