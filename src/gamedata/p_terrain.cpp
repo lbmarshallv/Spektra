@@ -97,7 +97,6 @@ enum EGenericType
 	GEN_Splash,
 	GEN_Float,
 	GEN_Double,
-	GEN_Time,
 	GEN_Bool,
 	GEN_Int,
 	GEN_Custom,
@@ -191,6 +190,8 @@ static const char *TerrainKeywords[] =
 	"allowprotection",
 	"damageonland",
 	"stepsounds",
+	"stepdistance",
+	"stepdistanceminvel",
 	NULL
 };
 
@@ -219,8 +220,8 @@ static FGenericParse TerrainParser[] =
 	{ GEN_Int,    {myoffsetof(FTerrainDef, DamageTimeMask)} },
 	{ GEN_Double, {myoffsetof(FTerrainDef, FootClip)} },
 	{ GEN_Float,  {myoffsetof(FTerrainDef, StepVolume)} },
-	{ GEN_Time,   {myoffsetof(FTerrainDef, WalkStepTics)} },
-	{ GEN_Time,   {myoffsetof(FTerrainDef, RunStepTics)} },
+	{ GEN_Int,   {myoffsetof(FTerrainDef, WalkStepTics)} },
+	{ GEN_Int,   {myoffsetof(FTerrainDef, RunStepTics)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, LeftStepSound)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, RightStepSound)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, DamageSound)} },
@@ -229,6 +230,8 @@ static FGenericParse TerrainParser[] =
 	{ GEN_Bool,   {myoffsetof(FTerrainDef, AllowProtection)} },
 	{ GEN_Bool,   {myoffsetof(FTerrainDef, DamageOnLand)} },
 	{ GEN_Sound,  {myoffsetof(FTerrainDef, StepSound)} },
+	{ GEN_Double,  {myoffsetof(FTerrainDef, StepDistance)} },
+	{ GEN_Double,  {myoffsetof(FTerrainDef, StepDistanceMinVel)} },
 };
 
 
@@ -604,11 +607,6 @@ static void GenericParse (FScanner &sc, FGenericParse *parser, const char **keyw
 			SET_FIELD(double, sc.Float);
 			break;
 
-		case GEN_Time:
-			sc.MustGetFloat ();
-			SET_FIELD (int, (int)(sc.Float));
-			break;
-
 		case GEN_Bool:
 			SET_FIELD (bool, true);
 			break;
@@ -756,3 +754,5 @@ DEFINE_FIELD(FTerrainDef, DamageOnLand)
 DEFINE_FIELD(FTerrainDef, Friction)
 DEFINE_FIELD(FTerrainDef, MoveFactor)
 DEFINE_FIELD(FTerrainDef, StepSound)
+DEFINE_FIELD(FTerrainDef, StepDistance)
+DEFINE_FIELD(FTerrainDef, StepDistanceMinVel)

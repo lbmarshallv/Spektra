@@ -615,6 +615,8 @@ struct TerrainDef native
 	native double Friction;
 	native double MoveFactor;
 	native Sound StepSound;
+	native double StepDistance;
+	native double StepDistanceMinVel;
 };
 
 enum EPickStart

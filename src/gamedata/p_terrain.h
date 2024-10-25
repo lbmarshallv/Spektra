@@ -120,6 +120,8 @@ struct FTerrainDef
 	double Friction;
 	double MoveFactor;
 	FSoundID StepSound;
+	double StepDistance;
+	double StepDistanceMinVel;
 };
 
 extern TArray<FSplashDef> Splashes;
