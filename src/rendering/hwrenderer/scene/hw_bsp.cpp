@@ -228,7 +228,7 @@ void HWDrawInfo::WorkerThread()
 EXTERN_CVAR(Float, r_line_distance_cull)
 
 
-inline double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
+static double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
 	//calcuate the distance between the viewpoint and any point on the line
 	double x1, y1, x2, y2, a, b, c;
 	x1 = line->v1->fPos().X;
@@ -238,11 +238,10 @@ inline double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
 	a = y1 - y2;
 	b = x2 - x1;
 	c = x1 * y2 - x2 * y1;
-	double dist = abs(a * vp.Pos.X + b * vp.Pos.Y + c) / sqrt(a * a + b * b);
-	return dist;
+	return abs(a * vp.Pos.X + b * vp.Pos.Y + c) / sqrt(a * a + b * b);
 }
 
-inline bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
+static bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 {
 	double cullDist = r_line_distance_cull;
 	if (cullDist <= 0.0)
@@ -253,7 +252,7 @@ inline bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 	return DistanceToLine(vp, line) > cullDist;
 }
 
-inline bool IsDistanceCulled(double dist, seg_t* line)
+static bool IsDistanceCulled(double dist, seg_t* line)
 {
 	double cullDist = r_line_distance_cull;
 	if (cullDist <= 0.0)
@@ -264,7 +263,8 @@ inline bool IsDistanceCulled(double dist, seg_t* line)
 	return dist > cullDist;
 }
 
-inline bool IsPointInFOV(FRenderViewpoint vp, const DVector3 point)
+/**
+static bool IsPointInFOV(FRenderViewpoint vp, const DVector3 point)
 {
 	double fov = vp.FieldOfView.Degrees();
 	DVector3 cameraPos = vp.Pos;
@@ -289,6 +289,7 @@ inline bool IsPointInFOV(FRenderViewpoint vp, const DVector3 point)
 	// The point is within the FOV if the angle to the point is less than or equal to half the FOV
 	return angleToPoint <= halfFOV;
 }
+**/
 
 EXTERN_CVAR(Bool, gl_render_segs)
 
