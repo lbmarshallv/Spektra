@@ -247,7 +247,7 @@ static bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 	if (cullDist <= 0.0)
 		return false;
 	//only lines outside (with sky flat) get culled
-	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum  && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
+	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum)
 		return false;
 	return DistanceToLine(vp, line) > cullDist;
 }
@@ -258,7 +258,7 @@ static bool IsDistanceCulled(double dist, seg_t* line)
 	if (cullDist <= 0.0)
 		return false;
 	//only lines outside (with sky flat) get culled
-	if (line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum && line->frontsector->GetTexture(sector_t::floor) != skyflatnum)
+	if (line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum)
 		return false;
 	return dist > cullDist;
 }
@@ -343,6 +343,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 		if (clipres == PClip_InFront) return;
 	}
 
+	bool isCulled = IsDistanceCulled(Viewpoint, seg);
 	auto &clipper = *mClipper;
 	angle_t startAngle = clipper.GetClipAngle(seg->v2);
 	angle_t endAngle = clipper.GetClipAngle(seg->v1);
@@ -419,8 +420,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 	if (!gl_multithread && !isNoLineCullMode())
 	{
-		double dist = DistanceToLine(Viewpoint, seg);
-		if (IsDistanceCulled(dist, seg)) {
+		if (isCulled) {
 			HWWall wall;
 			HWWallDispatcher disp(this);
 			SetupWall.Clock();
