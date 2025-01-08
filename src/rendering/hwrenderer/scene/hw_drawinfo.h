@@ -199,6 +199,7 @@ private:
 	void UnclipSubsector(subsector_t *sub);
 	
 	void AddLine(seg_t *seg, bool portalclip);
+	void AddCulledLine(seg_t* seg);
 	void PolySubsector(subsector_t * sub);
 	void RenderPolyBSPNode(void *node);
 	void AddPolyobjs(subsector_t *sub);

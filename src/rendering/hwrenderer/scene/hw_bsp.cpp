@@ -241,6 +241,54 @@ static double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
 	return abs(a * vp.Pos.X + b * vp.Pos.Y + c) / sqrt(a * a + b * b);
 }
 
+static double DistanceToSubsector(FRenderViewpoint vp, subsector_t* sub) {
+	int count = sub->numlines;
+	double minDistance = -1.0;
+	seg_t* seg = sub->firstline;
+
+	while (count--)
+	{
+		if (seg->linedef != nullptr && !(seg->sidedef->Flags & WALLF_POLYOBJ))
+		{
+			double lineDistance = DistanceToLine(vp, seg);
+			if (minDistance < 0 || lineDistance < minDistance) {
+				minDistance = lineDistance;
+			}
+		}
+		seg++;
+	}
+	return minDistance;
+}
+
+static double DistanceToCenter(FRenderViewpoint vp, sector_t* sector) {
+	DVector2 cp;
+	sector->ClosestPoint(vp.Pos.XY(),cp);
+	DVector2 diff = vp.Pos.XY() - cp;
+	return diff.Length();
+}
+
+static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
+	int count = sub->numlines;
+	seg_t* seg = sub->firstline;
+	sector_t* sector = sub->sector;
+	if (!sector || !seg)
+		return false;
+	if (DistanceToCenter(vp, sector) > r_line_distance_cull)
+		return true;
+	/**
+	while (count--)
+	{
+		if (seg && seg->linedef != nullptr && seg->sidedef != nullptr && !(seg->sidedef->Flags & WALLF_POLYOBJ))
+		{
+			if (DistanceToLine(vp, seg) > r_line_distance_cull)
+				return true;
+		}
+		seg++;
+	}
+	**/
+	return false;
+}
+
 static bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 {
 	double cullDist = r_line_distance_cull;
@@ -343,7 +391,6 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 		if (clipres == PClip_InFront) return;
 	}
 
-	bool isCulled = IsDistanceCulled(Viewpoint, seg);
 	auto &clipper = *mClipper;
 	angle_t startAngle = clipper.GetClipAngle(seg->v2);
 	angle_t endAngle = clipper.GetClipAngle(seg->v1);
@@ -417,21 +464,6 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 		currentsubsector->flags |= SSECMF_DRAWN;
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
-
-	if (!gl_multithread && !isNoLineCullMode())
-	{
-		if (isCulled) {
-			HWWall wall;
-			HWWallDispatcher disp(this);
-			SetupWall.Clock();
-			wall.sub = seg->Subsector;
-			wall.Process(&disp, seg, currentsector, backsector, true);
-			rendered_lines++;
-			SetupWall.Unclock();
-			clipper.SafeAddClipRange(startAngle, endAngle);
-			return;
-		}
-	}
 	
 	if (!seg->backsector)
 	{
@@ -498,6 +530,93 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 			}
 		}
 	}
+}
+
+
+void HWDrawInfo::AddCulledLine(seg_t* seg)
+{
+	sector_t* backsector = nullptr;
+
+	auto& clipper = *mClipper;
+	angle_t startAngle = clipper.GetClipAngle(seg->v2);
+	angle_t endAngle = clipper.GetClipAngle(seg->v1);
+	auto& clipperr = *rClipper;
+	angle_t startAngleR = clipperr.PointToPseudoAngle(seg->v2->fX(), seg->v2->fY());
+	angle_t endAngleR = clipperr.PointToPseudoAngle(seg->v1->fX(), seg->v1->fY());
+
+	if (Viewpoint.IsAllowedOoB() && r_radarclipper && !(Level->flags3 & LEVEL3_NOFOGOFWAR) && (startAngleR - endAngleR >= ANGLE_180))
+	{
+		if (!seg->backsector) clipperr.SafeAddClipRange(startAngleR, endAngleR);
+		else if ((seg->sidedef != nullptr) && !uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ) && (currentsector->sectornum != seg->backsector->sectornum))
+		{
+			if (in_area == area_default) in_area = hw_CheckViewArea(seg->v1, seg->v2, seg->frontsector, seg->backsector);
+			backsector = hw_FakeFlat(seg->backsector, in_area, true);
+			if (hw_CheckClip(seg->sidedef, currentsector, backsector)) clipperr.SafeAddClipRange(startAngleR, endAngleR);
+		}
+	}
+
+	// Back side, i.e. backface culling	- read: endAngle >= startAngle!
+	if (startAngle - endAngle < ANGLE_180)
+	{
+		return;
+	}
+
+	if (seg->sidedef == nullptr)
+	{
+		if (!(currentsubsector->flags & SSECMF_DRAWN))
+		{
+			if (clipper.SafeCheckRange(startAngle, endAngle) && (!r_radarclipper || (Level->flags3 & LEVEL3_NOFOGOFWAR)))
+			{
+				currentsubsector->flags |= SSECMF_DRAWN;
+			}
+			if ((r_radarclipper || !(Level->flags3 & LEVEL3_NOFOGOFWAR)) && clipperr.SafeCheckRange(startAngleR, endAngleR))
+			{
+				currentsubsector->flags |= SSECMF_DRAWN;
+			}
+		}
+		return;
+	}
+
+	if (!clipper.SafeCheckRange(startAngle, endAngle))
+	{
+		return;
+	}
+
+	if (Viewpoint.IsAllowedOoB()) // No need for vertical clipping if viewpoint not allowed out of bounds
+	{
+		auto& clipperv = *vClipper;
+		angle_t startPitch = clipperv.PointToPseudoPitch(seg->v1->fX(), seg->v1->fY(), currentsector->floorplane.ZatPoint(seg->v1));
+		angle_t endPitch = clipperv.PointToPseudoPitch(seg->v1->fX(), seg->v1->fY(), currentsector->ceilingplane.ZatPoint(seg->v1));
+		angle_t startPitch2 = clipperv.PointToPseudoPitch(seg->v2->fX(), seg->v2->fY(), currentsector->floorplane.ZatPoint(seg->v2));
+		angle_t endPitch2 = clipperv.PointToPseudoPitch(seg->v2->fX(), seg->v2->fY(), currentsector->ceilingplane.ZatPoint(seg->v2));
+		angle_t temp;
+		// Wall can be tilted from viewpoint perspective. Find vertical extent on screen in psuedopitch units (0 to 2, bottom to top)
+		if (int(startPitch) > int(startPitch2)) // Handle zero crossing
+		{
+			temp = startPitch; startPitch = startPitch2; startPitch2 = temp; // exchange
+		}
+		if (int(endPitch) > int(endPitch2)) // Handle zero crossing
+		{
+			temp = endPitch; endPitch = endPitch2; endPitch2 = temp; // exchange
+		}
+
+		if (!clipperv.SafeCheckRange(startPitch, endPitch2))
+		{
+			return;
+		}
+	}
+
+	if (!r_radarclipper || (Level->flags3 & LEVEL3_NOFOGOFWAR) || clipperr.SafeCheckRange(startAngleR, endAngleR))
+		currentsubsector->flags |= SSECMF_DRAWN;
+
+	HWWall wall;
+	HWWallDispatcher disp(this);
+	SetupWall.Clock();
+	wall.sub = seg->Subsector;
+	wall.Process(&disp, seg, currentsector, backsector, true);
+	//rendered_lines++;
+	SetupWall.Unclock();
+	clipper.SafeAddClipRange(startAngle, endAngle);
 }
 
 //==========================================================================
@@ -593,7 +712,7 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 {
 	currentsector = sector;
 	currentsubsector = sub;
-
+	bool isCulled = !gl_multithread && !isNoLineCullMode() && IsDistanceCulled(Viewpoint, sub);
 	ClipWall.Clock();
 	if (sub->polys != nullptr)
 	{
@@ -603,16 +722,19 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 	{
 		int count = sub->numlines;
 		seg_t * seg = sub->firstline;
-
+		
 		while (count--)
 		{
 			if (seg->linedef == nullptr)
 			{
 				if (!(sub->flags & SSECMF_DRAWN)) AddLine (seg, mClipPortal != nullptr);
 			}
-			else if (!(seg->sidedef->Flags & WALLF_POLYOBJ)) 
+			else if (!(seg->sidedef->Flags & WALLF_POLYOBJ))
 			{
-				AddLine (seg, mClipPortal != nullptr);
+				if (isCulled)
+					AddCulledLine(seg);
+				else
+					AddLine (seg, mClipPortal != nullptr);
 			}
 			seg++;
 		}
@@ -1058,7 +1180,9 @@ void HWDrawInfo::RenderBSPNode (void *node)
 
 		node = bsp->children[side];
 	}
-	DoSubsector ((subsector_t *)((uint8_t *)node - 1));
+	subsector_t* sub = (subsector_t*)((uint8_t*)node - 1);
+	if(sub->sector)
+		DoSubsector (sub);
 }
 
 // No need for clipping inside frustum if no fog of war (How is this faster!)
