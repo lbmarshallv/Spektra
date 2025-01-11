@@ -260,11 +260,14 @@ static double DistanceToSubsector(FRenderViewpoint vp, subsector_t* sub) {
 	return minDistance;
 }
 
-static double DistanceToCenter(FRenderViewpoint vp, sector_t* sector) {
+static double DistanceToSector(FRenderViewpoint vp, sector_t* sector) {
 	DVector2 cp;
 	sector->ClosestPoint(vp.Pos.XY(),cp);
 	DVector2 diff = vp.Pos.XY() - cp;
-	return diff.Length();
+	double hdiff = diff.Length();
+	//double vdiff = vp.Pos.Z - sector->floorplane.ZatPoint(cp);
+	//return sqrt((hdiff * hdiff) + (vdiff * vdiff));
+	return hdiff;
 }
 
 static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
@@ -273,19 +276,8 @@ static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
 	sector_t* sector = sub->sector;
 	if (!sector || !seg)
 		return false;
-	if (DistanceToCenter(vp, sector) > r_line_distance_cull)
+	if (DistanceToSector(vp, sector) > r_line_distance_cull)
 		return true;
-	/**
-	while (count--)
-	{
-		if (seg && seg->linedef != nullptr && seg->sidedef != nullptr && !(seg->sidedef->Flags & WALLF_POLYOBJ))
-		{
-			if (DistanceToLine(vp, seg) > r_line_distance_cull)
-				return true;
-		}
-		seg++;
-	}
-	**/
 	return false;
 }
 
