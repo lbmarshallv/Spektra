@@ -1677,6 +1677,7 @@ struct subsector_t
 	int				validcount;
 	char			hacked;			// 1: is part of a render hack
 
+	bool isCulled;
 	void BuildPolyBSP();
 	int Index() const { return subsectornum; }
 									// 2: has one-sided walls

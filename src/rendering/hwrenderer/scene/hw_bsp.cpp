@@ -186,7 +186,7 @@ void HWDrawInfo::WorkerThread()
 			}
 			else back = nullptr;
 
-			wall.Process(&disp, job->seg, front, back);
+			wall.Process(&disp, job->seg, front, back, job->sub->isCulled);
 			rendered_lines++;
 			SetupWall.Unclock();
 			break;
@@ -600,15 +600,25 @@ void HWDrawInfo::AddCulledLine(seg_t* seg)
 
 	if (!r_radarclipper || (Level->flags3 & LEVEL3_NOFOGOFWAR) || clipperr.SafeCheckRange(startAngleR, endAngleR))
 		currentsubsector->flags |= SSECMF_DRAWN;
-
-	HWWall wall;
-	HWWallDispatcher disp(this);
-	SetupWall.Clock();
-	wall.sub = seg->Subsector;
-	wall.Process(&disp, seg, currentsector, backsector, true);
-	//rendered_lines++;
-	SetupWall.Unclock();
 	clipper.SafeAddClipRange(startAngle, endAngle);
+	if (gl_render_walls)
+	{
+		if (multithread)
+		{
+			jobQueue.AddJob(RenderJob::WallJob, seg->Subsector, seg);
+		}
+		else
+		{
+			HWWall wall;
+			HWWallDispatcher disp(this);
+			SetupWall.Clock();
+			wall.sub = seg->Subsector;
+			wall.Process(&disp, seg, currentsector, backsector, true);
+			//rendered_lines++;
+			SetupWall.Unclock();
+			
+		}
+	}
 }
 
 //==========================================================================
@@ -704,7 +714,6 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 {
 	currentsector = sector;
 	currentsubsector = sub;
-	bool isCulled = !gl_multithread && !isNoLineCullMode() && IsDistanceCulled(Viewpoint, sub);
 	ClipWall.Clock();
 	if (sub->polys != nullptr)
 	{
@@ -723,7 +732,7 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 			}
 			else if (!(seg->sidedef->Flags & WALLF_POLYOBJ))
 			{
-				if (isCulled)
+				if (sub->isCulled)
 					AddCulledLine(seg);
 				else
 					AddLine (seg, mClipPortal != nullptr);
@@ -919,6 +928,9 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 
 	fakesector=hw_FakeFlat(sector, in_area, false);
 
+	bool isCulled = !isNoLineCullMode() && IsDistanceCulled(Viewpoint, sub);
+	sub->isCulled = isCulled;
+
 	if(Viewpoint.IsAllowedOoB() && sector->isSecret() && sector->wasSecret() && !r_radarclipper) return;
 
 	// cull everything if subsector outside vertical clipper
@@ -988,7 +1000,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 	}
 
 	// [RH] Add particles
-	if (gl_render_things && (sub->sprites.Size() > 0 || Level->ParticlesInSubsec[sub->Index()] != NO_PARTICLE))
+	if (!isCulled && gl_render_things && (sub->sprites.Size() > 0 || Level->ParticlesInSubsec[sub->Index()] != NO_PARTICLE))
 	{
 		if (multithread)
 		{
@@ -1014,7 +1026,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		sector->validcount = validcount;
 		sector->MoreFlags |= SECMF_DRAWN;
 
-		if (gl_render_things && (sector->touching_renderthings || sector->sectorportal_thinglist))
+		if (!isCulled && gl_render_things && (sector->touching_renderthings || sector->sectorportal_thinglist))
 		{
 			if (multithread)
 			{
