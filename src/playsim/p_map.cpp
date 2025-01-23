@@ -3773,7 +3773,7 @@ bool P_BounceActor(AActor *mo, AActor *BlockingMobj, bool ontop)
 			if (fabs(speed) < EQUAL_EPSILON) speed = 0;
 			mo->Angles.Yaw = angle;
 			mo->VelFromAngle(speed);
-			mo->PlayBounceSound(true);
+			mo->PlayBounceSound(true, 1.0);
 		}
 		else
 		{
@@ -3801,7 +3801,7 @@ bool P_BounceActor(AActor *mo, AActor *BlockingMobj, bool ontop)
 				mo->Vel *= mo->bouncefactor;
 			}
 
-			mo->PlayBounceSound(true);
+			mo->PlayBounceSound(true, 1.0);
 			if (mo->BounceFlags & BOUNCE_MBF) // Bring it to rest below a certain speed
 			{
 				if (fabs(mo->Vel.Z) < mo->Mass * mo->GetGravity() / 64)
@@ -5725,6 +5725,47 @@ void R_OffsetView(FRenderViewpoint& viewPoint, const DVector3& dir, const double
 //
 //==========================================================================
 
+static int CanTalk(AActor *self)
+{
+	return self->Conversation != nullptr && self->health > 0 && !(self->flags4 & MF4_INCOMBAT);
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(AActor, CanTalk, CanTalk)
+{
+	PARAM_SELF_PROLOGUE(AActor);
+	ACTION_RETURN_BOOL(CanTalk(self));
+}
+
+static int HasConversation(AActor *self)
+{
+	return self->Conversation != nullptr;
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(AActor, HasConversation, HasConversation)
+{
+	PARAM_SELF_PROLOGUE(AActor);
+	ACTION_RETURN_BOOL(HasConversation(self));
+}
+
+static int NativeStartConversation(AActor *self, AActor *player, bool faceTalker, bool saveAngle)
+{
+	if (!CanTalk(self))
+		return false;
+
+	self->ConversationAnimation(0);
+	P_StartConversation(self, player, faceTalker, saveAngle);
+	return true;
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(AActor, StartConversation, NativeStartConversation)
+{
+	PARAM_SELF_PROLOGUE(AActor);
+	PARAM_OBJECT(player, AActor);
+	PARAM_BOOL(faceTalker);
+	PARAM_BOOL(saveAngle);
+	ACTION_RETURN_BOOL(NativeStartConversation(self, player, faceTalker, saveAngle));
+}
+
 bool P_TalkFacing(AActor *player)
 {
 	static const double angleofs[] = { 0, 90./16, -90./16 };
@@ -5733,19 +5774,8 @@ bool P_TalkFacing(AActor *player)
 	for (double angle : angleofs)
 	{
 		P_AimLineAttack(player, player->Angles.Yaw + DAngle::fromDeg(angle), TALKRANGE, &t, DAngle::fromDeg(35.), ALF_FORCENOSMART | ALF_CHECKCONVERSATION | ALF_PORTALRESTRICT);
-		if (t.linetarget != NULL)
-		{
-			if (t.linetarget->health > 0 && // Dead things can't talk.
-				!(t.linetarget->flags4 & MF4_INCOMBAT) && // Fighting things don't talk either.
-				t.linetarget->Conversation != NULL)
-			{
-				// Give the NPC a chance to play a brief animation
-				t.linetarget->ConversationAnimation(0);
-				P_StartConversation(t.linetarget, player, true, true);
-				return true;
-			}
-			return false;
-		}
+		if (t.linetarget != nullptr)
+			return NativeStartConversation(t.linetarget, player, true, true);
 	}
 	return false;
 }
