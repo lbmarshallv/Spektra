@@ -5557,7 +5557,7 @@ void P_RailAttack(FRailParams *p)
 			rail_data.UseThruBits = !!(thepuff->flags8 & MF8_ALLOWTHRUBITS);
 	}
 
-	Trace(start, source->Sector, vec, p->distance, MF_SHOOTABLE, ML_BLOCKEVERYTHING, source, trace,	flags, ProcessRailHit, &rail_data);
+	Trace(start, source->Sector, vec, p->distance, MF_SHOOTABLE|MF_SOLID, ML_BLOCKEVERYTHING, source, trace,	flags, ProcessRailHit, &rail_data);
 
 	// Hurt anything the trace hit
 	unsigned int i;
