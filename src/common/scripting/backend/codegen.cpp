@@ -387,6 +387,30 @@ void FxExpression::EmitCompare(VMFunctionBuilder *build, bool invert, TArray<siz
 	if (op.Konst)
 	{
 		ScriptPosition.Message(MSG_WARNING, "Conditional expression is constant");
+		ExpEmit temp(build, op.RegType);
+		switch (op.RegType)
+		{
+		case REGT_INT:
+			build->Emit(OP_LK, temp.RegNum, op.RegNum);
+			break;
+
+		case REGT_FLOAT:
+			build->Emit(OP_LKF, temp.RegNum, op.RegNum);
+			break;
+
+		case REGT_POINTER:
+			build->Emit(OP_LKP, temp.RegNum, op.RegNum);
+			break;
+
+		case REGT_STRING:
+			build->Emit(OP_LKS, temp.RegNum, op.RegNum);
+			break;
+
+		default:
+			break;
+		}
+		op.Free(build);
+		op = temp;
 	}
 	switch (op.RegType)
 	{
@@ -1842,7 +1866,7 @@ FxExpression *FxTypeCast::Resolve(FCompileContext &ctx)
 	{
 		goto basereturn;
 	}
-	else if (ctx.Version >= MakeVersion(4, 15, 0) && basex->ValueType == TypeNullPtr && (ValueType == TypeSpriteID || ValueType == TypeTextureID || ValueType == TypeTranslationID))
+	else if (ctx.Version >= MakeVersion(4, 14, 1) && basex->ValueType == TypeNullPtr && (ValueType == TypeSpriteID || ValueType == TypeTextureID || ValueType == TypeTranslationID))
 	{
 		delete basex;
 		basex = new FxConstant(0, ScriptPosition);
@@ -8884,7 +8908,7 @@ FxExpression *FxMemberFunctionCall::Resolve(FCompileContext& ctx)
 			return Self;
 		}
 	}
-	else if (ctx.Version >= MakeVersion(4, 15, 0) && Self->ValueType == TypeSound && MethodName == NAME_IsValid)
+	else if (ctx.Version >= MakeVersion(4, 14, 1) && Self->ValueType == TypeSound && MethodName == NAME_IsValid)
 	{
 		if (ArgList.Size() > 0)
 		{
@@ -8901,7 +8925,7 @@ FxExpression *FxMemberFunctionCall::Resolve(FCompileContext& ctx)
 		delete this;
 		return x;
 	}
-	else if (Self->ValueType == TypeTextureID || (ctx.Version >= MakeVersion(4, 15, 0) && (Self->ValueType == TypeTranslationID)))
+	else if (Self->ValueType == TypeTextureID || (ctx.Version >= MakeVersion(4, 14, 1) && (Self->ValueType == TypeTranslationID)))
 	{
 		if (MethodName == NAME_IsValid || MethodName == NAME_IsNull || MethodName == NAME_Exists || MethodName == NAME_SetInvalid || MethodName == NAME_SetNull)
 		{
@@ -8944,7 +8968,7 @@ FxExpression *FxMemberFunctionCall::Resolve(FCompileContext& ctx)
 		}
 	}
 
-	else if (ctx.Version >= MakeVersion(4, 15, 0) && Self->ValueType == TypeSpriteID)
+	else if (ctx.Version >= MakeVersion(4, 14, 1) && Self->ValueType == TypeSpriteID)
 	{
 		if (MethodName == NAME_IsValid || MethodName == NAME_IsEmpty || MethodName == NAME_IsFixed || MethodName == NAME_IsKeep
 			|| MethodName == NAME_Exists
