@@ -44,6 +44,8 @@
 #include "hw_vertexbuilder.h"
 #include "hw_walldispatcher.h"
 
+#include "p_trace.h"
+
 #include "p_visualthinker.h"
 
 #ifdef ARCH_IA32
@@ -227,6 +229,16 @@ void HWDrawInfo::WorkerThread()
 
 EXTERN_CVAR(Float, r_line_distance_cull)
 
+static float getLineCullDistance(FRenderViewpoint vp) {
+	/*
+	if (!vp.LastTrace.ffloor && (vp.LastTrace.HitType == TRACE_HitFloor || vp.LastTrace.HitType == TRACE_HitWall))
+		//return vp.LastTrace.Distance + vp.camera->radius*2.;
+		return r_line_distance_cull / 2  > vp.LastTrace.Distance ? r_line_distance_cull / 2 : vp.LastTrace.Distance;
+	else 
+		return r_line_distance_cull;
+	*/
+	return r_line_distance_cull;
+}
 
 static double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
 	//calcuate the distance between the viewpoint and any point on the line
@@ -276,14 +288,14 @@ static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
 	sector_t* sector = sub->sector;
 	if (!sector || !seg)
 		return false;
-	if (DistanceToSector(vp, sector) > r_line_distance_cull)
+	if (DistanceToSector(vp, sector) > getLineCullDistance(vp))
 		return true;
 	return false;
 }
 
 static bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
 {
-	double cullDist = r_line_distance_cull;
+	double cullDist = getLineCullDistance(vp);
 	if (cullDist <= 0.0)
 		return false;
 	//only lines outside (with sky flat) get culled
@@ -1214,7 +1226,8 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 {
 	ClearDitherTargets();
 	Bsp.Clock();
-
+	DVector3 direction = { Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Cos(), Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Sin(), -Viewpoint.Angles.Pitch.Sin() };
+	Trace(Viewpoint.Pos, Viewpoint.sector, direction, r_line_distance_cull, 0, 0, Viewpoint.camera, Viewpoint.LastTrace, TRF_THRUBLOCK | TRF_THRUHITSCAN | TRF_THRUACTORS);
 	// Give the DrawInfo the viewpoint in fixed point because that's what the nodes are.
 	viewx = FLOAT2FIXED(Viewpoint.Pos.X);
 	viewy = FLOAT2FIXED(Viewpoint.Pos.Y);

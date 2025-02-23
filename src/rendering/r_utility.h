@@ -3,6 +3,7 @@
 
 #include "r_state.h"
 #include "vectors.h"
+#include "p_trace.h"
 
 class FSerializer;
 struct FViewWindow;
@@ -27,6 +28,7 @@ struct FRenderViewpoint
 	DVector2		ViewVector;		// HWR only: direction the camera is facing.
 	AActor			*ViewActor;		// either the same as camera or nullptr
 	FLevelLocals	*ViewLevel;		// The level this viewpoint is on.
+	FTraceResults	LastTrace;
 
 	DVector3		Path[2];		// View path for portal calculations
 	double			Cos;			// cos(Angles.Yaw)
