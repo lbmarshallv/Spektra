@@ -228,6 +228,7 @@ void HWDrawInfo::WorkerThread()
 }
 
 EXTERN_CVAR(Float, r_line_distance_cull)
+const double MIN_LINE_CULL = 640.0;
 
 static float getLineCullDistance(FRenderViewpoint vp) {
 	/*
@@ -237,7 +238,13 @@ static float getLineCullDistance(FRenderViewpoint vp) {
 	else 
 		return r_line_distance_cull;
 	*/
-	return r_line_distance_cull;
+	double ldc = r_line_distance_cull;
+	double pitch = vp.Angles.Pitch.Degrees();
+	double pchange = (pitch) / DAngle90.Degrees();
+	if (pitch > 0.0 && pitch <= 90.0) {
+		ldc -= (r_line_distance_cull - MIN_LINE_CULL) * pchange;
+	}
+	return max(ldc,MIN_LINE_CULL);
 }
 
 static double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
