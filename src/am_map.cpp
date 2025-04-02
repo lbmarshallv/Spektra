@@ -2028,6 +2028,12 @@ void DAutomap::drawSubsectors()
 	for (unsigned i = 0; i < subsectors.Size(); ++i)
 	{
 		auto sub = &subsectors[i];
+		#ifdef _DEBUG
+		if (sub->isCulled)
+		{
+			continue;
+		}
+		#endif
 		if (sub->flags & SSECF_POLYORG)
 		{
 			continue;
@@ -2165,11 +2171,6 @@ void DAutomap::drawSubsectors()
 				(colormap.LightColor.b + 160) / 2);
 			colormap.Desaturation = 255 - (255 - colormap.Desaturation) / 4;
 		}
-		// make table based fog visible on the automap as well.
-		if (Level->flags & LEVEL_HASFADETABLE)
-		{
-			colormap.FadeColor = PalEntry(0, 128, 128, 128);
-		}
 
 		// Draw the polygon.
 		if (maptex.isValid())
@@ -2219,7 +2220,7 @@ void DAutomap::drawSubsectors()
 				rotation,
 				colormap,
 				flatcolor,
-				fadelevel,
+				0.0,
 				indices.data(), indices.size());
 		}
 	}
