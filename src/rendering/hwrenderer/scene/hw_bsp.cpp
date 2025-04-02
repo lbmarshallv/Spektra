@@ -742,6 +742,7 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 			}
 			seg++;
 		}
+		sub->flags |= SSECMF_DRAWN;
 	}
 	ClipWall.Unclock();
 }
