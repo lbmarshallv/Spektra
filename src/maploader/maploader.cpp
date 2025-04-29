@@ -397,7 +397,39 @@ void MapLoader::FloodZones ()
 	{
 		if (sec.ZoneNumber == 0xFFFF)
 		{
-			FloodZone (&sec, z++);
+			TArray<sector_t*> sectors;
+			sectors.Push(&sec);
+			while (sectors.size())
+			{
+				sector_t* curSec;
+				sectors.Pop(curSec);
+				if (curSec->ZoneNumber == z)
+					continue;
+				curSec->ZoneNumber = z;
+				for (auto check : curSec->Lines)
+				{
+					sector_t* other;
+
+					if (check->sidedef[1] == nullptr || (check->flags & ML_ZONEBOUNDARY))
+						continue;
+
+					if (check->frontsector == curSec)
+					{
+						assert(check->backsector != nullptr);
+						other = check->backsector;
+					}
+					else
+					{
+						assert(check->frontsector != nullptr);
+						other = check->frontsector;
+					}
+
+					if (other->ZoneNumber != z)
+						sectors.AddUnique(other);
+				}
+			}
+			sectors.clear();
+			z++;
 		}
 	}
 	Level->Zones.Resize(z);
