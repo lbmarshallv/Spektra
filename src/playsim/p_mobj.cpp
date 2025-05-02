@@ -149,6 +149,10 @@ FRandom pr_spawnmissile("SpawnMissile");
 
 CUSTOM_CVAR (Float, sv_gravity, 800.f, CVAR_SERVERINFO|CVAR_NOSAVE|CVAR_NOINITCALL)
 {
+	// test NAN and INF
+	if (((double)self != (double)self) || isinf((double)self))
+		sv_gravity = 800.f;
+
 	for (auto Level : AllLevels())
 	{
 		Level->gravity = self;
@@ -1765,6 +1769,30 @@ void SerializeModelID(FSerializer &arc, const char *key, int &id)
 	}
 }
 
+template<typename T>
+static FSerializer &SerializeBoneOverrideComponent(FSerializer &arc, const char *key, T &comp)
+{
+	arc.BeginObject(key);
+	arc("mode", comp.mode);
+	arc("prev_mode", comp.prev_mode);
+	arc("switchtic", comp.switchtic);
+	arc("interplen", comp.interplen);
+	arc("prev", comp.prev);
+	arc("cur", comp.cur);
+	arc.EndObject();
+	return arc;
+}
+
+FSerializer &Serialize(FSerializer &arc, const char *key, BoneOverride &mod, BoneOverride *def)
+{
+	arc.BeginObject(key);
+	SerializeBoneOverrideComponent(arc, "translation", mod.translation);
+	SerializeBoneOverrideComponent(arc, "rotation", mod.rotation);
+	SerializeBoneOverrideComponent(arc, "scaling", mod.scaling);
+	arc.EndObject();
+	return arc;
+}
+
 FSerializer &Serialize(FSerializer &arc, const char *key, ModelOverride &mo, ModelOverride *def)
 {
 	arc.BeginObject(key);
@@ -1870,6 +1898,7 @@ void DActorModelData::Serialize(FSerializer& arc)
 		("skinIDs", skinIDs)
 		("animationIDs", animationIDs)
 		("modelFrameGenerators", modelFrameGenerators)
+		("modelBoneOverrides", modelBoneOverrides)
 		("flags", flags)
 		("overrideFlagsSet", overrideFlagsSet)
 		("overrideFlagsClear", overrideFlagsClear)
