@@ -592,6 +592,8 @@ const char *FStringTable::CheckString(const char *name, uint32_t *langtable, int
 		TableElement* bestItem = nullptr;
 		for (auto map : currentLanguageSet)
 		{
+			if (map.second == NULL || map.second == nullptr)
+				continue;
 			auto item = map.second->CheckKey(nm);
 			if (item)
 			{
