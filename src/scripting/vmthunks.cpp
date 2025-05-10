@@ -1738,6 +1738,15 @@ DEFINE_ACTION_FUNCTION_NATIVE(_Sector, SetXOffset, SetXOffset)
 	 return 0;
  }
 
+ DEFINE_ACTION_FUNCTION(FLevelLocals, ChangeSkyMist)
+ {
+	 PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
+	 PARAM_INT(skymist);
+	 self->skymisttexture = FSetTextureID(skymist);
+	 InitSkyMap(self);
+	 return 0;
+ }
+
  DEFINE_ACTION_FUNCTION(FLevelLocals, StartIntermission)
  {
 	 PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
@@ -2105,21 +2114,6 @@ DEFINE_ACTION_FUNCTION_NATIVE(DBaseStatusBar, DetachAllMessages, SBar_DetachAllM
 {
 	PARAM_SELF_PROLOGUE(DBaseStatusBar);
 	self->DetachAllMessages();
-	return 0;
-}
-
-static void SBar_Draw(DBaseStatusBar *self, int state, double ticFrac)
-{
-	self->Draw((EHudState)state, ticFrac);
-}
-
-
-DEFINE_ACTION_FUNCTION_NATIVE(DBaseStatusBar, Draw, SBar_Draw)
-{
-	PARAM_SELF_PROLOGUE(DBaseStatusBar);
-	PARAM_INT(state);
-	PARAM_FLOAT(ticFrac);
-	self->Draw((EHudState)state, ticFrac);
 	return 0;
 }
 
@@ -2817,6 +2811,7 @@ DEFINE_FIELD_X(LevelInfo, level_info_t, NextMap)
 DEFINE_FIELD_X(LevelInfo, level_info_t, NextSecretMap)
 DEFINE_FIELD_X(LevelInfo, level_info_t, SkyPic1)
 DEFINE_FIELD_X(LevelInfo, level_info_t, SkyPic2)
+DEFINE_FIELD_X(LevelInfo, level_info_t, SkyMistPic)
 DEFINE_FIELD_X(LevelInfo, level_info_t, F1Pic)
 DEFINE_FIELD_X(LevelInfo, level_info_t, cluster)
 DEFINE_FIELD_X(LevelInfo, level_info_t, partime)
@@ -2832,6 +2827,7 @@ DEFINE_FIELD_X(LevelInfo, level_info_t, MapLabel)
 DEFINE_FIELD_X(LevelInfo, level_info_t, musicorder)
 DEFINE_FIELD_X(LevelInfo, level_info_t, skyspeed1)
 DEFINE_FIELD_X(LevelInfo, level_info_t, skyspeed2)
+DEFINE_FIELD_X(LevelInfo, level_info_t, skymistspeed)
 DEFINE_FIELD_X(LevelInfo, level_info_t, cdtrack)
 DEFINE_FIELD_X(LevelInfo, level_info_t, gravity)
 DEFINE_FIELD_X(LevelInfo, level_info_t, compassadjustment)
@@ -2876,8 +2872,10 @@ DEFINE_FIELD(FLevelLocals, Music)
 DEFINE_FIELD(FLevelLocals, musicorder)
 DEFINE_FIELD(FLevelLocals, skytexture1)
 DEFINE_FIELD(FLevelLocals, skytexture2)
+DEFINE_FIELD(FLevelLocals, skymisttexture)
 DEFINE_FIELD(FLevelLocals, skyspeed1)
 DEFINE_FIELD(FLevelLocals, skyspeed2)
+DEFINE_FIELD(FLevelLocals, skymistspeed)
 DEFINE_FIELD(FLevelLocals, total_secrets)
 DEFINE_FIELD(FLevelLocals, found_secrets)
 DEFINE_FIELD(FLevelLocals, total_items)

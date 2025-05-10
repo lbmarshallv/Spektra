@@ -713,6 +713,11 @@ struct TVector3
 		*this = *this ^ other;
 		return *this;
 	}
+
+	constexpr TVector3 ScaleXYZ (const TVector3 &scaling)
+	{
+		return TVector3(X * scaling.X, Y * scaling.Y, Z * scaling.Z);
+	}
 };
 
 template<class vec_t>
