@@ -218,8 +218,9 @@ void P_FindParticleSubsectors (FLevelLocals *Level)
 	while (sp != nullptr)
 	{
 		if (!sp->PT.subsector) sp->PT.subsector = Level->PointInRenderSubsector(sp->PT.Pos);
-
-		sp->PT.subsector->sprites.Push(sp);
+		if (sp->PT.subsector) {
+			sp->PT.subsector->sprites.Push(sp);
+		}
 		sp = sp->GetNext();
 	}
 	// End VisualThinker hitching. Now onto the particles. 
