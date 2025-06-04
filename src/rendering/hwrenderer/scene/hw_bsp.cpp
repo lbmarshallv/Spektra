@@ -1063,7 +1063,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 				SetupSprite.Unclock();
 			}
 		}
-		if (r_dithertransparency && Viewpoint.IsAllowedOoB() && (RTnum < MAXDITHERACTORS) && mCurrentPortal == nullptr)
+		if (!isCulled && r_dithertransparency && Viewpoint.IsAllowedOoB() && (RTnum < MAXDITHERACTORS) && mCurrentPortal == nullptr)
 		{
 			// [DVR] Not parallelizable due to variables RTnum and RenderedTargets[]
 			for (auto p = sector->touching_renderthings; p != nullptr; p = p->m_snext)
@@ -1238,8 +1238,8 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 {
 	ClearDitherTargets();
 	Bsp.Clock();
-	DVector3 direction = { Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Cos(), Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Sin(), -Viewpoint.Angles.Pitch.Sin() };
-	Trace(Viewpoint.Pos, Viewpoint.sector, direction, r_line_distance_cull, 0, 0, Viewpoint.camera, Viewpoint.LastTrace, TRF_THRUBLOCK | TRF_THRUHITSCAN | TRF_THRUACTORS);
+	//DVector3 direction = { Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Cos(), Viewpoint.Angles.Pitch.Cos() * Viewpoint.Angles.Yaw.Sin(), -Viewpoint.Angles.Pitch.Sin() };
+	//Trace(Viewpoint.Pos, Viewpoint.sector, direction, r_line_distance_cull, 0, 0, Viewpoint.camera, Viewpoint.LastTrace, TRF_THRUBLOCK | TRF_THRUHITSCAN | TRF_THRUACTORS);
 	// Give the DrawInfo the viewpoint in fixed point because that's what the nodes are.
 	viewx = FLOAT2FIXED(Viewpoint.Pos.X);
 	viewy = FLOAT2FIXED(Viewpoint.Pos.Y);
