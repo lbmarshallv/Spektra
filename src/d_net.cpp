@@ -116,6 +116,14 @@ int					LastSentConsistency = 0;		// Last consistency we sent out. If < CurrentC
 int					CurrentConsistency = 0;			// Last consistency we generated.
 FClientNetState		ClientStates[MAXPLAYERS] = {};
 
+// Try and stabilize uneven connections by checking for spikes in available
+// sequences. If they're found, try and average out a buffer to prioritize
+// making the experience smoother over very stop and go heavy.
+static int			StabilityBuffer = 0;
+static int			PrevAvailableDiff = 0;
+static size_t		CurStabilityTic = 0u;
+static int			StabilityTics[STABILITYTICS] = {};
+
 // If we're sending a packet to ourselves, store it here instead. This is the simplest way to execute
 // playback as it means in the world running code itself all player commands are built the exact same way
 // instead of having to rely on pulling from the correct local buffers. It also ensures all commands are
@@ -157,7 +165,7 @@ extern	bool	 advancedemo;
 CVAR(Bool, vid_dontdowait, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR(Bool, vid_lowerinbackground, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
-CVAR(Bool, net_ticbalance, false, CVAR_SERVERINFO | CVAR_NOSAVE) // Currently deprecated, but may be brought back later.
+CVAR(Bool, net_ticbalance, true, CVAR_SERVERINFO | CVAR_NOSAVE)
 CVAR(Bool, net_extratic, false, CVAR_SERVERINFO | CVAR_NOSAVE)
 CVAR(Bool, net_limitsaves, true, CVAR_SERVERINFO | CVAR_NOSAVE)
 CVAR(Bool, net_repeatableactioncooldown, true, CVAR_SERVERINFO | CVAR_NOSAVE)
@@ -370,7 +378,7 @@ void Net_ClearBuffers()
 		memset(state.RecvTime, 0, sizeof(state.RecvTime));
 		state.bNewLatency = true;
 
-		state.ResendID = 0u;
+		state.ResendID = state.StabilityBuffer = 0u;
 		state.CurrentNetConsistency = state.LastVerifiedConsistency = state.ConsistencyAck = state.ResendConsistencyFrom = -1;
 		state.CurrentSequence = state.SequenceAck = state.ResendSequenceFrom = -1;
 		state.Flags = 0;
@@ -395,6 +403,9 @@ void Net_ClearBuffers()
 	LastEnterTic = LastGameUpdate = EnterTic;
 	gametic = ClientTic = 0;
 	SkipCommandTimer = SkipCommandAmount = CommandsAhead = 0;
+	StabilityBuffer = PrevAvailableDiff = 0;
+	CurStabilityTic = 0u;
+	memset(StabilityTics, 0, sizeof(StabilityTics));
 	NetEvents.ResetStream();
 	
 	CutsceneReady = 0u;
@@ -502,6 +513,9 @@ void Net_ResetCommands(bool midTic)
 	bCommandsReset = midTic;
 	++CurrentLobbyID;
 	SkipCommandTimer = SkipCommandAmount = CommandsAhead = 0;
+	StabilityBuffer = PrevAvailableDiff = 0;
+	CurStabilityTic = 0u;
+	memset(StabilityTics, 0, sizeof(StabilityTics));
 
 	int tic = gametic / TicDup;
 	if (midTic)
@@ -521,6 +535,7 @@ void Net_ResetCommands(bool midTic)
 	{
 		auto& state = ClientStates[client];
 		state.Flags &= CF_QUIT;
+		state.StabilityBuffer = 0u;
 		state.CurrentSequence = min<int>(state.CurrentSequence, tic);
 		state.SequenceAck = min<int>(state.SequenceAck, tic);
 		if (state.ResendSequenceFrom >= tic)
@@ -575,7 +590,8 @@ static size_t GetNetBufferSize()
 	const int ranTics = NetBuffer[totalBytes++];
 	if (ranTics > 0)
 		totalBytes += 4;
-	if (NetMode == NET_PacketServer && RemoteClient == Net_Arbitrator)
+	// Stability buffer/commands ahead
+	if (NetMode == NET_PacketServer)
 		++totalBytes;
 
 	// Minimum additional packet size per player:
@@ -917,12 +933,16 @@ static void GetPackets()
 		if (ranTics > 0)
 			baseConsistency = (NetBuffer[curByte++] << 24) | (NetBuffer[curByte++] << 16) | (NetBuffer[curByte++] << 8) | NetBuffer[curByte++];
 
-		if (NetMode == NET_PacketServer && clientNum == Net_Arbitrator)
+		if (NetMode == NET_PacketServer)
 		{
 			if (validID)
-				CommandsAhead = NetBuffer[curByte++];
-			else
-				++curByte;
+			{
+				if (clientNum == Net_Arbitrator)
+					CommandsAhead = NetBuffer[curByte];
+				else if (consoleplayer == Net_Arbitrator)
+					clientState.StabilityBuffer = NetBuffer[curByte];
+			}
+			++curByte;
 		}
 		
 		for (int p = 0; p < playerCount; ++p)
@@ -1208,7 +1228,7 @@ static bool Net_UpdateStatus()
 	// Wait for the game to stabilize a bit after launch before skipping commands.
 	bool updated = false;
 	int lowestDiff = INT_MAX;
-	if (gametic > TICRATE * 2)
+	if (gametic > TICRATE * 2 && !(gametic % TicDup))
 	{
 		if (NetMode != NET_PacketServer)
 		{
@@ -1292,6 +1312,7 @@ static bool Net_UpdateStatus()
 
 	if (updated)
 	{
+		lowestDiff -= StabilityBuffer;
 		if (lowestDiff > 0)
 		{
 			if (SkipCommandTimer++ > TICRATE / 2)
@@ -1381,9 +1402,19 @@ void NetUpdate(int tics)
 		LevelStartDelay = max<int>(LevelStartDelay - tics, 0);
 	}
 		
-	const bool netGood = Net_UpdateStatus();
+	bool netGood = Net_UpdateStatus();
 	const int startTic = ClientTic;
 	tics = min<int>(tics, MAXSENDTICS * TicDup);
+	if ((startTic + tics - gametic) / TicDup > BACKUPTICS / 2)
+	{
+		tics = (gametic + BACKUPTICS / 2 * TicDup) - startTic;
+		if (tics <= 0)
+		{
+			tics = 1;
+			netGood = false;
+		}
+	}
+
 	for (int i = 0; i < tics; ++i)
 	{
 		I_StartTic();
@@ -1681,8 +1712,13 @@ void NetUpdate(int tics)
 					NetBuffer[size++] = baseConsistency + curTicOfs;
 				}
 
-				if (NetMode == NET_PacketServer && consoleplayer == Net_Arbitrator)
-					NetBuffer[size++] = client == Net_Arbitrator ? 0 : max<int>(curState.CurrentSequence - newestTic, 0);
+				if (NetMode == NET_PacketServer)
+				{
+					if (consoleplayer == Net_Arbitrator)
+						NetBuffer[size++] = client == Net_Arbitrator ? 0 : max<int>(curState.CurrentSequence + curState.StabilityBuffer - newestTic, 0);
+					else
+						NetBuffer[size++] = max<int>(StabilityBuffer, 0);
+				}
 
 				// Client commands.
 
@@ -1976,9 +2012,12 @@ ADD_STAT(network)
 
 	const int delay = max<int>((ClientTic - gametic) / TicDup, 0);
 	const int msDelay = min<int>(delay * TicDup * 1000.0 / TICRATE, 999);
-	out.AppendFormat("\nLocal\n\tIs arbitrator: %d\tDelay: %02d (%03dms)",
+	const int buffer = max<int>(StabilityBuffer, 0);
+	const int msBuffer = min<int>(buffer * 1000.0 / TICRATE, 999);
+	out.AppendFormat("\nLocal\n\tIs arbitrator: %d\tDelay: %02d (%03dms)\tStability Buffer: %02d (%03dms)",
 		consoleplayer == Net_Arbitrator,
-		delay, msDelay);
+		delay, msDelay,
+		buffer, msBuffer);
 
 	if (NetMode == NET_PacketServer && consoleplayer != Net_Arbitrator)
 		out.AppendFormat("\tAvg latency: %03ums", min<unsigned int>(ClientStates[consoleplayer].AverageLatency, 999u));
@@ -2090,6 +2129,47 @@ static bool ShouldStabilizeTick()
 			&& gameaction != ga_worlddone && gameaction != ga_completed && gameaction != ga_screenshot && gameaction != ga_fullconsole;
 }
 
+// If the connection has been unstable then let the game lag behind for a little bit
+// while we wait for it to stabilize, otherwise everything will appear to jitter around.
+static void CalculateNetStabilityBuffer(int diff)
+{
+	if (!netgame || demoplayback)
+	{
+		StabilityBuffer = 0;
+		return;
+	}
+
+	if (diff < 0)
+		diff = 0;
+
+	if (!(gametic % TicDup))
+	{
+		StabilityTics[CurStabilityTic++ % STABILITYTICS] = diff > PrevAvailableDiff ? diff : 0;
+		PrevAvailableDiff = diff;
+	}
+
+	// If we're not balancing latency, just give an extra tic for padding
+	// and nothing else.
+	if (!net_ticbalance)
+	{
+		StabilityBuffer = 1;
+		return;
+	}
+
+	double total = 0.0;
+	int unstableCount = 0;
+	for (int t : StabilityTics)
+	{
+		if (t > 0)
+		{
+			++unstableCount;
+			total += t;
+		}
+	}
+
+	StabilityBuffer = unstableCount > 0 ? static_cast<int>(ceil(total / unstableCount)) : 0;
+}
+
 //
 // TryRunTics
 //
@@ -2148,8 +2228,12 @@ void TryRunTics()
 	// If the amount of tics to run is falling behind the amount of available tics,
 	// speed the playsim up a bit to help catch up.
 	int runTics = min<int>(totalTics, availableTics);
-	if (totalTics > 0 && totalTics < availableTics && !singletics)
-		++runTics;
+	if (!singletics && totalTics > 0)
+	{
+		CalculateNetStabilityBuffer(availableTics - totalTics);
+		if (totalTics < availableTics - StabilityBuffer)
+			++runTics;
+	}
 
 	// Test player prediction code in singleplayer
 	// by running the gametic behind the ClientTic
