@@ -2029,7 +2029,8 @@ static void AddAutoloadFiles(const char *autoname, std::vector<std::string>& all
 		}
 	}
 
-	if (!(gameinfo.flags & GI_SHAREWARE) && !Args->CheckParm("-noautoload") && !disableautoload)
+	// Disable autoloading in netgames as we don't want people who are hosting/joining loading up random files.
+	if (!(gameinfo.flags & GI_SHAREWARE) && !Args->CheckParm("-noautoload") && !disableautoload && !Args->CheckParm("-host") && !Args->CheckParm("-join"))
 	{
 		FString file;
 
@@ -3237,8 +3238,6 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 		else if (gameinfo.gametype == GAME_Strife)
 			GameStartupInfo.Type = FStartupInfo::StrifeStartup;
 	}
-
-	StartScreen = nostartscreen? nullptr : GetGameStartScreen(per_shader_progress > 0 ? max_progress * 10 / 9 : max_progress + 3);
 	
 	GameConfig->DoKeySetup(gameinfo.ConfigName.GetChars());
 
@@ -3281,7 +3280,6 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 	if (!restart)
 	{
 		screen->CompileNextShader();
-		if (StartScreen != nullptr) StartScreen->Render();
 	}
 	else
 	{
@@ -3291,6 +3289,9 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 
 	// Base systems have been inited; enable cvar callbacks
 	FBaseCVar::EnableCallbacks ();
+
+	StartScreen = nostartscreen? nullptr : GetGameStartScreen(per_shader_progress > 0 ? max_progress * 10 / 9 : max_progress + 3);
+	if (StartScreen != nullptr) StartScreen->Render();
 	
 	// +compatmode cannot be used on the command line, so use this as a substitute
 	auto compatmodeval = Args->CheckValue("-compatmode");

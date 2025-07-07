@@ -1198,6 +1198,9 @@ int P_GetRealMaxHealth(AActor *actor, int max)
 	// Max is 0 by default, preserving default behavior for P_GiveBody()
 	// calls while supporting health pickups.
 	auto player = actor->player;
+	auto orig_max = max;
+	int maxPickupHealth = actor->IntVar(NAME_MaxPickupHealth);
+
 	if (max <= 0)
 	{
 		max = actor->GetMaxHealth(true);
@@ -1228,6 +1231,13 @@ int P_GetRealMaxHealth(AActor *actor, int max)
 		{
 			max += actor->IntVar(NAME_BonusHealth);
 		}
+	}
+	if (maxPickupHealth)
+	{
+		max = maxPickupHealth;
+		// Allow health items with greater MaxAmount values to work properly.
+		if (orig_max > 0 && orig_max > max)
+			max = orig_max;
 	}
 	return max;
 }
