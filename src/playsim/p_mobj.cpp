@@ -540,6 +540,8 @@ DBehavior* AActor::AddBehavior(PClass& type)
 			return nullptr;
 
 		b->Owner = this;
+		b->ObjectFlags |= (ObjectFlags & (OF_ClientSide | OF_Transient));
+
 		Behaviors[type.TypeName] = b;
 		Level->AddActorBehavior(*b);
 		IFOVERRIDENVIRTUALPTRNAME(b, NAME_Behavior, Initialize)
@@ -653,6 +655,9 @@ void AActor::MoveBehaviors(AActor& from)
 {
 	if (&from == this)
 		return;
+
+	if (IsClientside() != from.IsClientside())
+		I_Error("Cannot move Behaviors between client-side and world Actors");
 
 	// Clean these up properly before transferring.
 	ClearBehaviors();

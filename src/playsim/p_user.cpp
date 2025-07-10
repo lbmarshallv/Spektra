@@ -1475,22 +1475,10 @@ nodetype *RestoreNodeList(AActor *act, nodetype *linktype::*otherlist, TArray<no
 
 void P_PredictPlayer (player_t *player)
 {
-	int maxtic;
-
-	if (demoplayback ||
+	if (demoplayback || gamestate != GS_LEVEL ||
 		player->mo == NULL ||
 		player != player->mo->Level->GetConsolePlayer() ||
-		player->playerstate != PST_LIVE ||
-		(!netgame && cl_debugprediction == 0) ||
-		/*player->morphTics ||*/
 		(player->cheats & CF_PREDICTING))
-	{
-		return;
-	}
-
-	maxtic = ClientTic;
-
-	if (gametic == maxtic)
 	{
 		return;
 	}
@@ -1547,6 +1535,12 @@ void P_PredictPlayer (player_t *player)
 	}
 	act->BlockNode = NULL;
 
+	int maxtic = ClientTic;
+	if (gametic == maxtic || player->playerstate != PST_LIVE)
+	{
+		return;
+	}
+
 	// This essentially acts like a mini P_Ticker where only the stuff relevant to the client is actually
 	// called. Call order is preserved.
 	bool rubberband = false, rubberbandLimit = false;
@@ -1558,7 +1552,6 @@ void P_PredictPlayer (player_t *player)
 		// Make sure any portal paths have been cleared from the previous movement.
 		R_ClearInterpolationPath();
 		r_NoInterpolate = false;
-		// Because we're always predicting, this will get set by teleporters and then can never unset itself in the renderer properly.
 		player->mo->renderflags &= ~RF_NOINTERPOLATEVIEW;
 
 		// Got snagged on something. Start correcting towards the player's final predicted position. We're
@@ -1717,6 +1710,7 @@ void P_UnPredictPlayer ()
 		}
 
 		act->UpdateRenderSectorList();
+		act->renderflags &= ~RF_NOINTERPOLATEVIEW;
 
 		actInvSel = InvSel;
 		player->inventorytics = inventorytics;
