@@ -144,7 +144,7 @@ static void NoiseMarkSector(sector_t *sec, AActor *soundtarget, bool splash, AAc
 	// [RH] Set this in the actors in the sector instead of the sector itself.
 	for (AActor *actor = sec->thinglist; actor != NULL; actor = actor->snext)
 	{
-		if (actor != soundtarget && (!splash || !(actor->flags4 & MF4_NOSPLASHALERT)) &&
+		if (actor != soundtarget && (actor->flags3 & MF3_ISMONSTER) && !actor->player && (!splash || !(actor->flags4 & MF4_NOSPLASHALERT)) &&
 			(!maxdist || (actor->Distance2D(emitter) <= maxdist)))
 		{
 			actor->LastHeard = soundtarget;
@@ -977,7 +977,6 @@ void P_NewChaseDir(AActor * actor)
 	{
 		// Don't abort if this happens.
 		Printf ("P_NewChaseDir: called with no target\n");
-		P_RandomChaseDir(actor);
 		return;
 	}
 	
@@ -2390,6 +2389,11 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 	{
 		return;
 	}
+	if (!actor->target)
+	{
+		actor->SetIdle();
+		return;
+	}
 	actor->flags7 |= MF7_INCHASE;
 
 	// [RH] Andy Baker's stealth monsters
@@ -2458,74 +2462,6 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 	// [RH] If the target is dead or a friend (and not a goal), stop chasing it.
 	if (actor->target && actor->target != actor->goal && (actor->target->health <= 0 || actor->IsFriend(actor->target)))
 		actor->target = nullptr;
-
-	// [RH] Friendly monsters will consider chasing whoever hurts a player if they
-	// don't already have a target.
-	if (actor->flags & MF_FRIENDLY && actor->target == NULL)
-	{
-		player_t *player;
-
-		if (actor->FriendPlayer != 0)
-		{
-			player = actor->Level->Players[actor->FriendPlayer - 1];
-		}
-		else
-		{
-			int i;
-			if (!multiplayer)
-			{
-				i = 0;
-			}
-			else for (i = pr_newchasedir() & (MAXPLAYERS-1); !actor->Level->PlayerInGame(i); i = (i+1) & (MAXPLAYERS-1))
-			{
-			}
-			player = actor->Level->Players[i];
-		}
-		if (player->attacker && player->attacker->health > 0 && player->attacker->flags & MF_SHOOTABLE && pr_newchasedir() < 80)
-		{
-			if (!(player->attacker->flags & MF_FRIENDLY) ||
-				(deathmatch && actor->FriendPlayer != 0 && player->attacker->FriendPlayer != 0 &&
-				actor->FriendPlayer != player->attacker->FriendPlayer))
-			{
-				actor->target = player->attacker;
-			} 
-		}
-	}
-	if (!actor->target || !(actor->target->flags & MF_SHOOTABLE))
-	{ // look for a new target
-		if (actor->target != nullptr && (actor->target->flags2 & MF2_NONSHOOTABLE))
-		{
-			// Target is only temporarily unshootable, so remember it.
-			actor->lastenemy = actor->target;
-			// Switch targets faster, since we're only changing because we can't
-			// hurt our old one temporarily.
-			actor->threshold = 0;
-		}
-		if (P_LookForPlayers (actor, !(flags & CHF_DONTLOOKALLAROUND), nullptr) && actor->target != actor->goal)
-		{ // got a new target
-			actor->flags7 &= ~MF7_INCHASE;
-			return;
-		}
-		if (actor->target == nullptr)
-		{
-			if (flags & CHF_DONTIDLE || actor->flags & MF_FRIENDLY)
-			{
-				//A_Look(actor);
-				if (actor->target == nullptr)
-				{
-					if (!dontmove) A_Wander(actor);
-					actor->flags7 &= ~MF7_INCHASE;
-					return;
-				}
-			}
-			else
-			{
-				actor->SetIdle();
-				actor->flags7 &= ~MF7_INCHASE;
-				return;
-			}
-		}
-	}
 	
 	// do not attack twice in a row
 	if (actor->flags & MF_JUSTATTACKED)
@@ -2662,31 +2598,6 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 	}
 
  nomissile:
-	// possibly choose another target
-	if ((multiplayer || actor->TIDtoHate)
-		&& !actor->threshold
-		&& !P_CheckSight (actor, actor->target, 0) )
-	{
-		bool lookForBetter = false;
-		bool gotNew;
-		if (actor->flags3 & MF3_NOSIGHTCHECK)
-		{
-			actor->flags3 &= ~MF3_NOSIGHTCHECK;
-			lookForBetter = true;
-		}
-		AActor * oldtarget = actor->target;
-		gotNew = P_LookForPlayers (actor, !(flags & CHF_DONTLOOKALLAROUND), nullptr);
-		if (lookForBetter)
-		{
-			actor->flags3 |= MF3_NOSIGHTCHECK;
-		}
-		if (gotNew && actor->target != oldtarget)
-		{
-			actor->flags7 &= ~MF7_INCHASE;
-			return; 	// got a new target
-		}
-	}
-
 	//
 	// chase towards player
 	//
