@@ -4010,16 +4010,124 @@ DEFINE_ACTION_FUNCTION(AActor, SetShade)
 	return 0;
 }
 
-void AActor::SetDynLightLevel (float r, float g, float b)
+template<class T>
+T smoothstep(const T edge0, const T edge1, const T x)
 {
-	float m = g;
-	if(r > m){
-		m = r;
+	auto t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+	return t * t * (3.0 - 2.0 * t);
+}
+
+// estimate the current dynamic light level
+void AActor::SetDynLightLevel ()
+{
+	float r = 0.f, g = 0.f, b = 0.f;
+	float frac, lr, lg, lb;
+	double x = X();
+	double y = Y();
+	double z = Center();
+	FDynamicLight* light;
+	LightProbe* probe = FindLightProbe(Level, x, y, z);
+	if (probe)
+	{
+		r = probe->Red;
+		g = probe->Green;
+		b = probe->Blue;
 	}
-	if (b > m){
-		m = g;
+	// Go through both light lists
+	auto flatLightList = Level->lightlists.flat_dlist.CheckKey(section);
+	if (flatLightList)
+	{
+		TMap<FDynamicLight*, std::unique_ptr<FLightNode>>::Iterator it(*flatLightList);
+		TMap<FDynamicLight*, std::unique_ptr<FLightNode>>::Pair* pair;
+		while (it.NextPair(pair))
+		{
+			auto node = pair->Value.get();
+			if (!node) continue;
+			light = node->lightsource;
+			if (light->ShouldLightActor(this))
+			{
+				float dist;
+				FVector3 L;
+
+				// This is a performance critical section of code where we cannot afford to let the compiler decide whether to inline the function or not.
+				// This will do the calculations explicitly rather than calling one of AActor's utility functions.
+				if (Level->Displacements.size > 0)
+				{
+					int fromgroup = light->Sector->PortalGroup;
+					int togroup = Sector->PortalGroup;
+					if (fromgroup == togroup || fromgroup == 0 || togroup == 0) goto direct;
+
+					DVector2 offset = Level->Displacements.getOffset(fromgroup, togroup);
+					L = FVector3(x - (float)(light->X() + offset.X), y - (float)(light->Y() + offset.Y), z - (float)light->Z());
+				}
+				else
+				{
+				direct:
+					L = FVector3(x - (float)light->X(), y - (float)light->Y(), z - (float)light->Z());
+				}
+
+				dist = (float)L.LengthSquared();
+				float lightRadius = light->GetRadius();
+
+				if (dist < lightRadius * lightRadius)
+				{
+					dist = sqrtf(dist);	// only calculate the square root if we really need it.
+
+					frac = 1.0f - (dist / lightRadius);
+
+					if (light->IsSpot())
+					{
+						L *= -1.0f / dist;
+						DAngle negPitch = -*light->pPitch;
+						DAngle Angle = light->target->Angles.Yaw;
+						double xyLen = negPitch.Cos();
+						double spotDirX = -Angle.Cos() * xyLen;
+						double spotDirY = -Angle.Sin() * xyLen;
+						double spotDirZ = -negPitch.Sin();
+						double cosDir = L.X * spotDirX + L.Y * spotDirY + L.Z * spotDirZ;
+						frac *= (float)smoothstep(light->pSpotOuterAngle->Cos(), light->pSpotInnerAngle->Cos(), cosDir);
+					}
+
+					if (frac > 0 && (!light->shadowmapped || (lightRadius > 0 && screen->mShadowMap.ShadowTest(light->Pos, { x, y, z }))))
+					{
+						lr = light->GetRed() / 255.0f;
+						lg = light->GetGreen() / 255.0f;
+						lb = light->GetBlue() / 255.0f;
+
+						if (light->target && (light->target->renderflags2 & RF2_LIGHTMULTALPHA))
+						{
+							float alpha = (float)light->target->Alpha;
+							lr *= alpha;
+							lg *= alpha;
+							lb *= alpha;
+						}
+
+						// Get GLDEFS intensity
+						lr *= light->GetLightDefIntensity();
+						lg *= light->GetLightDefIntensity();
+						lb *= light->GetLightDefIntensity();
+
+						if (light->IsSubtractive())
+						{
+							float bright = (float)FVector3(lr, lg, lb).Length();
+							FVector3 lightColor(lr, lg, lb);
+							lr = (bright - lr) * -1;
+							lg = (bright - lg) * -1;
+							lb = (bright - lb) * -1;
+						}
+
+						r += lr * frac;
+						g += lg * frac;
+						b += lb * frac;
+						// if light values are maxed out we're done
+						if (std::max({ r,g,b }) > 1)
+							break;
+					}
+				}
+			}
+		}
 	}
-	DynLightLevel = uint8_t(m*255.0f);
+	DynLightLevel = uint16_t(std::max({ r,g,b })*255.0f);
 }
 
 // [MC] Helper function for Set(View)Pitch. 
@@ -5046,6 +5154,8 @@ void AActor::Tick ()
 		{
 			return;
 		}
+
+		SetDynLightLevel ();
 
 		// Check for poison damage, but only once per PoisonPeriod tics (or once per second if none).
 		if (PoisonDurationReceived && (Level->time % (PoisonPeriodReceived ? PoisonPeriodReceived : TICRATE) == 0))

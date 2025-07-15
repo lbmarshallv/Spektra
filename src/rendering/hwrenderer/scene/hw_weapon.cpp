@@ -739,9 +739,6 @@ void HWDrawInfo::PreparePlayerSprites2D(sector_t * viewsector, area_t in_area)
 		if (hudsprite.RenderStyle.BlendOp != STYLEOP_Shadow && Level->HasDynamicLights && !isFullbrightScene() && gl_light_sprites)
 		{
 			GetDynSpriteLight(playermo, nullptr, hudsprite.dynrgb);
-			if (playermo) {
-				playermo->SetDynLightLevel(hudsprite.dynrgb[0], hudsprite.dynrgb[1], hudsprite.dynrgb[2]);
-			}
 		}
 
 		if (!hudsprite.GetWeaponRect(this, psp, spos.X, spos.Y, player, vp.TicFrac)) continue;

@@ -961,7 +961,7 @@ public:
 	void SetShade (uint32_t rgb);
 	void SetShade (int r, int g, int b);
 	
-	void SetDynLightLevel (float r, float g, float b);
+	void SetDynLightLevel ();
 
 	// Plays a conversation animation
 	void ConversationAnimation (int animnum);
@@ -1255,7 +1255,7 @@ public:
 	int16_t			LightLevel;		// Allows for overriding sector light levels.
 	uint16_t			SpawnAngle;
 	
-	uint8_t			DynLightLevel;  // Total amount of light from dynamic light sources
+	uint16_t			DynLightLevel;  // Total amount of light from dynamic light sources
 
 	TObjPtr<AActor*> target;			// thing being chased/attacked (or NULL)
 									// also the originator for missiles
