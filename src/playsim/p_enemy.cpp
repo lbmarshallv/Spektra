@@ -2389,6 +2389,20 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 	{
 		return;
 	}
+	
+	// [RH] If the target is dead or a friend (and not a goal), stop chasing it.
+	if (actor->target && actor->target != actor->goal && (actor->target->health <= 0 || actor->IsFriend(actor->target))) {
+		actor->target = nullptr;
+	}
+
+	// [RH] Don't chase invisible targets
+	if (actor->target != NULL &&
+		((actor->target->renderflags & RF_INVISIBLE) || (actor->target->flags8 & MF8_MINVISIBLE)) &&
+		actor->target != actor->goal)
+	{
+		actor->target = nullptr;
+	}
+
 	if (!actor->target)
 	{
 		actor->SetIdle();
@@ -2407,14 +2421,6 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 		actor->reactiontime--;
 	}
 
-	// [RH] Don't chase invisible targets
-	if (actor->target != NULL &&
-		((actor->target->renderflags & RF_INVISIBLE) || (actor->target->flags8 & MF8_MINVISIBLE)) &&
-		actor->target != actor->goal)
-	{
-		actor->target = nullptr;
-	}
-
 	// modify target threshold
 	if (actor->threshold)
 	{
@@ -2425,18 +2431,6 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 		else
 		{
 			actor->threshold--;
-		}
-	}
-
-	if (nightmarefast && G_SkillProperty(SKILLP_FastMonsters))
-	{ // Monsters move faster in nightmare mode
-		if (actor->tics > 3)
-		{
-			actor->tics -= actor->tics / 2;
-			if (actor->tics < 3)
-			{
-				actor->tics = 3;
-			}
 		}
 	}
 
@@ -2459,10 +2453,8 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 		}
 	}
 
-	// [RH] If the target is dead or a friend (and not a goal), stop chasing it.
-	if (actor->target && actor->target != actor->goal && (actor->target->health <= 0 || actor->IsFriend(actor->target)))
-		actor->target = nullptr;
-	
+
+		
 	// do not attack twice in a row
 	if (actor->flags & MF_JUSTATTACKED)
 	{
