@@ -1314,7 +1314,7 @@ void DAutomap::changeWindowLoc ()
 
 void DAutomap::startDisplay()
 {
-	int pnum;
+	unsigned int pnum;
 
 	f_oldloc.x = FLT_MAX;
 	amclock = 0;
@@ -2813,7 +2813,7 @@ void DAutomap::drawPlayers ()
 
 	mpoint_t pt;
 	DAngle angle;
-	int i;
+	unsigned int i;
 
 	if (!multiplayer)
 	{
