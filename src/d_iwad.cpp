@@ -52,6 +52,7 @@
 #include "gstrings.h"
 
 EXTERN_CVAR(Bool, queryiwad);
+EXTERN_CVAR(String, queryiwad_key);
 EXTERN_CVAR(Bool, disableautoload)
 EXTERN_CVAR(Bool, autoloadlights)
 EXTERN_CVAR(Bool, autoloadbrightmaps)
@@ -698,7 +699,7 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 				picks.Clear();
 				picks.Push(found);
 				pickedprio = mIWadInfos[found.mInfoIndex].prio;
-				foundprio = true;
+				foundprio = !HoldingQueryKey(queryiwad_key);
 			}
 		}
 	}
@@ -775,7 +776,7 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 		if (i_loadsupportwad) flags |= 16;
 
 		FStartupSelectionInfo info = FStartupSelectionInfo(wads, *Args, flags);
-		if (I_PickIWad(queryiwad, info))
+		if (I_PickIWad(queryiwad || HoldingQueryKey(queryiwad_key), info))
 		{
 			pick = info.SaveInfo();
 			disableautoload = !!(info.DefaultStartFlags & 1);
@@ -797,7 +798,7 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 
 	// [SP] Load non-free assets if available. This must be done before the IWAD.
 	int iwadnum = 1;
-	if (optional_wad && D_AddFile(wadfiles, optional_wad, true, -1, GameConfig))
+	if (optional_wad && D_AddFile(wadfiles, optional_wad, true, -1, GameConfig, true))
 	{
 		iwadnum++;
 	}
@@ -823,7 +824,7 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 
 			if(supportWAD.IsNotEmpty())
 			{
-				D_AddFile(wadfiles, supportWAD.GetChars(), true, -1, GameConfig);
+				D_AddFile(wadfiles, supportWAD.GetChars(), true, -1, GameConfig, true);
 			}
 		}
 	}
