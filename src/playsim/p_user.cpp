@@ -1483,6 +1483,10 @@ void P_PredictPlayer (player_t *player)
 		return;
 	}
 
+	bPredictionGuard = true;
+	// Avoid memcpying in bad pointers.
+	GC::CheckGC();
+
 	FRandom::SaveRNGState(PredictionRNG);
 
 	// Save original values for restoration later
@@ -1714,6 +1718,8 @@ void P_UnPredictPlayer ()
 
 		actInvSel = InvSel;
 		player->inventorytics = inventorytics;
+
+		bPredictionGuard = false;
 	}
 }
 
