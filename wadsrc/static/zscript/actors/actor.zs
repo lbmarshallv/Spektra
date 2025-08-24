@@ -1,3 +1,39 @@
+/*
+** actor.zs
+**
+**---------------------------------------------------------------------------
+**
+** Copyright 2010-2017 Christoph Oelckers
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** All rights reserved.
+**
+** Redistribution and use in source and binary forms, with or without
+** modification, are permitted provided that the following conditions
+** are met:
+**
+** 1. Redistributions of source code must retain the above copyright
+**    notice, this list of conditions and the following disclaimer.
+** 2. Redistributions in binary form must reproduce the above copyright
+**    notice, this list of conditions and the following disclaimer in the
+**    documentation and/or other materials provided with the distribution.
+** 3. The name of the author may not be used to endorse or promote products
+**    derived from this software without specific prior written permission.
+**
+** THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+** IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+** OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+** IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+** INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+** NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+** DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+** THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+**
+**---------------------------------------------------------------------------
+**
+*/
+
 struct FCheckPosition
 {
 	// in
@@ -25,11 +61,11 @@ struct FCheckPosition
 	native int			portalgroup;
 
 	native int			PushTime;
-	
+
 	// These are internal helpers to properly initialize an object of this type.
 	private native void _Constructor();
 	private native void _Destructor();
-	
+
 	native void ClearLastRipped();
 }
 
@@ -110,7 +146,7 @@ class Actor : Thinker native
 	const MELEEDELTA = 20;
 
 	// flags are not defined here, the native fields for those get synthesized from the internal tables.
-	
+
 	// for some comments on these fields, see their native representations in actor.h.
 	native readonly Actor snext;	// next in sector list.
 	native PlayerInfo Player;
@@ -398,7 +434,7 @@ class Actor : Thinker native
 	property ShadowPenaltyFactor: ShadowPenaltyFactor;
 	property AutomapOffsets : AutomapOffsets;
 	property LandingSpeed: LandingSpeed;
-	
+
 	// need some definition work first
 	//FRenderStyle RenderStyle;
 	native private int RenderStyle;	// This is kept private until its real type has been implemented into the VM. But some code needs to copy this.
@@ -418,11 +454,10 @@ class Actor : Thinker native
 	native deprecated("2.3", "Use Scale.Y instead") double ScaleY;
 
 	//FStrifeDialogueNode *Conversation; // [RH] The dialogue to show when this actor is used.;
-	
-	
+
 	Default
 	{
-		LightLevel -1; 
+		LightLevel -1;
 		Scale 1;
 		Health DEFAULT_HEALTH;
 		Reactiontime 8;
@@ -491,7 +526,7 @@ class Actor : Thinker native
 		FriendlySeeBlocks 10; // 10 (blocks) * 128 (one map unit block)
 		LandingSpeed -8; // landing speed from a jump with normal gravity (squats the player's view)
 	}
-	
+
 	// Functions
 
 	// 'parked' global functions.
@@ -500,7 +535,7 @@ class Actor : Thinker native
 	native clearscope static Vector2 AngleToVector(double angle, double length = 1);
 	native clearscope static Vector2 RotateVector(Vector2 vec, double angle);
 	native clearscope static double Normalize180(double ang);
-	
+
 	virtual void MarkPrecacheSounds()
 	{
 		MarkSound(SeeSound);
@@ -521,7 +556,7 @@ class Actor : Thinker native
 	{
 		return GetPointer(ptr_select1) == GetPointer(ptr_select2);
 	}
-	
+
 	clearscope static double BobSin(double fb)
 	{
 		return sin(fb * (180./32)) * 8;
@@ -563,8 +598,8 @@ class Actor : Thinker native
 		return true;
 	}
 
-	// [AA] Called by inventory items in CallTryPickup to see if this actor needs 
-	// to process them in some way before they're received. Gets called before 
+	// [AA] Called by inventory items in CallTryPickup to see if this actor needs
+	// to process them in some way before they're received. Gets called before
 	// the item's TryPickup, allowing fully customized handling of all items.
 	virtual bool CanReceive(Inventory item)
 	{
@@ -630,7 +665,7 @@ class Actor : Thinker native
 	{
 		return false;
 	}
-	
+
 	virtual class<Actor> GetBloodType(int type)
 	{
 		Class<Actor> bloodcls;
@@ -657,7 +692,7 @@ class Actor : Thinker native
 		}
 		return bloodcls;
 	}
-	
+
 	virtual int GetGibHealth()
 	{
 		if (GibHealth != int.min)
@@ -669,7 +704,7 @@ class Actor : Thinker native
 			return -int(GetSpawnHealth() * gameinfo.gibfactor);
 		}
 	}
-	
+
 	virtual double GetDeathHeight()
 	{
 		// [RH] Allow the death height to be overridden using metadata.
@@ -691,7 +726,7 @@ class Actor : Thinker native
 			return MAX(metaheight, 0);
 		}
 	}
-	
+
 	virtual String GetObituary(Actor victim, Actor inflictor, Name mod, bool playerattack)
 	{
 		if (mod == 'Telefrag')
@@ -709,7 +744,7 @@ class Actor : Thinker native
 	{
 		return SelfObituary;
 	}
-	
+
 	virtual int OnDrain(Actor victim, int damage, Name dmgtype)
 	{
 		return damage;
@@ -722,7 +757,7 @@ class Actor : Thinker native
 	// return false in PreTeleport() to cancel the action early
 	virtual bool PreTeleport( Vector3 destpos, double destangle, int flags ) { return true; }
 	virtual void PostTeleport( Vector3 destpos, double destangle, int flags ) {}
-	
+
 	native virtual bool OkayToSwitchTarget(Actor other);
 	native clearscope static class<Actor> GetReplacement(class<Actor> cls);
 	native clearscope static class<Actor> GetReplacee(class<Actor> cls);
@@ -743,7 +778,7 @@ class Actor : Thinker native
 	protected native void CheckPortalTransition(bool linked = true);
 	native clearscope bool HasConversation() const;
 	native clearscope bool CanTalk() const;
-	native bool StartConversation(Actor player, bool faceTalker = true, bool saveAngle = true);
+	native bool StartConversation(Actor player, bool faceTalker = true, bool saveAngle = true, bool rumble = true);
 
 	native clearscope string GetTag(string defstr = "") const;
 	native clearscope string GetCharacterName() const;
@@ -768,7 +803,7 @@ class Actor : Thinker native
 	native clearscope Vector3 PosRelative(sector sec) const;
 	native void RailAttack(FRailParams p);
 	native clearscope Name GetDecalName() const;
-		
+
 	native void HandleSpawnFlags();
 	native void ExplodeMissile(line lin = null, Actor target = null, bool onsky = false);
 	native void RestoreDamage();
@@ -790,7 +825,7 @@ class Actor : Thinker native
 	native bool CheckFor3DFloorHit(double z, bool trigger);
 	native bool CheckFor3DCeilingHit(double z, bool trigger);
 	native int CheckMonsterUseSpecials(Line blocking = null);
-	
+
 	native bool CheckMissileSpawn(double maxdist);
 	native bool CheckPosition(Vector2 pos, bool actorsonly = false, FCheckPosition tm = null);
 	native bool TestMobjLocation();
@@ -815,7 +850,7 @@ class Actor : Thinker native
 	void A_Light1() { if (player) player.extralight = 1; }
 	void A_Light2() { if (player) player.extralight = 2; }
 	void A_LightInverse() { if (player) player.extralight = 0x80000000; }
-	
+
 	native Actor OldSpawnMissile(Actor dest, class<Actor> type, Actor owner = null);
 	native Actor SpawnPuff(class<Actor> pufftype, vector3 pos, double hitdir, double particledir, int updown, int flags = 0, Actor victim = null);
 	native Actor SpawnBlood (Vector3 pos1, double dir, int damage);
@@ -823,7 +858,7 @@ class Actor : Thinker native
 	native bool HitWater (sector sec, Vector3 pos, bool checkabove = false, bool alert = true, bool force = false, int flags = 0);
 	native void PlaySpawnSound(Actor missile);
 	native clearscope bool CountsAsKill() const;
-	
+
 	native bool Teleport(Vector3 pos, double angle, int flags);
 	native void TraceBleed(int damage, Actor missile);
 	native void TraceBleedAngle(int damage, double angle, double pitch);
@@ -842,7 +877,7 @@ class Actor : Thinker native
 	native bool, Actor, double PerformShadowChecks (Actor other, Vector3 pos);
 	native bool HitFriend();
 	native bool MonsterMove();
-	
+
 	native SeqNode StartSoundSequenceID (int sequence, int type, int modenum, bool nostop = false);
 	native SeqNode StartSoundSequence (Name seqname, int modenum);
 	native void StopSoundSequence();
@@ -851,7 +886,7 @@ class Actor : Thinker native
 	native double, double GetFriction();
 	native bool, Actor TestMobjZ(bool quick = false);
 	native clearscope static bool InStateSequence(State newstate, State basestate);
-	
+
 	bool TryWalk ()
 	{
 		if (!MonsterMove ())
@@ -861,7 +896,7 @@ class Actor : Thinker native
 		movecount = random[TryWalk](0, 15);
 		return true;
 	}
-	
+
 	native bool TryMove(vector2 newpos, int dropoff, bool missilecheck = false, FCheckPosition tm = null);
 	native bool CheckMove(vector2 newpos, int flags = 0, FCheckPosition tm = null);
 	native void NewChaseDir();
@@ -936,10 +971,11 @@ class Actor : Thinker native
 	//
 	// AActor :: GetLevelSpawnTime
 	//
-	// Returns the time when this actor was spawned, 
+	// Returns the time when this actor was spawned,
 	// relative to the current level.
 	//
 	//==========================================================================
+
 	clearscope int GetLevelSpawnTime() const
 	{
 		return SpawnTime - level.totaltime + level.time;
@@ -952,7 +988,7 @@ class Actor : Thinker native
 	// Returns the number of ticks passed since this actor was spawned.
 	//
 	//==========================================================================
-	
+
 	clearscope int GetAge() const
 	{
 		return level.totaltime - SpawnTime;
@@ -963,8 +999,6 @@ class Actor : Thinker native
 		return 1. / (1 << (accuracy * 5 / 100));
 	}
 
-	
-	
 	protected native void DestroyAllInventory();	// This is not supposed to be called by user code!
 	native clearscope Inventory FindInventory(class<Inventory> itemtype, bool subclass = false) const;
 	native Inventory GiveInventoryType(class<Inventory> itemtype);
@@ -1018,7 +1052,7 @@ class Actor : Thinker native
 	void A_SetRipMax(int maximum) { RipLevelMax = maximum; }
 	void A_ScreamAndUnblock() { A_Scream(); A_NoBlocking(); }
 	void A_ActiveAndUnblock() { A_ActiveSound(); A_NoBlocking(); }
-	
+
 	//---------------------------------------------------------------------------
 	//
 	// FUNC P_SpawnMissileAngle
@@ -1037,7 +1071,6 @@ class Actor : Thinker native
 	{
 		return SpawnMissileAngleZSpeed (z, type, angle, vz, GetDefaultSpeed (type), owner);
 	}
-	
 
 	void A_SetScale(double scalex, double scaley = 0, int ptr = AAPTR_DEFAULT, bool usezero = false)
 	{
@@ -1098,7 +1131,7 @@ class Actor : Thinker native
 	}
 
 	void A_ChangeLinkFlags(int blockmap = FLAG_NO_CHANGE, int sector = FLAG_NO_CHANGE)
-	{	
+	{
 		UnlinkFromWorld();
 		if (blockmap != FLAG_NO_CHANGE) bNoBlockmap = blockmap;
 		if (sector != FLAG_NO_CHANGE) bNoSector = sector;
@@ -1123,7 +1156,7 @@ class Actor : Thinker native
 			mo.Vel.Z = random[Dirt]() / 64.;
 		}
 	}
-	
+
 	//
 	// A_SinkMobj
 	// Sink a mobj incrementally into the floor
@@ -1141,8 +1174,8 @@ class Actor : Thinker native
 
 	//
 	// A_RaiseMobj
-	// Raise a mobj incrementally from the floor to 
-	// 
+	// Raise a mobj incrementally from the floor to
+	//
 
 	bool RaiseMobj (double speed)
 	{
@@ -1162,14 +1195,14 @@ class Actor : Thinker native
 		}
 		return true;
 	}
-	
+
 	Actor AimTarget()
 	{
 		FTranslatedLineTarget t;
 		BulletSlope(t, ALF_PORTALRESTRICT);
 		return t.linetarget;
 	}
-	
+
 	void RestoreRenderStyle()
 	{
 		bShadow = default.bShadow;
@@ -1177,7 +1210,7 @@ class Actor : Thinker native
 		RenderStyle = default.RenderStyle;
 		Alpha = default.Alpha;
 	}
-	
+
 	virtual bool ShouldSpawn()
 	{
 		return true;
@@ -1202,7 +1235,7 @@ class Actor : Thinker native
 	// Meh, MBF redundant functions. Only for DeHackEd support.
 	native bool A_LineEffect(int boomspecial = 0, int tag = 0);
 	// End of MBF redundant functions.
-	
+
 	native void A_MonsterRail();
 	native void A_Pain();
 	native void A_NoBlocking(bool drop = true);
@@ -1284,7 +1317,7 @@ class Actor : Thinker native
 	native void A_CountdownArg(int argnum, statelabel targstate = null);
 	native state A_MonsterRefire(int chance, statelabel label);
 	native void A_LookEx(int flags = 0, double minseedist = 0, double maxseedist = 0, double maxheardist = 0, double fov = 0, statelabel label = null);
-	
+
 	native void A_Recoil(double xyvel);
 	native int A_RadiusGive(class<Inventory> itemtype, double distance, int flags, int amount = 0, class<Actor> filter = null, name species = "None", double mindist = 0, int limit = 0);
 	native void A_CustomMeleeAttack(int damage = 0, sound meleesound = "", sound misssound = "", name damagetype = "none", bool bleed = true);
@@ -1293,7 +1326,7 @@ class Actor : Thinker native
 	native void A_RadiusDamageSelf(int damage = 128, double distance = 128.0, int flags = 0, class<Actor> flashtype = null);
 	native int GetRadiusDamage(Actor thing, int damage, double distance, double fulldmgdistance = 0.0, bool oldradiusdmg = false, bool circular = false);
 	native int RadiusAttack(Actor bombsource, int bombdamage, double bombdistance, Name bombmod = 'none', int flags = RADF_HURTSOURCE, double fulldamagedistance = 0.0, name species = "None");
-	
+
 	native void A_Respawn(int flags = 1);
 	native void A_RestoreSpecialPosition();
 	native void A_QueueCorpse();
@@ -1364,15 +1397,15 @@ class Actor : Thinker native
 	action native void A_OverlayAlpha(int layer, double alph);
 	action native void A_OverlayRenderStyle(int layer, int style);
 	action native void A_OverlayTranslation(int layer, name trname);
-	
+
 	native bool A_AttachLightDef(Name lightid, Name lightdef);
 	native bool A_AttachLight(Name lightid, int type, Color lightcolor, int radius1, int radius2, int flags = 0, Vector3 ofs = (0,0,0), double param = 0, double spoti = 10, double spoto = 25, double spotp = 0, double intensity = 1.0);
 	native bool A_RemoveLight(Name lightid);
 
 	//================================================
-	// 
+	//
 	// Bone Offset Setters
-	// 
+	//
 	//================================================
 
 	native version("4.15.1") void SetBoneRotation(int boneIndex, Quat rotation, int mode = SB_ADD, double interpolation_duration = 1.0);
@@ -1427,9 +1460,9 @@ class Actor : Thinker native
 	native version("4.15.1") void ClearBoneOffsets();
 
 	//================================================
-	// 
+	//
 	// Bone Offset Getters
-	// 
+	//
 	//================================================
 
 	/* rotation, translation, scaling */
@@ -1437,58 +1470,58 @@ class Actor : Thinker native
 	native version("4.15.1") Quat, Vector3, Vector3 GetNamedBoneOffset(Name boneName);
 
 	//================================================
-	// 
+	//
 	// Bone Info Getters
-	// 
+	//
 	//================================================
-	
+
 	native version("4.15.1") void GetRootBones(out Array<int> rootBones);
-	
+
 	native version("4.15.1") Name GetBoneName(int boneIndex);
 	native version("4.15.1") int GetBoneIndex(Name boneName);
-	
+
 	native version("4.15.1") int GetBoneParent(int boneIndex);
 	native version("4.15.1") int GetNamedBoneParent(Name boneName); // return value lower than 0 means it's a root bone, and as such has no parent
-	
+
 	native version("4.15.1") void GetBoneChildren(int boneIndex, out Array<int> children);
 	native version("4.15.1") void GetNamedBoneChildren(Name boneName, out Array<int> children);
-	
+
 	/* rotation, translation, scaling */
 	native version("4.15.1") Quat, Vector3, Vector3 GetBoneBaseTRS(int boneIndex);
 	native version("4.15.1") Quat, Vector3, Vector3 GetNamedBoneBaseTRS(Name boneName);
-	
+
 	native version("4.15.1") Vector3 GetBoneBasePosition(int boneIndex);
 	native version("4.15.1") Vector3 GetNamedBoneBasePosition(Name boneName);
-	
+
 	native version("4.15.1") Quat GetBoneBaseRotation(int boneIndex);
 	native version("4.15.1") Quat GetNamedBoneBaseRotation(Name boneName);
 
 	native version("4.15.1") int GetBoneCount();
 
 	//================================================
-	// 
+	//
 	// Bone Pose Getters
-	// 
+	//
 	//================================================
 
 	native version("4.15.1") int GetAnimStartFrame(Name animName);
 	native version("4.15.1") int GetAnimEndFrame(Name animName);
 	native version("4.15.1") double GetAnimFramerate(Name animName);
-	
+
 	/* rotation, translation, scaling */
 	native version("4.15.1") Quat, Vector3, Vector3 GetBoneFramePose(int boneIndex, int frame);
 	native version("4.15.1") Quat, Vector3, Vector3 GetNamedBoneFramePose(Name boneName, int frame);
 
 	//================================================
-	// 
+	//
 	// Bone TRS Getters
-	// 
+	//
 	//================================================
-	
+
 	/* rotation, translation, scaling, doesn't include parent bones */
 	native version("4.15.1") Quat, Vector3, Vector3 GetBoneTRS(int boneIndex, bool include_offsets = true);
 	native version("4.15.1") Quat, Vector3, Vector3 GetNamedBoneTRS(Name boneName, bool include_offsets = true);
-	
+
 	/* angle, pitch, roll, includes parent bones */
 	native version("4.15.1") Vector3 GetBoneEulerAngles(int boneIndex, bool include_offsets = true);
 	native version("4.15.1") Vector3 GetNamedBoneEulerAngles(Name boneName, bool include_offsets = true);
@@ -1496,13 +1529,13 @@ class Actor : Thinker native
 	//input position/direction vectors are in xzy, model space
 	native version("4.15.1") Vector3, Vector3, Vector3 TransformByBone(int boneIndex, Vector3 position, Vector3 forward = (1,0,0), Vector3 up = (0,0,1), bool include_offsets = true);
 	native version("4.15.1") Vector3, Vector3, Vector3 TransformByNamedBone(Name boneName, Vector3 position, Vector3 forward = (1,0,0), Vector3 up = (0,0,1), bool include_offsets = true);
-	
+
 	version("4.15.1") Vector3, Vector3, Vector3 GetBonePosition(int boneIndex, bool include_offsets = true)
 	{
 		let [a, b, c] = TransformByBone(boneIndex, GetBoneBasePosition(boneIndex), include_offsets:include_offsets);
 		return a, b, c;
 	}
-	
+
 	version("4.15.1") Vector3, Vector3, Vector3 GetNamedBonePosition(name boneName, bool include_offsets = true)
 	{
 		let [a, b, c] = GetBonePosition(GetBoneIndex(boneName), include_offsets);
@@ -1510,11 +1543,11 @@ class Actor : Thinker native
 	}
 
 	//================================================
-	// 
+	//
 	// Bone Matrix Getters
-	// 
+	//
 	//================================================
-	
+
 	//outMatrix will be a 16-length array containing the raw matrix data
 	native version("4.15.1") void GetBoneMatrixRaw(int boneIndex, out Array<double> outMatrix, bool include_offsets = true);
 	native version("4.15.1") void GetNamedBoneMatrixRaw(Name boneName, out Array<double> outMatrix, bool include_offsets = true);
@@ -1522,9 +1555,9 @@ class Actor : Thinker native
 	native version("4.15.1") void GetObjectToWorldMatrixRaw(out Array<double> outMatrix);
 
 	//================================================
-	// 
-	// 
-	// 
+	//
+	//
+	//
 	//================================================
 
 	native version("4.12") void SetAnimation(Name animName, double framerate = -1, int startFrame = -1, int loopFrame = -1, int endFrame = -1, int interpolateTics = -1, int flags = 0);
@@ -1536,8 +1569,7 @@ class Actor : Thinker native
 	native version("4.12") void SetModelFlag(int flag, int iqmFlags = 0);
 	native version("4.12") void ClearModelFlag(int flag, int iqmFlags = 0);
 	native version("4.12") void ResetModelFlags(bool resetModel = true, bool resetIqm = false);
-    
-    
+
 	action version("4.12") void A_SetAnimation(Name animName, double framerate = -1, int startFrame = -1, int loopFrame = -1, int endFrame = -1, int interpolateTics = -1, int flags = 0)
 	{
 		invoker.SetAnimation(animName, framerate, startFrame, loopFrame, endFrame, interpolateTics, flags);
@@ -1552,20 +1584,16 @@ class Actor : Thinker native
 	{
 		invoker.SetModelFlag(flag);
 	}
-	
+
 	action version("4.12") void A_ClearModelFlag(int flag)
 	{
 		invoker.ClearModelFlag(flag);
 	}
-    
+
 	action version("4.12") void A_ResetModelFlags()
 	{
 		invoker.ResetModelFlags();
 	}
-    
-    
-    
-    
 
 	int ACS_NamedExecute(name script, int mapnum=0, int arg1=0, int arg2=0, int arg3=0)
 	{
@@ -1599,7 +1627,7 @@ class Actor : Thinker native
 	{
 		return ACS_ExecuteWithResult(-int(script), arg1, arg2, arg3, arg4);
 	}
-	
+
 	//===========================================================================
 	//
 	// Sounds
@@ -1610,23 +1638,23 @@ class Actor : Thinker native
 	{
 		if (DeathSound)
 		{
-			A_StartSound(DeathSound, CHAN_VOICE, CHANF_DEFAULT, 1, bBoss || bFullvolDeath? ATTN_NONE : ATTN_NORM);
+			A_StartSound(DeathSound, CHAN_VOICE, CHANF_DEFAULT|CHANF_NORUMBLE, 1, bBoss || bFullvolDeath? ATTN_NONE : ATTN_NORM);
 		}
 	}
 
 	void A_XScream()
 	{
-		A_StartSound(player? Sound("*gibbed") : Sound("misc/gibbed"), CHAN_VOICE);
+		A_StartSound(player? Sound("*gibbed") : Sound("misc/gibbed"), CHAN_VOICE, CHANF_NORUMBLE);
 	}
 
 	void A_ActiveSound()
 	{
 		if (ActiveSound)
 		{
-			A_StartSound(ActiveSound, CHAN_VOICE);
+			A_StartSound(ActiveSound, CHAN_VOICE, CHANF_NORUMBLE);
 		}
 	}
-	
+
 	virtual void PlayerLandedMakeGruntSound(actor onmobj)
 	{
 		bool grunted;
@@ -1638,7 +1666,7 @@ class Actor : Thinker native
 			// Why should this number vary by gravity?
 			if (self.Vel.Z < -self.player.mo.GruntSpeed)
 			{
-				A_StartSound("*grunt", CHAN_VOICE);
+				A_StartSound("*grunt", CHAN_VOICE, CHANF_NORUMBLE);
 				grunted = true;
 			}
 			bool isliquid = (pos.Z <= floorz) && HitFloor ();
@@ -1646,11 +1674,11 @@ class Actor : Thinker native
 			{
 				if (!grunted)
 				{
-					A_StartSound("*land", CHAN_AUTO);
+					A_StartSound("*land", CHAN_AUTO, CHANF_NORUMBLE);
 				}
 				else
 				{
-					A_StartSoundIfNotSame("*land", "*grunt", CHAN_AUTO);
+					A_StartSoundIfNotSame("*land", "*grunt", CHAN_AUTO, CHANF_NORUMBLE);
 				}
 			}
 		}
@@ -1672,7 +1700,7 @@ class Actor : Thinker native
 		if (oldlevel < 3 && WaterLevel == 3)
 		{
 			// Our head just went under.
-			A_StartSound("*dive", CHAN_VOICE, attenuation: ATTN_NORM);
+			A_StartSound("*dive", CHAN_VOICE, CHANF_NORUMBLE, attenuation: ATTN_NORM);
 		}
 		else if (oldlevel == 3 && WaterLevel < 3)
 		{
@@ -1680,10 +1708,73 @@ class Actor : Thinker native
 			if (player.air_finished > Level.maptime)
 			{
 				// We hadn't run out of air yet.
-				A_StartSound("*surface", CHAN_VOICE, attenuation: ATTN_NORM);
+				A_StartSound("*surface", CHAN_VOICE, CHANF_NORUMBLE, attenuation: ATTN_NORM);
 			}
 			// If we were running out of air, then ResetAirSupply() will play *gasp.
 		}
+	}
+
+	//----------------------------------------------------------------------------
+	//
+	// player rumble events
+	//
+	//----------------------------------------------------------------------------
+
+	virtual void PlayerLandedMakeRumble(actor onmobj)
+	{
+		if (!CVar.GetCVar("haptics_do_world").GetBool()) return;
+
+		bool isliquid = (pos.Z <= floorz) && HitFloor ();
+		if (onmobj != NULL || !isliquid)
+		{
+			Haptics.Rumble("*land");
+		}
+		else if (self.Vel.Z < -self.player.mo.GruntSpeed)
+		{
+			Haptics.Rumble("*grunt");
+		}
+	}
+
+	virtual void PlayerHurtMakeRumble(actor source)
+	{
+		if (!CVar.GetCVar("haptics_do_damage").GetBool()) return;
+
+		Haptics.Rumble("*pain");
+	}
+
+	virtual void PlayerDiedMakeRumble(actor source)
+	{
+		if (!CVar.GetCVar("haptics_do_damage").GetBool()) return;
+
+		Haptics.Rumble("*death");
+	}
+
+	virtual void PlayerUsedSomethingMakeRumble(int activationType, int levelNum, int lineNum, int lineSpecial)
+	{
+		if (!CVar.GetCVar("haptics_do_action").GetBool()) return;
+
+		Haptics.Rumble("*usesuccess");
+	}
+
+	virtual void PlayerTeleportedMakeRumble()
+	{
+		if (!CVar.GetCVar("haptics_do_world").GetBool()) return;
+
+		Haptics.Rumble("misc/teleport");
+	}
+
+	virtual void PlayerPushedSomethingMakeRumble(actor thing)
+	{
+		if (!CVar.GetCVar("haptics_do_world").GetBool()) return;
+
+		Haptics.Rumble("misc/push");
+	}
+
+	virtual void PlayerWasPushedMakeRumble(actor source)
+	{
+		if (!CVar.GetCVar("haptics_do_world").GetBool()) return;
+
+		Haptics.Rumble("misc/pushed");
 	}
 
 	//----------------------------------------------------------------------------
@@ -1697,8 +1788,6 @@ class Actor : Thinker native
 		if (player == NULL) Destroy();
 	}
 
-	
-	
 	States(Actor, Overlay, Weapon, Item)
 	{
 	Spawn:
