@@ -673,7 +673,6 @@ void FDynamicLight::CollectWithinRadius(const DVector3 &opos, FSection *section,
 
 void FDynamicLight::LinkLight()
 {
-	UnlinkLight();
 	if (radius>0)
 	{
 		// passing in radius*radius allows us to do a distance check without any calls to sqrt
@@ -692,7 +691,7 @@ void FDynamicLight::LinkLight()
 // Deletes the link lists
 //
 //==========================================================================
-void FDynamicLight::UnlinkLight()
+void FDynamicLight::UnlinkLight ()
 {
 	
 	for(int i = 0; i < touchlists.wall_tlist.SSize(); i++)
