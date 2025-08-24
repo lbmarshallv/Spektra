@@ -159,9 +159,11 @@ void HWFlat::SetupLights(HWDrawInfo *di, FDynLightData &lightdata, int portalgro
 		return;	// no lights on additively blended surfaces.
 	}
 
-	if (di->Level->lightlists.flat_dlist.SSize() > section->Index())
+	auto flatLightList = di->Level->lightlists.flat_dlist.CheckKey(section);
+
+	if (flatLightList)
 	{
-		TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(di->Level->lightlists.flat_dlist[section->Index()]);
+		TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(*flatLightList);
 		TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Pair *pair;
 		while (it.NextPair(pair))
 		{

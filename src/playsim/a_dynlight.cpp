@@ -453,50 +453,69 @@ void FDynamicLight::UpdateLocation()
 //
 //=============================================================================
 
-
-int FSection::Index() const
-{
-	return int(this - &sector->Level->sections.allSections[0]);
-}
-
 void FDynamicLight::AddLightNode(FSection *section, side_t *sidedef)
 {
+	auto updateFlatTList = [&](FSection *sec)
+	{
+		touchlists.flat_tlist.TryEmplace(sec, sec);
+	};
+	auto updateWallTList = [&](side_t *sidedef)
+	{
+		touchlists.wall_tlist.TryEmplace(sidedef, sidedef);
+	};
+
 	if (section)
 	{
-		if(Level->lightlists.flat_dlist.SSize() <= section->Index())
+		auto flatLightList = Level->lightlists.flat_dlist.CheckKey(section);
+		if (flatLightList)
 		{
-			Level->lightlists.flat_dlist.Resize(section->Index() + 1);
+			if (!flatLightList->CheckKey(this))
+			{
+				FLightNode * node = new FLightNode;
+				node->lightsource = this;
+				node->targ = section;
+
+				flatLightList->TryEmplace(this, node);
+				updateFlatTList(section);
+			}
 		}
-
-		auto &flatLightList = Level->lightlists.flat_dlist[section->Index()];
-
-		if (!flatLightList.CheckKey(this))
+		else
 		{
 			FLightNode * node = new FLightNode;
 			node->lightsource = this;
 			node->targ = section;
 
-			flatLightList.TryEmplace(this, node);
-			touchlists.flat_tlist.SortedAddUnique(section);
+			TMap<FDynamicLight *, std::unique_ptr<FLightNode>> u;
+			u.TryEmplace(this, node);
+			Level->lightlists.flat_dlist.TryEmplace(section, std::move(u));
+			updateFlatTList(section);
 		}
 	}
 	else if (sidedef)
 	{
-		if(Level->lightlists.wall_dlist.SSize() <= sidedef->Index())
+		auto wallLightList = Level->lightlists.wall_dlist.CheckKey(sidedef);
+		if (wallLightList)
 		{
-			Level->lightlists.wall_dlist.Resize(sidedef->Index() + 1);
+			if (!wallLightList->CheckKey(this))
+			{
+				FLightNode * node = new FLightNode;
+				node->lightsource = this;
+				node->targ = sidedef;
+
+				wallLightList->TryEmplace(this, node);
+				updateWallTList(sidedef);
+			}
 		}
-
-		auto &wallLightList = Level->lightlists.wall_dlist[sidedef->Index()];
-
-		if (!wallLightList.CheckKey(this))
+		else
 		{
 			FLightNode * node = new FLightNode;
 			node->lightsource = this;
 			node->targ = sidedef;
 
-			wallLightList.TryEmplace(this, node);
-			touchlists.wall_tlist.SortedAddUnique(sidedef);
+			TMap<FDynamicLight *, std::unique_ptr<FLightNode>> u;
+			u.TryEmplace(this, node);
+			Level->lightlists.wall_dlist.TryEmplace(sidedef, std::move(u));
+			updateWallTList(sidedef);
 		}
 	}
 }
@@ -694,24 +713,32 @@ void FDynamicLight::LinkLight()
 void FDynamicLight::UnlinkLight ()
 {
 	
-	for(int i = 0; i < touchlists.wall_tlist.SSize(); i++)
+	TMap<side_t *, side_t *>::Iterator wit(touchlists.wall_tlist);
+	TMap<side_t *, side_t *>::Pair *wpair;
+	while (wit.NextPair(wpair))
 	{
-		auto sidedef = touchlists.wall_tlist[i];
+		auto sidedef = wpair->Value;
 		if (!sidedef) continue;
 		
-		assert(Level->lightlists.wall_dlist.SSize() < sidedef->Index());
-
-		Level->lightlists.wall_dlist[sidedef->Index()].Remove(this);
+		auto wallLightList = Level->lightlists.wall_dlist.CheckKey(sidedef);
+		if (wallLightList)
+		{
+			wallLightList->Remove(this);
+		}
 	}
 
-	for(int i = 0; i < touchlists.flat_tlist.SSize(); i++)
+	TMap<FSection *, FSection *>::Iterator fit(touchlists.flat_tlist);
+	TMap<FSection *, FSection *>::Pair *fpair;
+	while (fit.NextPair(fpair))
 	{
-		auto sec = touchlists.flat_tlist[i];
+		auto sec = fpair->Value;
 		if (!sec) continue;
-
-		assert(Level->lightlists.flat_dlist.SSize() < sec->Index());
-
-		Level->lightlists.flat_dlist[sec->Index()].Remove(this);
+		
+		auto flatLightList = Level->lightlists.flat_dlist.CheckKey(sec);
+		if (flatLightList)
+		{
+			flatLightList->Remove(this);
+		}
 	}
 
 	touchlists.flat_tlist.Clear();

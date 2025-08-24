@@ -117,9 +117,11 @@ int HWDrawInfo::SetupLightsForOtherPlane(subsector_t * sub, FDynLightData &light
 
 		lightdata.Clear();
 
-		if (Level->lightlists.flat_dlist.SSize() > sub->section->Index())
+		auto flatLightList = Level->lightlists.flat_dlist.CheckKey(sub->section);
+
+		if (flatLightList)
 		{
-			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(Level->lightlists.flat_dlist[sub->section->Index()]);
+			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(*flatLightList);
 			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Pair *pair;
 			while (it.NextPair(pair))
 			{

@@ -427,9 +427,11 @@ void HWWall::SetupLights(HWDrawInfo*di, FDynLightData &lightdata)
 	if ((seg->sidedef->Flags & WALLF_POLYOBJ) && sub)
 	{
 		// Polobject segs cannot be checked per sidedef so use the subsector instead.
-		if (di->Level->lightlists.flat_dlist.SSize() > sub->section->Index())
+		auto flatLightList = di->Level->lightlists.flat_dlist.CheckKey(sub->section);
+
+		if (flatLightList)
 		{
-			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(di->Level->lightlists.flat_dlist[sub->section->Index()]);
+			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(*flatLightList);
 			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Pair *pair;
 			while (it.NextPair(pair))
 			{
@@ -490,9 +492,11 @@ void HWWall::SetupLights(HWDrawInfo*di, FDynLightData &lightdata)
 	}
 	else
 	{
-		if (di->Level->lightlists.wall_dlist.SSize() > seg->sidedef->Index())
+		auto wallLightList = di->Level->lightlists.wall_dlist.CheckKey(seg->sidedef);
+
+		if (wallLightList)
 		{
-			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(di->Level->lightlists.wall_dlist[seg->sidedef->Index()]);
+			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Iterator it(*wallLightList);
 			TMap<FDynamicLight *, std::unique_ptr<FLightNode>>::Pair *pair;
 			while (it.NextPair(pair))
 			{

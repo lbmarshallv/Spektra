@@ -120,8 +120,6 @@ struct FSection
 	short					 mapsection;
 	char					 hacked;			// 1: is part of a render hack
 	char					 flags;
-
-	int Index() const;
 };
 
 class FSectionContainer
