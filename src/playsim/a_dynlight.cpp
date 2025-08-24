@@ -474,6 +474,7 @@ void FDynamicLight::AddLightNode(FSection *section, side_t *sidedef)
 		{
 			FLightNode * node = new FLightNode;
 			node->lightsource = this;
+			node->targ = section;
 
 			flatLightList.TryEmplace(this, node);
 			touchlists.flat_tlist.SortedAddUnique(section);
@@ -492,6 +493,7 @@ void FDynamicLight::AddLightNode(FSection *section, side_t *sidedef)
 		{
 			FLightNode * node = new FLightNode;
 			node->lightsource = this;
+			node->targ = sidedef;
 
 			wallLightList.TryEmplace(this, node);
 			touchlists.wall_tlist.SortedAddUnique(sidedef);
