@@ -812,13 +812,13 @@ void CalcFps()
 	static uint64_t LastMS = 0, LastSec = 0, FrameCount = 0, LastTic = 0;
 
 	uint64_t ms = screen->FrameTime;
-	uint64_t howlong = ms - LastMS;
+	uint64_t howlong = (ms - LastMS) / i_timescale;
 	if ((signed)howlong > 0) // do this only once per frame.
 	{
 		uint32_t thisSec = (uint32_t)(ms / 1000);
 		if (LastSec < thisSec)
 		{
-			LastFPS = FrameCount / (thisSec - LastSec);
+			LastFPS = FrameCount / (thisSec - LastSec) * i_timescale;
 			LastSec = thisSec;
 			FrameCount = 0;
 		}
@@ -917,7 +917,7 @@ void D_Display ()
 	if (nodrawers || screen == NULL)
 		return; 				// for comparative timing / profiling
 	
-	if (!AppActive && (screen->IsFullscreen() || !vid_activeinbackground))
+	if (!AppActive && !setmodeneeded && (screen->IsFullscreen() || !vid_activeinbackground))
 	{
 		return;
 	}
@@ -3353,6 +3353,7 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 	FBaseCVar::EnableCallbacks ();
 
 	StartScreen = nostartscreen? nullptr : GetGameStartScreen(per_shader_progress > 0 ? max_progress * 10 / 9 : max_progress + 3);
+	setmodeneeded = true;
 	if (StartScreen != nullptr) StartScreen->Render();
 	
 	// +compatmode cannot be used on the command line, so use this as a substitute
@@ -3543,7 +3544,6 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 		{
 			return 0;
 		}
-		setmodeneeded = true;
 	}
 
 	// [SP] Force vanilla transparency auto-detection to re-detect our game lumps now

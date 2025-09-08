@@ -384,7 +384,6 @@ OptionMenu "OptionsMenu" protected
 	Command "$OPTMNU_OPENCONFIG",		"openconfig"
 	Command "$OPTMNU_OPENSCREENSHOTS",	"openscreenshots"
 	Command "$OPTMNU_OPENSAVES",		"opensaves"
-	StaticText " "
 }
 
 //-------------------------------------------------------------------------------------------
@@ -2390,7 +2389,6 @@ OptionValue ScaleModes
 	4, "1280x800"
 	5, "$OPTVAL_CUSTOM"
 	1, "$OPTVAL_LOWEST"
-	7, "$OPTVAL_LOWEST12"
 }
 OptionValue CropAspect
 {
