@@ -6,7 +6,7 @@
 **---------------------------------------------------------------------------
 **
 ** Copyright 2025 Marcus Minhorst
-** Copyright 2025 ZDoom + GZDoom teams, and contributors
+** Copyright 2025 GZDoom Maintainers and Contributors
 **
 ** This program is free software: you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -55,6 +55,17 @@
 
 // PRIVATE FUNCTION PROTOTYPES ---------------------------------------------
 
+inline void _Rumble(const int);
+inline void _RumbleDirect(int, int, double, double, double, double);
+
+const FName * Joy_GetMapping(const FName);
+const FName * Joy_GuessMapping(const FName);
+const struct Haptics * Joy_GetRumble(FName);
+void Joy_Rumble(const FName, const struct Haptics, double);
+
+void RumbleDump();
+void RumblePrint(const FName, const FName *, const struct Haptics *, double);
+
 // EXTERNAL DATA DECLARATIONS ----------------------------------------------
 
 extern bool AppActive;
@@ -87,7 +98,9 @@ const FName HapticIntense = "INTENSE",
 			HapticHeavy = "HEAVY",
 			HapticMedium = "MEDIUM",
 			HapticLight = "LIGHT",
-			HapticSubtle = "SUBTLE";
+			HapticSubtle = "SUBTLE",
+			HapticNone = "NONE",
+			HapticDirect = "DIRECT"; // except for this one
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
@@ -161,28 +174,26 @@ CVARD(Bool, haptics_do_action, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "allow ha
 const FName * Joy_GuessMapping(const FName identifier)
 {
 	FString text = identifier.GetChars();
-
-	text.ToLower();
 	// I would like to slugify here
 	// Maybe one day
+	text.ToLower();
 
-	auto search = [&text](TArray<FString> &strs) {
-		for (auto str: strs)
-		{
-			if (text.IndexOf(str) != -1) return true;
-		}
-		return false;
+	struct MapSet { const FName * mapping; const TArray<FString> tokens; };
+	static struct MapSet mappings[] = {
+		{ &HapticNone, { "ricochet", "casing" } },
+		{ &HapticIntense, { "quake", "death", "gibbed" } },
+		{ &HapticHeavy, { "teleport", "activate", "secret" } },
+		{ &HapticMedium, { "success", "grunt", "land", "pain", "pkup", "pickup", "fist", "weapon",
+			"fire", "shoot", "blast", "attack", "launch", "punch" } },
+		{ &HapticLight, { "push", "menu", "use", "fail", "open", "close", "eject", "reload",
+			"charge", "try" } },
+		{ &HapticNone, { "step", "floor" } },
 	};
 
-	static TArray<FString> intense = { "quake", "death", "gibbed" };
-	static TArray<FString> heavy = { "teleport", "activate", "secret" };
-	static TArray<FString> medium = { "success", "grunt", "land", "pain", "pkup", "pickup", "fist", "weapon", "fire"};
-	static TArray<FString> light = { "push", "menu", "use", "fail", "open", "close", "eject" };
-
-	if (search(intense)) return &HapticIntense;
-	if (search(heavy)) return &HapticHeavy;
-	if (search(medium)) return &HapticMedium;
-	if (search(light)) return &HapticLight;
+	for (auto mapping: mappings)
+		for (auto token: mapping.tokens)
+			if (text.IndexOf(token) != -1)
+				return mapping.mapping;
 
 	return nullptr;
 }
@@ -207,7 +218,8 @@ const FName * Joy_GetMapping(const FName identifier)
 		auto id = soundEngine->FindSoundTentative(identifier.GetChars());
 
 		// loop a couple layers deep, trying to find a candidate
-		for (auto i = 0; i < MAX_TRY_DEPTH; i++) {
+		for (auto i = 0; i < MAX_TRY_DEPTH; i++)
+		{
 			if (!id.isvalid()) break;
 
 			actual = soundEngine->GetSoundName(id);
@@ -244,9 +256,11 @@ const FName * Joy_GetMapping(const FName identifier)
 
 	bool replaced = actual != identifier && actual.IsValidName();
 
-	auto warn = [&identifier]() {
+	auto warn = [&identifier]()
+	{
+		if (RumbleMissed.Contains(identifier)) return;
 		RumbleMissed.Push(identifier);
-		Printf(DMSG_WARNING, "Unknown rumble mapping '%s'\n", identifier.GetChars());
+		Printf(DMSG_WARNING|PRINT_NONOTIFY, "Unknown rumble mapping '%s'\n", identifier.GetChars());
 	};
 
 	if (!mapping && identifier != "")
@@ -257,11 +271,13 @@ const FName * Joy_GetMapping(const FName identifier)
 			if (!RumbleMissed.Contains(identifier)) warn();
 			break;
 		case HAPTCOMPAT_WARN: // always warn for authors
-			Printf(TEXTCOLOR_ORANGE "Unknown rumble mapping '%s'\n", identifier.GetChars());
+			replaced = nullptr != (mapping = Joy_GuessMapping(identifier));
+			if (replaced) Printf("Rumble compat mapped '%s' to '%s'\n", identifier.GetChars(), mapping->GetChars());
+			else Printf(TEXTCOLOR_ORANGE "Unknown rumble mapping '%s'\n", identifier.GetChars());
 			break;
-		case HAPTCOMPAT_MATCH: // try our best to choose correct
-			if ((mapping = Joy_GuessMapping(identifier))) replaced = true;
-			else warn();
+		case HAPTCOMPAT_MATCH: // try our best to choose correct (default)
+			replaced = nullptr != (mapping = Joy_GuessMapping(identifier));
+			if (!replaced) warn();
 			break;
 		case HAPTCOMPAT_ALL: // simple fallback
 			mapping = &HapticMedium;
@@ -270,7 +286,7 @@ const FName * Joy_GetMapping(const FName identifier)
 		}
 	}
 
-	if (mapping && replaced)
+	if (mapping && replaced && haptics_compat != HAPTCOMPAT_WARN)
 	{
 		// cache replacement
 		RumbleMapping.Insert(identifier, *mapping);
@@ -291,7 +307,8 @@ const struct Haptics * Joy_GetRumble(FName identifier)
 {
 	struct Haptics * rumble = RumbleDefinition.CheckKey(identifier);
 
-	if (!rumble && !RumbleMissed.Contains(identifier)) {
+	if (!rumble && !RumbleMissed.Contains(identifier))
+	{
 		RumbleMissed.Push(identifier);
 		Printf(DMSG_ERROR, TEXTCOLOR_RED "Rumble mapping not found! '%s'\n", identifier.GetChars());
 		return nullptr;
@@ -310,6 +327,11 @@ const struct Haptics * Joy_GetRumble(FName identifier)
 
 void Joy_AddRumbleType(const FName identifier, const struct Haptics data)
 {
+	if (haptics_debug)
+	{
+		if (data.ticks == 0) Printf("rumble disabled %s\n", identifier.GetChars());
+		else                 Printf("rumble add %s T%d H%.1g L%.1g\n", identifier.GetChars(), data.ticks, data.high_frequency, data.low_frequency);
+	}
 	RumbleDefinition.Insert(identifier, data);
 }
 
@@ -324,6 +346,7 @@ void Joy_AddRumbleType(const FName identifier, const struct Haptics data)
 
 void Joy_AddRumbleAlias(const FName alias, const FName actual)
 {
+	if (haptics_debug) Printf("rumble alias %s -> %s\n", alias.GetChars(), actual.GetChars());
 	RumbleAlias.Insert(alias, actual);
 }
 
@@ -337,6 +360,7 @@ void Joy_AddRumbleAlias(const FName alias, const FName actual)
 
 void Joy_MapRumbleType(const FName sound, const FName identifier)
 {
+	if (haptics_debug) Printf("rumble map %s -> %s\n", sound.GetChars(), identifier.GetChars());
 	RumbleMapping.Insert(sound, identifier);
 }
 
@@ -350,6 +374,7 @@ void Joy_MapRumbleType(const FName sound, const FName identifier)
 
 void Joy_ResetRumbleMapping()
 {
+	if (haptics_debug) Printf("rumble reset\n");
 	RumbleMapping.Clear();
 	RumbleAlias.Clear();
 	RumbleMissed.Clear();
@@ -371,6 +396,7 @@ void Joy_ResetRumbleMapping()
 
 void Joy_ReadyRumbleMapping()
 {
+	if (haptics_debug) Printf("rumble ready\n");
 	TArray<FName> found;
 	TMapIterator<FName, FName> it(RumbleAlias);
 	TMap<FName, FName>::Pair* pair;
@@ -403,11 +429,13 @@ void Joy_ReadyRumbleMapping()
 			break;
 		}
 
-		while (found.size() > 0) {
+		while (found.size() > 0)
+		{
 			RumbleAlias.Remove(found.Last());
 			found.Pop();
 		}
 	}
+	if (haptics_debug) RumbleDump();
 }
 
 //==========================================================================
@@ -418,7 +446,8 @@ void Joy_ReadyRumbleMapping()
 //
 //==========================================================================
 
-void Joy_RumbleTick() {
+void Joy_RumbleTick()
+{
 	if (!Haptics.enabled) return;
 
 	// pause detection
@@ -505,14 +534,6 @@ void Joy_RumbleTick() {
 	Haptics.dirty = false;
 }
 
-//==========================================================================
-//
-// Joy_Rumble
-//
-// Requests haptic feedback. Attenuation of >=1 results in no-op.
-//
-//==========================================================================
-
 void Joy_Rumble(const FName source, const struct Haptics data, double attenuation)
 {
 	if (!Haptics.enabled) return;
@@ -520,9 +541,6 @@ void Joy_Rumble(const FName source, const struct Haptics data, double attenuatio
 	if (attenuation >= 1) return;
 
 	float strength = 1 - (attenuation < 0? 0: attenuation);
-
-	if (haptics_debug)
-		Printf("r %s * %g\n", source.GetChars(), strength);
 
 	// this will overwrite stuff from same source mapping (weapons/pistol not W_BULLET)
 	Haptics.channels.Insert(source, {
@@ -540,21 +558,47 @@ void Joy_Rumble(const FName source, const struct Haptics data, double attenuatio
 //
 // Joy_Rumble
 //
+// Requests haptic feedback based on provided data. Attenuation of >=1 results in no-op.
+//
+//==========================================================================
+
+void Joy_Rumble(
+	const FName source,
+	int tic_count,
+	double high_frequency,
+	double low_frequency,
+	double left_trigger,
+	double right_trigger,
+	double attenuation
+)
+{
+	const struct Haptics rumble {tic_count, high_frequency, low_frequency, left_trigger, right_trigger};
+
+	if (haptics_debug) RumblePrint(source, &HapticDirect, &rumble, attenuation);
+
+	Joy_Rumble(source, rumble, attenuation);
+}
+
+//==========================================================================
+//
+// Joy_Rumble
+//
 // Requests haptic feedback. Attenuation of >=1 results in no-op.
 //
 //==========================================================================
 
 void Joy_Rumble(const FName identifier, double attenuation)
 {
-	const FName * mapping = Joy_GetMapping(identifier);
+	const FName * mapping;
+	const struct Haptics * rumble;
 
-	if (mapping == nullptr) return;
+	rumble = (nullptr != (mapping = Joy_GetMapping(identifier)))
+		? Joy_GetRumble(*mapping)
+		: nullptr;
 
-	const struct Haptics * rumble = Joy_GetRumble(*mapping);
+	if (haptics_debug) RumblePrint(identifier, mapping, rumble, attenuation);
 
-	if (rumble == nullptr) return;
-
-	Joy_Rumble(identifier, * rumble, attenuation);
+	if (rumble) Joy_Rumble(identifier, * rumble, attenuation);
 }
 
 //==========================================================================
@@ -571,69 +615,12 @@ CCMD (rumble)
 	int ticks;
 	double high_freq, low_freq, left_trig, right_trig;
 
-	switch (count) {
+	switch (count)
+	{
 		case 0: {
-			TArray<FString> unused, used;
-
-			{
-				TMapIterator<FName, struct Haptics> it(RumbleDefinition);
-				TMap<FName, struct Haptics>::Pair* pair;
-				while (it.NextPair(pair)) unused.AddUnique(pair->Key.GetChars());
-			}
-			{
-				TMapIterator<FName, FName> it(RumbleAlias);
-				TMap<FName, FName>::Pair* pair;
-				while (it.NextPair(pair)) unused.AddUnique(pair->Key.GetChars());
-			}
-			{
-				TMapIterator<FName, FName> it(RumbleAlias);
-				TMap<FName, FName>::Pair* pair;
-				while (it.NextPair(pair))
-				{
-					if (unused.Contains(pair->Value.GetChars()))
-						unused.Delete(unused.Find(pair->Value.GetChars()));
-				}
-			}
-			{
-				TMapIterator<FName, FName> it(RumbleMapping);
-				TMap<FName, FName>::Pair* pair;
-				Printf("Mappings:\n");
-				while (it.NextPair(pair)) {
-					used.AddUnique(pair->Value.GetChars());
-					if (unused.Contains(pair->Value.GetChars()))
-						unused.Delete(unused.Find(pair->Value.GetChars()));
-					auto mapping = Joy_GetRumble(pair->Value);
-					FString key = pair->Key.GetChars();
-					FString val = pair->Value.GetChars();
-					key.ToLower();
-					val.ToUpper();
-					FString a = FStringf("'%s'\t->\t'%s'", key.GetChars(), val.GetChars());
-					FString b = mapping
-						? FStringf(
-							"{ %d %g %g %g %g }",
-							mapping->ticks,
-							mapping->high_frequency,
-							mapping->low_frequency,
-							mapping->left_trigger,
-							mapping->right_trigger
-						) : "[undefined]";
-					Printf("\t%s\t->\t%s\n", a.GetChars(), b.GetChars());
-				}
-			}
-
-			if (unused.Size() > 0)
-			{
-				Printf("Unused:\n");
-				for (auto i:unused)
-				{
-					FString s = i.GetChars();
-					s.ToUpper();
-					Printf("\t'%s'\n", s.GetChars());
-				}
-			}
-
+			RumbleDump();
 			Printf("Testing rumble for 5s\n");
-			Joy_Rumble("", {5 * TICRATE, 1.0, 1.0, 1.0, 1.0});
+			Joy_Rumble("", 5 * TICRATE, 1.0, 1.0, 1.0, 1.0);
 		}
 		break;
 		case 1:
@@ -641,18 +628,20 @@ CCMD (rumble)
 			Joy_Rumble(argv[1]);
 			break;
 		case 5:
-			try {
+			try
+			{
 				ticks = std::stoi(argv[1], nullptr, 10);
 				high_freq = static_cast <double> (std::stof(argv[2], nullptr));
 				low_freq = static_cast <double> (std::stof(argv[3], nullptr));
 				left_trig = static_cast <double> (std::stof(argv[4], nullptr));
 				right_trig = static_cast <double> (std::stof(argv[5], nullptr));
-			} catch (...) {
+			} catch (...)
+			{
 				Printf("Failed to parse args\n");
 				return;
 			}
 			Printf("testing rumble with params (%d, %f, %f, %f, %f)\n", ticks, high_freq, low_freq, left_trig, right_trig);
-			Joy_Rumble("", {ticks, high_freq, low_freq, left_trig, right_trig});
+			Joy_Rumble("", ticks, high_freq, low_freq, left_trig, right_trig);
 			break;
 		default:
 			Printf(
@@ -673,7 +662,8 @@ CCMD (rumble)
 //
 //==========================================================================
 
-void _Rumble(const int identifier) {
+inline void _Rumble(const int identifier)
+{
 	Joy_Rumble(ENamedName(identifier));
 }
 
@@ -701,8 +691,23 @@ DEFINE_ACTION_FUNCTION_NATIVE(DHaptics, Rumble, _Rumble)
 //
 //==========================================================================
 
-void _RumbleDirect(int source, int tic_count, double high_frequency, double low_frequency, double left_trigger, double right_trigger) {
-	Joy_Rumble(ENamedName(source), {tic_count, high_frequency, low_frequency, left_trigger, right_trigger});
+inline void _RumbleDirect(
+	int source,
+	int tic_count,
+	double high_frequency,
+	double low_frequency,
+	double left_trigger,
+	double right_trigger
+)
+{
+	Joy_Rumble(
+		ENamedName(source),
+		tic_count,
+		high_frequency,
+		low_frequency,
+		left_trigger,
+		right_trigger
+	);
 }
 
 //==========================================================================
@@ -724,4 +729,104 @@ DEFINE_ACTION_FUNCTION_NATIVE(DHaptics, RumbleDirect, _RumbleDirect)
 	PARAM_FLOAT(right_trigger);
 	_RumbleDirect(source, tic_count, high_frequency, low_frequency, left_trigger, right_trigger);
 	return 0;
+}
+
+
+//==========================================================================
+//
+// RumblePrint
+//
+// Debug printout
+//
+//==========================================================================
+
+void RumblePrint(const FName identifier, const FName * mapping, const struct Haptics * rumble, double attenuation)
+{
+	const char * color;
+	FString text = FStringf("r '%s'", identifier.GetChars());
+	if (!mapping)
+	{	color = TEXTCOLOR_ORANGE; text.AppendFormat(" -"); }
+	else
+	{
+		text.AppendFormat(" %s", mapping->GetChars());
+		if (!rumble)
+		{	color = TEXTCOLOR_RED; text.AppendFormat(" -"); }
+		else if (rumble->ticks == 0)
+		{	color = TEXTCOLOR_BLACK; text.AppendFormat(" 0"); }
+		else
+		{	color = TEXTCOLOR_CYAN; text.AppendFormat(" T%d H%.1g L%.1g A%.1g",
+			rumble->ticks, rumble->high_frequency, rumble->low_frequency, attenuation); }
+	}
+	Printf("%s%s\n", color, text.GetChars());
+}
+
+//==========================================================================
+//
+// RumbleDump
+//
+// Debug printout
+//
+//==========================================================================
+
+void RumbleDump()
+{
+	TArray<FString> unused, used;
+
+	{
+		TMapIterator<FName, struct Haptics> it(RumbleDefinition);
+		TMap<FName, struct Haptics>::Pair* pair;
+		while (it.NextPair(pair)) unused.AddUnique(pair->Key.GetChars());
+	}
+	{
+		TMapIterator<FName, FName> it(RumbleAlias);
+		TMap<FName, FName>::Pair* pair;
+		while (it.NextPair(pair)) unused.AddUnique(pair->Key.GetChars());
+	}
+	{
+		TMapIterator<FName, FName> it(RumbleAlias);
+		TMap<FName, FName>::Pair* pair;
+		while (it.NextPair(pair))
+		{
+			if (unused.Contains(pair->Value.GetChars()))
+				unused.Delete(unused.Find(pair->Value.GetChars()));
+		}
+	}
+	{
+		TMapIterator<FName, FName> it(RumbleMapping);
+		TMap<FName, FName>::Pair* pair;
+		Printf("Mappings:\n");
+		while (it.NextPair(pair))
+		{
+			used.AddUnique(pair->Value.GetChars());
+			if (unused.Contains(pair->Value.GetChars()))
+				unused.Delete(unused.Find(pair->Value.GetChars()));
+			auto mapping = Joy_GetRumble(pair->Value);
+			FString key = pair->Key.GetChars();
+			FString val = pair->Value.GetChars();
+			key.ToLower();
+			val.ToUpper();
+			FString a = FStringf("'%s'\t->\t'%s'", key.GetChars(), val.GetChars());
+			FString b = mapping
+				? FStringf(
+					"{ %d %g %g %g %g }",
+					mapping->ticks,
+					mapping->high_frequency,
+					mapping->low_frequency,
+					mapping->left_trigger,
+					mapping->right_trigger
+				) : "[undefined]";
+			Printf("\t%s\t->\t%s\n", a.GetChars(), b.GetChars());
+		}
+	}
+
+	if (unused.Size() > 0)
+	{
+		Printf("Unused:\n");
+		for (auto i:unused)
+		{
+			FString s = i.GetChars();
+			s.ToUpper();
+			Printf("\t'%s'\n", s.GetChars());
+		}
+	}
 }
