@@ -260,7 +260,6 @@ const FName * Joy_GetMapping(const FName identifier)
 	{
 		if (RumbleMissed.Contains(identifier)) return;
 		RumbleMissed.Push(identifier);
-		Printf(DMSG_WARNING|PRINT_NONOTIFY, "Unknown rumble mapping '%s'\n", identifier.GetChars());
 	};
 
 	if (!mapping && identifier != "")
@@ -273,7 +272,6 @@ const FName * Joy_GetMapping(const FName identifier)
 		case HAPTCOMPAT_WARN: // always warn for authors
 			replaced = nullptr != (mapping = Joy_GuessMapping(identifier));
 			if (replaced) Printf("Rumble compat mapped '%s' to '%s'\n", identifier.GetChars(), mapping->GetChars());
-			else Printf(TEXTCOLOR_ORANGE "Unknown rumble mapping '%s'\n", identifier.GetChars());
 			break;
 		case HAPTCOMPAT_MATCH: // try our best to choose correct (default)
 			replaced = nullptr != (mapping = Joy_GuessMapping(identifier));
