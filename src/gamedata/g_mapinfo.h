@@ -327,6 +327,7 @@ struct FExitText
 struct level_info_t
 {
 	int			levelnum;
+	int			id24_levelnum;
 	
 	FString		MapName;
 	FString		NextMap;
@@ -507,6 +508,7 @@ FString CalcMapName (int episode, int level);
 
 void G_ClearMapinfo();
 void G_ParseMapInfo (FString basemapinfo);
+void G_AddBoomHelpScreens();
 
 enum ESkillProperty
 {

@@ -1076,7 +1076,7 @@ DVisualThinker* DVisualThinker::NewVisualThinker(FLevelLocals* Level, PClass* ty
 		return nullptr;
 	}
 
-	auto zs = static_cast<DVisualThinker*>(clientSide ? Level->CreateClientsideThinker(type, DVisualThinker::DEFAULT_STAT) : Level->CreateThinker(type, DVisualThinker::DEFAULT_STAT));
+	auto zs = static_cast<DVisualThinker*>(clientSide ? Level->CreateClientSideThinker(type, DVisualThinker::DEFAULT_STAT) : Level->CreateThinker(type, DVisualThinker::DEFAULT_STAT));
 	zs->Construct();
 
 	IFOVERRIDENVIRTUALPTRNAME(zs, NAME_VisualThinker, BeginPlay)

@@ -194,7 +194,7 @@ public:
 
 	void ActivateInStasisPlat(int tag);
 	bool CreateCeiling(sector_t *sec, DCeiling::ECeiling type, line_t *line, int tag, double speed, double speed2, double height, int crush, int silent, int change, DCeiling::ECrushMode hexencrush);
-	void ActivateInStasisCeiling(int tag);
+	bool ActivateInStasisCeiling(int tag);
 	bool CreateFloor(sector_t *sec, DFloor::EFloor floortype, line_t *line, double speed, double height, int crush, int change, bool hexencrush, bool hereticlower);
 	void DoDeferedScripts();
 	void AdjustPusher(int tag, int magnitude, int angle, bool wind);
@@ -256,7 +256,7 @@ public:
 	void SpawnExtraPlayers();
 	void Serialize(FSerializer &arc, bool hubload);
 	DThinker *FirstThinker (int statnum);
-	DThinker* FirstClientsideThinker(int statnum);
+	DThinker* FirstClientSideThinker(int statnum);
 
 	// g_Game
 	void PlayerReborn (int player);
@@ -314,12 +314,12 @@ public:
 	{
 		return TThinkerIterator<T>(this, subtype, statnum, prev, false);
 	}
-	template<class T> TThinkerIterator<T> GetClientsideThinkerIterator(FName subtype = NAME_None, int statnum = MAX_STATNUM + 1)
+	template<class T> TThinkerIterator<T> GetClientSideThinkerIterator(FName subtype = NAME_None, int statnum = MAX_STATNUM + 1)
 	{
 		if (subtype == NAME_None) return TThinkerIterator<T>(this, statnum, true);
 		else return TThinkerIterator<T>(this, subtype, statnum, true);
 	}
-	template<class T> TThinkerIterator<T> GetClientsideThinkerIterator(FName subtype, int statnum, AActor* prev)
+	template<class T> TThinkerIterator<T> GetClientSideThinkerIterator(FName subtype, int statnum, AActor* prev)
 	{
 		return TThinkerIterator<T>(this, subtype, statnum, prev, true);
 	}
@@ -478,20 +478,20 @@ public:
 		return thinker;
 	}
 
-	DThinker* CreateClientsideThinker(PClass* cls, int statnum = STAT_DEFAULT)
+	DThinker* CreateClientSideThinker(PClass* cls, int statnum = STAT_DEFAULT)
 	{
 		DThinker* thinker = static_cast<DThinker*>(cls->CreateNew());
 		assert(thinker->IsKindOf(RUNTIME_CLASS(DThinker)));
 		thinker->ObjectFlags |= OF_JustSpawned | OF_ClientSide | OF_Transient;
-		ClientsideThinkers.Link(thinker, statnum);
+		ClientSideThinkers.Link(thinker, statnum);
 		thinker->Level = this;
 		return thinker;
 	}
 
 	template<typename T, typename... Args>
-	T* CreateClientsideThinker(Args&&... args)
+	T* CreateClientSideThinker(Args&&... args)
 	{
-		auto thinker = static_cast<T*>(CreateClientsideThinker(RUNTIME_CLASS(T), T::DEFAULT_STAT));
+		auto thinker = static_cast<T*>(CreateClientSideThinker(RUNTIME_CLASS(T), T::DEFAULT_STAT));
 		thinker->Construct(std::forward<Args>(args)...);
 		return thinker;
 	}
@@ -732,7 +732,7 @@ public:
 	TArray<particle_t>	Particles;
 	TArray<uint16_t>	ParticlesInSubsec;
 	FThinkerCollection Thinkers;
-	FThinkerCollection ClientsideThinkers;
+	FThinkerCollection ClientSideThinkers;
 	TArray<DThinker*> TravellingThinkers;
 
 	TArray<DVector2>	Scrolls;		// NULL if no DScrollers in this level
@@ -789,7 +789,7 @@ public:
 		if (b.Level == nullptr)
 		{
 			b.Level = this;
-			if (b.IsClientside())
+			if (b.IsClientSide())
 				ClientSideActorBehaviors.Push(&b);
 			else
 				ActorBehaviors.Push(&b);
@@ -801,7 +801,7 @@ public:
 		if (b.Level == this)
 		{
 			b.Level = nullptr;
-			if (b.IsClientside())
+			if (b.IsClientSide())
 				ClientSideActorBehaviors.Delete(ClientSideActorBehaviors.Find(&b));
 			else
 				ActorBehaviors.Delete(ActorBehaviors.Find(&b));
