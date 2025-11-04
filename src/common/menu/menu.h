@@ -143,7 +143,7 @@ public:
 
 class DImageScrollerDescriptor : public DMenuDescriptor
 {
-	DECLARE_CLASS(DOptionMenuDescriptor, DMenuDescriptor)
+	DECLARE_CLASS(DImageScrollerDescriptor, DMenuDescriptor)
 public:
 	FTextureID textBackground;
 	PalEntry textBackgroundBrightness;
@@ -244,6 +244,7 @@ public:
 	double mTooltipScrollTimer;
 	double mTooltipScrollOffset;
 	FFont* mTooltipFont;
+	bool DrawTooltips;
 	static int InMenu;
 
 	DMenu(DMenu *parent = NULL);

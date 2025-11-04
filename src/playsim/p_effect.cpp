@@ -4,6 +4,8 @@
 **
 **---------------------------------------------------------------------------
 ** Copyright 1998-2006 Randy Heit
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025 UZDoom Maintainers and Contributors
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -58,12 +60,16 @@
 #pragma warning(disable: 6011) // dereference null pointer in thinker iterator
 #endif
 
-CVAR (Int, cl_rockettrails, 1, CVAR_ARCHIVE);
+CVAR (Int, cl_rockettrails, 0, CVAR_ARCHIVE);
 CVAR (Bool, r_rail_smartspiral, false, CVAR_ARCHIVE);
 CVAR (Int, r_rail_spiralsparsity, 1, CVAR_ARCHIVE);
 CVAR (Int, r_rail_trailsparsity, 1, CVAR_ARCHIVE);
 CVAR (Bool, r_particles, true, 0);
 EXTERN_CVAR(Int, r_maxparticles);
+
+FARG(numparticles, "Performance", "Max number of particles", "",
+	"Sets r_maxparticles on a per-run basis, controlling the maximum number of particles that are"
+	" allowed to spawn at one time");
 
 FCRandom pr_railtrail("RailTrail");
 
@@ -173,7 +179,7 @@ void P_InitParticles (FLevelLocals *Level)
 	const char *i;
 	int num;
 
-	if ((i = Args->CheckValue ("-numparticles")))
+	if ((i = Args->CheckValue (FArg_numparticles)))
 		num = atoi (i);
 	// [BC] Use r_maxparticles now.
 	else
@@ -1091,9 +1097,14 @@ DVisualThinker* DVisualThinker::NewVisualThinker(FLevelLocals* Level, PClass* ty
 	return zs;
 }
 
-static DVisualThinker* SpawnVisualThinker(FLevelLocals* Level, PClass* type, bool clientSide)
+static DVisualThinker* SpawnVisualThinker(FLevelLocals* Level, PClass* type)
 {
-	return DVisualThinker::NewVisualThinker(Level, type, clientSide);
+	return DVisualThinker::NewVisualThinker(Level, type, false);
+}
+
+static DVisualThinker* SpawnClientSideVisualThinker(FLevelLocals* Level, PClass* type)
+{
+	return DVisualThinker::NewVisualThinker(Level, type, true);
 }
 
 void DVisualThinker::UpdateSector(subsector_t * newSubsector)
@@ -1127,8 +1138,15 @@ DEFINE_ACTION_FUNCTION_NATIVE(FLevelLocals, SpawnVisualThinker, SpawnVisualThink
 {
 	PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
 	PARAM_CLASS_NOT_NULL(type, DVisualThinker);
-	PARAM_BOOL(clientSide);
-	DVisualThinker* zs = SpawnVisualThinker(self, type, clientSide);
+	DVisualThinker* zs = SpawnVisualThinker(self, type);
+	ACTION_RETURN_OBJECT(zs);
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(FLevelLocals, SpawnClientSideVisualThinker, SpawnClientSideVisualThinker)
+{
+	PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
+	PARAM_CLASS_NOT_NULL(type, DVisualThinker);
+	DVisualThinker* zs = SpawnClientSideVisualThinker(self, type);
 	ACTION_RETURN_OBJECT(zs);
 }
 

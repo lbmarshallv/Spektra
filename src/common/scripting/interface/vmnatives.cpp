@@ -32,7 +32,7 @@
 **---------------------------------------------------------------------------
 **
 **
-*/ 
+*/
 
 
 #include "texturemanager.h"
@@ -382,7 +382,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(DStatusBarCore, BeginHUD, BeginHUD)
 
 //=====================================================================================
 //
-// 
+//
 //
 //=====================================================================================
 
@@ -670,7 +670,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(FFont, GetBottomAlignOffset, GetBottomAlignOffset)
 
 static int StringWidth(FFont *font, const FString &str, int localize)
 {
-	const char *txt = (localize && str[0] == '$') ? GStrings.GetString(&str[1]) : str.GetChars();
+	const char *txt = (localize && str.Len() >= 2 && str[0] == '$') ? GStrings.GetString(str.GetChars() + 1) : str.GetChars();
 	return font->StringWidth(txt);
 }
 
@@ -684,7 +684,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(FFont, StringWidth, StringWidth)
 
 static int GetMaxAscender(FFont* font, const FString& str, int localize)
 {
-	const char* txt = (localize && str[0] == '$') ? GStrings.GetString(&str[1]) : str.GetChars();
+	const char *txt = (localize && str.Len() >= 2 && str[0] == '$') ? GStrings.GetString(str.GetChars() + 1) : str.GetChars();
 	return font->GetMaxAscender(txt);
 }
 
@@ -698,7 +698,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(FFont, GetMaxAscender, GetMaxAscender)
 
 static int CanPrint(FFont *font, const FString &str, int localize)
 {
-	const char *txt = (localize && str[0] == '$') ? GStrings.GetString(&str[1]) : str.GetChars();
+	const char *txt = (localize && str.Len() >= 2 && str[0] == '$') ? GStrings.GetString(str.GetChars() + 1) : str.GetChars();
 	return font->CanPrint(txt);
 }
 
@@ -956,7 +956,7 @@ DEFINE_ACTION_FUNCTION(_CVar, SetInt)
 	{
 		auto realCVar = (FBaseCVar*)(self->GetExtraDataPointer());
 		assert(realCVar->GetFlags() & CVAR_ZS_CUSTOM);
-		
+
 		v = realCVar->GenericZSCVarCallback(v, CVAR_Int);
 		self->SetGenericRep(v, realCVar->GetRealType());
 

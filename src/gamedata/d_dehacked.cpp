@@ -4,6 +4,8 @@
 **
 **---------------------------------------------------------------------------
 ** Copyright 1998-2006 Randy Heit
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025 UZDoom Maintainers and Contributors
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -65,12 +67,17 @@
 #include "vmbuilder.h"
 
 extern TArray<PalEntry> TranslationColors;
+extern TMap<FName, bool> AutoTrans;
 
 void JitDumpLog(FILE *file, VMScriptFunction *func);
 
 // [SO] Just the way Randy said to do it :)
 // [RH] Made this CVAR_SERVERINFO
 CVAR (Int, infighting, 0, CVAR_SERVERINFO)
+
+#ifdef HAVE_VM_JIT
+EXTERN_FARG(dumpjit);
+#endif // HAVE_VM_JIT
 
 static bool LoadDehSupp ();
 static void UnloadDehSupp ();
@@ -135,6 +142,7 @@ static PClassActor* FindInfoName(int index, bool mustexist = false)
 			cls = static_cast<PClassActor*>(RUNTIME_CLASS(AActor)->CreateDerivedClass(name.GetChars(), (unsigned)sizeof(AActor)));
 			NewClassType(cls, -1);	// This needs a VM type to work as intended.
 			cls->InitializeDefaults();
+			AutoTrans[cls->TypeName] = true;
 			PClassActor::AllActorClasses.Push(cls);
 		}
 		if (cls)
@@ -1143,7 +1151,7 @@ static void SetDehParams(FState *state, int codepointer, VMDisassemblyDumper &di
 		disasmdump.Write(sfunc, sfunc->PrintableName);
 
 #ifdef HAVE_VM_JIT
-		if (Args->CheckParm("-dumpjit"))
+		if (Args->CheckParm(FArg_dumpjit))
 		{
 			FILE *dump = fopen("dumpjit.txt", "a");
 			if (dump != nullptr)
@@ -3800,6 +3808,7 @@ void FinishDehPatch ()
 			if (newlycreated)
 			{
 				subclass->InitializeDefaults();
+				AutoTrans[subclass->TypeName] = true;
 				PClassActor::AllActorClasses.Push(subclass);
 			}
 		} 

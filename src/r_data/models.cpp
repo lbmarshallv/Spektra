@@ -279,18 +279,18 @@ void RenderHUDModel(FModelRenderer *renderer, DPSprite *psp, FVector3 translatio
 
 	// [BB] Weapon bob, very similar to the normal Doom weapon bob.
 
-	
+
 
 	objectToWorldMatrix.translate(rotation_pivot.X, rotation_pivot.Y, rotation_pivot.Z);
-	
+
 	objectToWorldMatrix.rotate(rotation.X, 0, 1, 0);
 	objectToWorldMatrix.rotate(rotation.Y, 1, 0, 0);
 	objectToWorldMatrix.rotate(rotation.Z, 0, 0, 1);
 
 	objectToWorldMatrix.translate(-rotation_pivot.X, -rotation_pivot.Y, -rotation_pivot.Z);
-	
+
 	objectToWorldMatrix.translate(translation.X, translation.Y, translation.Z);
-	
+
 
 	// [BB] For some reason the jDoom models need to be rotated.
 	objectToWorldMatrix.rotate(90.f, 0, 1, 0);
@@ -495,7 +495,7 @@ bool CalcModelOverrides(int i, const FSpriteModelFrame *smf, DActorModelData* da
 				) {
 				out.modelframe = smf->modelframes[data->modelFrameGenerators[i]];
 
-				if (info.smfNext) 
+				if (info.smfNext)
 				{
 					if(info.smfNext->modelframes[data->modelFrameGenerators[i]] >= 0)
 					{
@@ -567,7 +567,7 @@ bool CalcModelOverrides(int i, const FSpriteModelFrame *smf, DActorModelData* da
 const TArray<VSMatrix> * ProcessModelFrame(FModel * animation, bool nextFrame, int i, const FSpriteModelFrame *smf, DActorModelData* modelData, const CalcModelFrameInfo &frameinfo, ModelDrawInfo &drawinfo, bool is_decoupled, double tic, BoneInfo *out)
 {
 	const TArray<TRS>* animationData = nullptr;
-	
+
 	if (drawinfo.animationid >= 0)
 	{
 		animation = Models[drawinfo.animationid];
@@ -632,6 +632,11 @@ static inline void RenderModelFrame(FModelRenderer *renderer, int i, const FSpri
 
 		if(frameinfo.smf_flags & MDL_MODELSAREATTACHMENTS || is_decoupled)
 		{
+			if(!boneData)
+			{
+				boneData = mdl->GetBasePose();
+			}
+
 			boneStartingPosition = boneData ? screen->mBones->UploadBones(*boneData) : -1;
 			evaluatedSingle = true;
 		}
@@ -1118,7 +1123,7 @@ void ParseModelDefLump(int Lump)
 						smf.modelframes[index] = sc.Number;
 					}
 
-					for(int i=0; framechars[i]>0; i++)
+					for (int i = 0; i < static_cast<int>(framechars.Len()) && framechars[i] > 0; i++)
 					{
 						char map[29]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 						int c = toupper(framechars[i])-'A';

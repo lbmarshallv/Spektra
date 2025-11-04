@@ -1,4 +1,5 @@
 // common names
+// clang-format off
 
 // 'None' must always be the first name.
 xx(None)
@@ -278,7 +279,7 @@ xx(OptionMenuItemColorPicker)
 xx(OptionMenuItemStaticText)
 xx(OptionMenuItemStaticTextSwitchable)
 
-xx(Handler)
+xx(InternalHandler)
 
 xx(Color)
 
@@ -299,3 +300,5 @@ xx(CheckDeprecatedFlags)
 
 xx(ScreenJobRunner)
 xx(Action)
+
+// clang-format on

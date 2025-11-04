@@ -42,6 +42,7 @@
 #include "palentry.h"
 #include "textureid.h"
 #include "autosegs.h"
+#include <new>
 
 class PClass;
 class PType;
@@ -92,7 +93,7 @@ class PClassActor;
 #define NATIVE_TYPE(object)			(object->StaticType())			// Passed an object, returns the type of the C++ class representing the object
 
 // Enumerations for the meta classes created by ClassReg::RegisterClass()
-struct ClassReg
+struct ClassReg : FAutoSegEntry<ClassReg>
 {
 	PClass *MyClass;
 	const char *Name;
@@ -103,11 +104,12 @@ struct ClassReg
 	void(*InitNatives)();
 	unsigned int SizeOf;
 
+	ClassReg(PClass *mc, const char * nm, ClassReg * pt, ClassReg *vm, const size_t * ps, void (*cn)(void *), void(*in)(), unsigned int so)
+	: FAutoSegEntry(AutoSegs::TypeInfos, this), MyClass(mc), Name(nm), ParentType(pt), _VMExport(vm), Pointers(ps), ConstructNative(cn), InitNatives(in), SizeOf(so) {}
+
 	PClass *RegisterClass();
 	void SetupClass(PClass *cls);
 };
-
-enum EInPlace { EC_InPlace };
 
 #define DECLARE_ABSTRACT_CLASS(cls,parent) \
 public: \
@@ -134,13 +136,6 @@ public: \
 #define HAS_OBJECT_POINTERS \
 	static const size_t PointerOffsets[];
 
-#if defined(_MSC_VER)
-#	pragma section(SECTION_CREG,read)
-#	define _DECLARE_TI(cls) __declspec(allocate(SECTION_CREG)) ClassReg * const cls::RegistrationInfoPtr = &cls::RegistrationInfo;
-#else
-#	define _DECLARE_TI(cls) ClassReg * const cls::RegistrationInfoPtr __attribute__((section(SECTION_CREG))) = &cls::RegistrationInfo;
-#endif
-
 #define _IMP_PCLASS(cls, ptrs, create) \
 	ClassReg cls::RegistrationInfo = {\
 		nullptr, \
@@ -151,7 +146,6 @@ public: \
 		create, \
 		nullptr, \
 		sizeof(cls) }; \
-	_DECLARE_TI(cls) \
 	PClass *cls::StaticType() const { return RegistrationInfo.MyClass; }
 
 #define IMPLEMENT_CLASS(cls, isabstract, ptrs) \
@@ -171,7 +165,7 @@ public: \
 #define _X_FIELDS_true(cls)			nullptr
 #define _X_FIELDS_false(cls)		nullptr
 #define _X_CONSTRUCTOR_true(cls)
-#define _X_CONSTRUCTOR_false(cls)	void cls::InPlaceConstructor(void *mem) { new((EInPlace *)mem) cls; }
+#define _X_CONSTRUCTOR_false(cls)	void cls::InPlaceConstructor(void *mem) { new(mem) cls; }
 #define _X_ABSTRACT_true(cls)		nullptr
 #define _X_ABSTRACT_false(cls)		cls::InPlaceConstructor
 #define _X_VMEXPORT_true(cls)		nullptr
@@ -262,26 +256,35 @@ public:
 		Class = inClass;
 	}
 
-private:
-	struct nonew
-	{
-	};
-
-	void *operator new(size_t len, nonew&)
-	{
-		return M_Calloc(len, 1);
-	}
 public:
 
-	void operator delete (void *mem, nonew&)
-	{
-		M_Free(mem);
-	}
+	// [Jay] DObject-based classes should not be new'd other than placement
+	void* operator new(size_t) = delete;
+	void* operator new[](size_t) = delete;
+	void* operator new(size_t, std::align_val_t) = delete;
+	void* operator new[](size_t, std::align_val_t) = delete;
 
-	void operator delete (void *mem)
-	{
-		M_Free(mem);
-	}
+	/*
+	// [Jay] DObject-based classes should never use delete - they should be deleted by calling Delete() and leaving the ultimate deletion to the GC
+	// [Jay] THIS BREAKS BECAUSE OF VIRTUAL DESTRUCTORS - TODO remove virtual destructors from DObject
+
+	void operator delete(void *mem) = delete;
+	void operator delete[](void *mem) = delete;
+	void operator delete(void *mem, std::size_t) = delete;
+	void operator delete[](void *mem, std::size_t) = delete;
+	void operator delete(void *mem, std::align_val_t) = delete;
+	void operator delete[](void *mem, std::align_val_t) = delete;
+	void operator delete(void *mem, std::size_t, std::align_val_t) = delete;
+	void operator delete[](void *mem, std::size_t, std::align_val_t) = delete;
+	*/
+	void operator delete(void *mem) {};
+
+	// [Jay] placement new, plus matching delete to stop the compiler from complaining
+	void* operator new(size_t, void* p) { return p; }
+	void* operator new[](size_t, void* p) { return p; }
+	void operator delete(void *mem, void* p) {};
+	void operator delete[](void *mem, void* p) {};
+
 
 	// GC fiddling
 
@@ -338,17 +341,6 @@ public:
 	virtual size_t PropagateMark();
 
 protected:
-	// This form of placement new and delete is for use *only* by PClass's
-	// CreateNew() method. Do not use them for some other purpose.
-	void *operator new(size_t, EInPlace *mem)
-	{
-		return (void *)mem;
-	}
-
-	void operator delete (void *mem, EInPlace *)
-	{
-		M_Free (mem);
-	}
 
 	template<typename T, typename... Args>
 		friend T* Create(Args&&... args);
@@ -376,14 +368,15 @@ extern bool bPredictionGuard;
 template<typename T, typename... Args>
 T* Create(Args&&... args)
 {
-	DObject::nonew nono;
-	T *object = new(nono) T(std::forward<Args>(args)...);
-	if (object != nullptr)
+	void * mem = M_Calloc(sizeof(T), 1);
+	if (mem)
 	{
+		T *object = new(mem) T(std::forward<Args>(args)...);
 		object->SetClass(RUNTIME_CLASS(T));
 		assert(object->GetClass() != nullptr);	// beware of objects that get created before the type system is up.
+		return object;
 	}
-	return object;
+	return nullptr;
 }
 
 

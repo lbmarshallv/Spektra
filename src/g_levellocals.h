@@ -153,8 +153,8 @@ struct FLevelLocals
 	int FindNode (const FStrifeDialogueNode *node);
     int GetInfighting();
 	void SetCompatLineOnSide(bool state);
-	int GetCompatibility(int mask);
-	int GetCompatibility2(int mask);
+	ELevelCompatFlags GetCompatibility(ELevelCompatFlags mask);
+	ELevelCompatFlags2 GetCompatibility2(ELevelCompatFlags2 mask);
 	void ApplyCompatibility();
 	void ApplyCompatibility2();
 	AActor* SelectActorFromTID(int tid, size_t index, AActor* defactor);
@@ -572,11 +572,11 @@ public:
 	FDialogueMap ClassRoots;
 	FCajunMaster BotInfo;
 
-	int ii_compatflags = 0;
-	int ii_compatflags2 = 0;
-	int ib_compatflags = 0;
-	int i_compatflags = 0;
-	int i_compatflags2 = 0;
+	ELevelCompatFlags ii_compatflags = 0;
+	ELevelCompatFlags2 ii_compatflags2 = 0;
+	ELevelBugCompatFlags ib_compatflags = 0;
+	ELevelCompatFlags i_compatflags = 0;
+	ELevelCompatFlags2 i_compatflags2 = 0;
 
 	DSectorMarker *SectorMarker;
 

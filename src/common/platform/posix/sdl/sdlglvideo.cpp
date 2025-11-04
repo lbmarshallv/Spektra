@@ -4,6 +4,7 @@
 **---------------------------------------------------------------------------
 ** Copyright 2005-2016 Christoph Oelckers et.al.
 ** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025 UZDoom Maintainers and Contributors
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -85,6 +86,7 @@ EXTERN_CVAR (Int, vid_defwidth)
 EXTERN_CVAR (Int, vid_defheight)
 EXTERN_CVAR (Bool, cl_capfps)
 EXTERN_CVAR(Bool, vk_debug)
+EXTERN_FARG(glversion);
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
@@ -178,10 +180,13 @@ namespace Priv
 
 		if (Priv::window != nullptr)
 		{
+			SDL_version sdlver;
+			SDL_GetVersion(&sdlver);
 			// Enforce minimum size limit
 			SDL_SetWindowMinimumSize(Priv::window, VID_MIN_WIDTH, VID_MIN_HEIGHT);
-			// Tell SDL to start sending text input on Wayland.
-			if (strncasecmp(SDL_GetCurrentVideoDriver(), "wayland", 7) == 0) SDL_StartTextInput();
+			// Tell SDL to start sending text input on Wayland if it's on affected versions.
+			if (strncasecmp(SDL_GetCurrentVideoDriver(), "wayland", 7) == 0 && sdlver.major == 2 && sdlver.minor == 0 && sdlver.patch < 18)
+				SDL_StartTextInput();
 		}
 	}
 
@@ -541,7 +546,7 @@ SystemGLFrameBuffer::SystemGLFrameBuffer(void *hMonitor, bool fullscreen)
 	int glveridx = 0;
 	int i;
 
-	const char *version = Args->CheckValue("-glversion");
+	const char *version = Args->CheckValue(FArg_glversion);
 	if (version != NULL)
 	{
 		double gl_version = strtod(version, NULL) + 0.01;

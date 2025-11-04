@@ -1,3 +1,5 @@
+// clang-format off
+
 // GZDoom specific names
 
 xx(Doom)
@@ -693,6 +695,7 @@ xx(Vavoom)
 xx(GZDoom)
 xx(Eternity)
 xx(Dsda)
+xx(UZDoom) // for future use, just in case
 
 xx(Xpanningfloor)
 xx(Ypanningfloor)
@@ -927,3 +930,5 @@ xx(movefactor)
 
 xx(Corona)
 xx(BuiltinStateOffset)
+
+// clang-format on

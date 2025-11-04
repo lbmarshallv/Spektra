@@ -3,6 +3,8 @@
 // Copyright 1993-1996 id Software
 // Copyright 1999-2016 Randy Heit
 // Copyright 2002-2016 Christoph Oelckers
+// Copyright 2017-2025 GZDoom Maintainers and Contributors
+// Copyright 2025 UZDoom Maintainers and Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,78 +22,69 @@
 //-----------------------------------------------------------------------------
 //
 
-
-
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stddef.h>
 #include <memory>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "i_time.h"
-
-#include "version.h"
-#include "doomdef.h" 
-#include "doomstat.h"
-#include "d_protocol.h"
+#include "a_dynlight.h"
+#include "a_keys.h"
+#include "a_morph.h"
+#include "am_map.h"
+#include "c_bind.h"
+#include "c_buttons.h"
+#include "c_console.h"
+#include "c_dispatch.h"
+#include "cmdlib.h"
+#include "d_buttons.h"
+#include "d_event.h"
+#include "d_main.h"
+#include "d_net.h"
 #include "d_netinf.h"
+#include "d_protocol.h"
+#include "dobjgc.h"
+#include "doomdef.h"
+#include "doommenu.h"
+#include "doomstat.h"
+#include "events.h"
+#include "filesystem.h"
+#include "fs_findfile.h"
+#include "g_game.h"
+#include "g_hub.h"
+#include "g_levellocals.h"
+#include "gi.h"
+#include "gstrings.h"
+#include "hu_stuff.h"
+#include "hwrenderer/scene/hw_drawinfo.h"
+#include "i_interface.h"
+#include "i_system.h"
+#include "i_time.h"
 #include "intermission/intermission.h"
 #include "m_argv.h"
 #include "m_misc.h"
-#include "menu.h"
-#include "m_crc32.h"
-#include "p_saveg.h"
-#include "p_tick.h"
-#include "d_main.h"
-#include "wi_stuff.h"
-#include "hu_stuff.h"
-#include "st_stuff.h"
-#include "am_map.h"
-#include "c_console.h"
-#include "c_bind.h"
-#include "c_dispatch.h"
-#include "filesystem.h"
-#include "p_local.h" 
-#include "gstrings.h"
-#include "r_sky.h"
-#include "g_game.h"
-#include "sbar.h"
 #include "m_png.h"
-#include "a_keys.h"
-#include "cmdlib.h"
-#include "d_net.h"
-#include "d_event.h"
-#include "p_acs.h"
-#include "p_effect.h"
-#include "m_joy.h"
-#include "r_utility.h"
-#include "a_morph.h"
-#include "p_spec.h"
-#include "serializer_doom.h"
-#include "vm.h"
-#include "dobjgc.h"
-#include "gi.h"
-#include "a_dynlight.h"
-#include "i_system.h"
-#include "p_conversation.h"
-#include "v_palette.h"
-#include "s_music.h"
-#include "p_setup.h"
-#include "d_event.h"
+#include "menu.h"
 #include "model.h"
-
-#include "v_video.h"
-#include "g_hub.h"
-#include "g_levellocals.h"
-#include "events.h"
-#include "c_buttons.h"
-#include "d_buttons.h"
-#include "hwrenderer/scene/hw_drawinfo.h"
-#include "doommenu.h"
+#include "p_acs.h"
+#include "p_conversation.h"
+#include "p_effect.h"
+#include "p_local.h"
+#include "p_saveg.h"
+#include "p_setup.h"
+#include "p_spec.h"
+#include "p_tick.h"
+#include "r_sky.h"
+#include "r_utility.h"
+#include "s_music.h"
+#include "sbar.h"
 #include "screenjob.h"
-#include "i_interface.h"
-#include "fs_findfile.h"
-
+#include "serializer_doom.h"
+#include "st_stuff.h"
+#include "v_palette.h"
+#include "version.h"
+#include "vm.h"
+#include "wi_stuff.h"
 
 static FRandom pr_dmspawn ("DMSpawn");
 static FRandom pr_pspawn ("PlayerSpawn");
@@ -126,9 +119,16 @@ CVAR (Bool, longsavemessages, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR (Bool, cl_waitforsave, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
 CVAR (Bool, enablescriptscreenshot, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
 CVAR (Bool, cl_restartondeath, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
+
 EXTERN_CVAR (Float, con_midtime);
-EXTERN_CVAR(Int, net_disablepause)
-EXTERN_CVAR(Bool, net_limitsaves)
+EXTERN_CVAR(Int, net_disablepause);
+EXTERN_CVAR(Bool, net_limitsaves);
+
+FARG(nodraw, "Debug", "Stops the game from drawing anything.", "",
+	"Causes ZDoom not to draw anything at all. Only useful with -timedemo.");
+FARG(noblit, "Debug", "Prevents the screen from updating.", "",
+	"Causes ZDoom not to update the display on the screen, but it still draws everything to an"
+	" internal buffer. Only useful with -timedemo.");
 
 //==========================================================================
 //
@@ -219,6 +219,7 @@ CVAR (Float,	m_side,			2.f,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 CVAR (Float, cl_analog_sensitivity_yaw,		1.f,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 CVAR (Float, cl_analog_sensitivity_pitch,	0.6f,	CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 
+CVAR (Bool, cl_analog_run, true, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 CVAR (Bool, cl_analog_straferun, false, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 
 int 			turnheld;								// for accelerative turning 
@@ -775,8 +776,8 @@ void G_BuildTiccmd (usercmd_t *cmd)
 		G_AddViewAngle(joyint(-ANALOG_LOOK_BASE * cl_analog_sensitivity_yaw * axis_yaw));
 	}
 
-	side -= joyint(sidemove[speed] * axis_side);
-	forward += joyint(axis_forward * forwardmove[speed]);
+	side    -= joyint(axis_side    *    sidemove[cl_analog_run | speed]);
+	forward += joyint(axis_forward * forwardmove[cl_analog_run | speed]);
 	fly += joyint(axis_up * 2048);
 
 	// Handle mice.
@@ -2019,6 +2020,7 @@ void C_SerializeCVars(FSerializer& arc, const char* label, uint32_t filter)
 
 void SetupLoadingCVars();
 void FinishLoadingCVars();
+bool CheckGZDoomSaveCompat(FString &engine, FString &software);
 
 void G_DoLoadGame ()
 {
@@ -2065,7 +2067,17 @@ void G_DoLoadGame ()
 	arc("Current Map", map);
 	arc("GameUUID", GameUUID);
 
+	#if LOAD_GZDOOM_4142_SAVES
+	FString software = arc.GetString("Software");
+	bool gzdoom_compat_ok = false;
+	if(engine.Compare("GZDOOM") == 0)
+	{
+		gzdoom_compat_ok = CheckGZDoomSaveCompat(engine, software);
+	}
+	if (engine.CompareNoCase(GAMESIG) != 0 && !gzdoom_compat_ok)
+	#else
 	if (engine.CompareNoCase(GAMESIG) != 0)
+	#endif
 	{
 		// Make a special case for the message printed for old savegames that don't
 		// have this information.
@@ -3013,8 +3025,8 @@ void G_DoPlayDemo (void)
 //
 void G_TimeDemo (const char* name)
 {
-	nodrawers = !!Args->CheckParm ("-nodraw");
-	noblit = !!Args->CheckParm ("-noblit");
+	nodrawers = !!Args->CheckParm (FArg_nodraw);
+	noblit = !!Args->CheckParm (FArg_noblit);
 	timingdemo = true;
 
 	defdemoname = name;

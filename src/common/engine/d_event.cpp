@@ -51,6 +51,7 @@ extern bool ToggleFullscreen;
 int eventhead;
 int eventtail;
 event_t events[MAXEVENTS];
+mousestate_t LastMousePos = {};
 
 CVAR(Float, m_sensitivity_x, 2.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, m_sensitivity_y, 2.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
@@ -250,8 +251,8 @@ FUiEvent::FUiEvent(const event_t *ev)
 		IsCtrl = !!(ev->data3 & GKM_CTRL);
 		break;
 	case EV_GUI_Char:
-		KeyChar = ev->data1;
-		KeyString = MakeUTF8(ev->data1);
+		KeyChar = (uint16_t)ev->data1;
+		KeyString = MakeUTF8((uint16_t)ev->data1);
 		IsAlt = !!ev->data2; // only true for Win32, not sure about SDL
 		break;
 	default: // mouse event

@@ -43,19 +43,11 @@
 #include "hw_viewpointuniforms.h"
 #include "vm.h"
 #include "maps.h"
+#include "doomdef.h"
 
 struct level_info_t;
 struct cluster_info_t;
 class FSerializer;
-
-#if defined(_MSC_VER)
-#pragma section(SECTION_YREG,read)
-#define MSVC_YSEG __declspec(allocate(SECTION_YREG))
-#define GCC_YSEG
-#else
-#define MSVC_YSEG
-#define GCC_YSEG __attribute__((section(SECTION_YREG))) __attribute__((used))
-#endif
 
 // The structure used to control scripts between maps
 struct acsdefered_t
@@ -147,15 +139,17 @@ struct FMapInfoParser
 	static void MapOptHandler_##name(FMapInfoParser &parse, level_info_t *info); \
 	static FMapOptInfo MapOpt_##name = \
 		{ #name, MapOptHandler_##name, old }; \
-	MSVC_YSEG FMapOptInfo *mapopt_##name GCC_YSEG = &MapOpt_##name; \
 	static void MapOptHandler_##name(FMapInfoParser &parse, level_info_t *info)
 
 
-struct FMapOptInfo
+struct FMapOptInfo : FAutoSegEntry<FMapOptInfo>
 {
 	const char *name;
 	void (*handler) (FMapInfoParser &parse, level_info_t *levelinfo);
 	bool old;
+
+	FMapOptInfo(const char *n, void (*h) (FMapInfoParser &, level_info_t *), bool o)
+	: FAutoSegEntry(AutoSegs::MapInfoOptions, this), name(n), handler(h), old(o) {}
 };
 
 enum ELevelFlags : unsigned int
@@ -372,8 +366,10 @@ struct level_info_t
 	double		aircontrol;
 	int			WarpTrans;
 	int			airsupply;
-	uint32_t	compatflags, compatflags2;
-	uint32_t	compatmask, compatmask2;
+	ELevelCompatFlags	compatflags;
+	ELevelCompatFlags2  compatflags2;
+	ELevelCompatFlags	compatmask;
+	ELevelCompatFlags2	compatmask2;
 	FString		Translator;	// for converting Doom-format linedef and sector types.
 	int			DefaultEnvironment;	// Default sound environment for the map.
 	FName		Intermission;

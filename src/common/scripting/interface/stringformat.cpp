@@ -146,7 +146,8 @@ FString FStringFormat(VM_ARGS, int offset)
 						ThrowAbortException(X_FORMAT_ERROR, "Cannot mix explicit and implicit arguments.");
 					in_fmt = false;
 					// append
-					if (fmt_current[1] == '*' || fmt_current[2] == '*')
+					if ((fmt_current.Len() > 1 && fmt_current[1] == '*')
+						|| (fmt_current.Len() > 2 && fmt_current[2] == '*'))
 					{
 						// fail if something was found, but it's not an int
 						if (argnum+1 >= numparam) ThrowAbortException(X_FORMAT_ERROR, "Not enough arguments for format.");
@@ -184,7 +185,8 @@ FString FStringFormat(VM_ARGS, int offset)
 					if (argnum < 0 && haveargnums)
 						ThrowAbortException(X_FORMAT_ERROR, "Cannot mix explicit and implicit arguments.");
 					in_fmt = false;
-					if (fmt_current[1] == '*' || fmt_current[2] == '*')
+					if ((fmt_current.Len() > 1 && fmt_current[1] == '*')
+						|| (fmt_current.Len() > 2 && fmt_current[2] == '*'))
 					{
 						// fail if something was found, but it's not an int
 						if (argnum + 1 >= numparam) ThrowAbortException(X_FORMAT_ERROR, "Not enough arguments for format.");
@@ -282,9 +284,12 @@ DEFINE_ACTION_FUNCTION(FStringStruct, DeleteLastCharacter)
 
 static void LocalizeString(const FString &label, bool prefixed, FString *result)
 {
-	if (!prefixed) *result = GStrings.GetString(label);
-	else if (label[0] != '$') *result = label;
-	else *result = GStrings.GetString(&label[1]);
+	if (!prefixed)
+		*result = GStrings.GetString(label);
+	else if (label.Len() >= 2 && label[0] == '$')
+		*result = GStrings.GetString(label.GetChars() + 1);
+	else
+		*result = label;
 }
 
 DEFINE_ACTION_FUNCTION_NATIVE(FStringTable, Localize, LocalizeString)
@@ -714,5 +719,3 @@ DEFINE_ACTION_FUNCTION_NATIVE(FStringStruct, GetNextCodePoint, StringNextCodePoi
 	if (numret > 1) ret[1].SetInt(pos);
 	return numret;
 }
-
-

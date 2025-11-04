@@ -982,6 +982,7 @@ AActor *FBlockThingsIterator::Next(bool centeronly)
 	{
 		while (block != NULL)
 		{
+			PrefetchL3(block->NextActor);
 			AActor *me = block->Me;
 			FBlockNode *mynode = block;
 			HashEntry *entry;

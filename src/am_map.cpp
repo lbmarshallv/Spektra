@@ -172,7 +172,7 @@ CVAR(Bool, am_showitems, false, CVAR_ARCHIVE);
 CVAR(Bool, am_showtime, true, CVAR_ARCHIVE);
 CVAR(Bool, am_showtotaltime, false, CVAR_ARCHIVE);
 CVAR(Bool, am_showlevelname, true, CVAR_ARCHIVE);
-CVAR(Int, am_colorset, 0, CVAR_ARCHIVE);
+CVAR(Int, am_colorset, -1, CVAR_ARCHIVE);
 CVAR(Bool, am_customcolors, true, CVAR_ARCHIVE);
 CVAR(Int, am_map_secrets, 1, CVAR_ARCHIVE);
 CVAR(Int, am_drawmapback, 1, CVAR_ARCHIVE);
@@ -714,28 +714,42 @@ static void AM_initColors(bool overlayed)
 	{
 		AMColors = AMMod;
 	}
-	else switch (am_colorset)
+	else 
 	{
-	default:
-		/* Use the custom colors in the am_* cvars */
-		AMColors.initFromCVars(cv_standard);
-		break;
+		int set = am_colorset;
+		if (set == -1)
+		{
+			if (gameinfo.gametype & GAME_DoomChex)
+				set = 1;
+			else if (gameinfo.gametype & GAME_Strife)
+				set = 2;
+			else if (gameinfo.gametype & GAME_Raven)
+				set = 3;
+		}
 
-	case 1:	// Doom
-		// Use colors corresponding to the original Doom's
-		AMColors.initFromColors(DoomColors, false);
-		break;
+		switch (set)
+		{
+		default:
+			/* Use the custom colors in the am_* cvars */
+			AMColors.initFromCVars(cv_standard);
+			break;
 
-	case 2:	// Strife
-		// Use colors corresponding to the original Strife's
-		AMColors.initFromColors(StrifeColors, false);
-		break;
+		case 1:	// Doom
+			// Use colors corresponding to the original Doom's
+			AMColors.initFromColors(DoomColors, false);
+			break;
 
-	case 3:	// Raven
-		// Use colors corresponding to the original Raven's
-		AMColors.initFromColors(RavenColors, true);
-		break;
+		case 2:	// Strife
+			// Use colors corresponding to the original Strife's
+			AMColors.initFromColors(StrifeColors, false);
+			break;
 
+		case 3:	// Raven
+			// Use colors corresponding to the original Raven's
+			AMColors.initFromColors(RavenColors, true);
+			break;
+
+		}
 	}
 }
 
@@ -981,6 +995,8 @@ class DAutomap :public DAutomapBase
 
 	TArray<FVector2> points;
 
+	int line_thickness_scaled; // line thickness scaled to resolution
+
 	// translates between frame-buffer and map distances
 	double FTOM(double x)
 	{
@@ -1038,13 +1054,14 @@ class DAutomap :public DAutomapBase
 	void drawMarks();
 	void drawAuthorMarkers();
 	void drawCrosshair(const AMColor &color);
-
+	void CalculateLineThicknessScaled();
 
 public:
 	bool Responder(event_t* ev, bool last) override;
 	void Ticker(void) override;
 	void Drawer(int bottom) override;
 	void NewResolution() override;
+	void NewUIScale() override;
 	void LevelInit() override;
 	void UpdateShowAllLines() override;
 	void Serialize(FSerializer &arc) override;
@@ -1335,6 +1352,8 @@ void DAutomap::startDisplay()
 	m_y = players[pnum].camera->Y() - m_h/2;
 	changeWindowLoc();
 
+	NewUIScale();
+
 	// for saving & restoring
 	old_m_x = m_x;
 	old_m_y = m_y;
@@ -1410,6 +1429,29 @@ void DAutomap::maxOutWindowScale ()
 
 //=============================================================================
 //
+// Pre-calculate scaled line thickness
+//
+//=============================================================================
+
+void DAutomap::NewUIScale()
+{
+	if (StatusBar == nullptr)
+	{
+		line_thickness_scaled = 1;
+		return;
+	}
+
+	double sc = min<double>(StatusBar->SBarScale.X, StatusBar->SBarScale.Y);
+	line_thickness_scaled = xs_CRoundToInt(sc);
+
+	if (line_thickness_scaled <= 0)
+	{
+		line_thickness_scaled = 1;
+	}
+}
+
+//=============================================================================
+//
 // Called right after the resolution has changed
 //
 //=============================================================================
@@ -1431,6 +1473,7 @@ void DAutomap::NewResolution()
 		maxOutWindowScale();
 	f_w = twod->GetWidth();
 	f_h = StatusBar->GetTopOfStatusbar();
+	NewUIScale();
 	activateNewScale();
 }
 
@@ -1575,7 +1618,7 @@ void DAutomap::clearFB (const AMColor &color)
 		// only draw background when using a mod defined custom color set or Raven colors, if am_drawmapback is 2.
 		if (!am_customcolors || !AMMod.defined)
 		{
-			drawback &= (am_colorset == 3);
+			drawback &= (am_colorset == 3) || (am_colorset == -1 && (gameinfo.gametype & GAME_Raven));
 		}
 	}
 
@@ -1753,14 +1796,16 @@ void DAutomap::drawMline (mline_t *ml, const AMColor &color)
 		const int x2 = f_x + fl.b.x;
 		const int y2 = f_y + fl.b.y;
 
+		const int thickness = (am_linethickness > 0) ? am_linethickness : line_thickness_scaled;
+
 		if (am_lineantialiasing) {
 			// Draw 5 lines (am_linethickness 2) or 9 lines (am_linethickness >= 3)
 			// slightly offset from each other, but with lower opacity
 			// as a bruteforce way to achieve antialiased line drawing.
-			const int aa_alpha_divide = am_linethickness >= 3 ? 3 : 2;
+			const int aa_alpha_divide = thickness >= 3 ? 3 : 2;
 
 			// Subtract to line thickness to compensate for the antialiasing making lines thicker.
-			const int aa_linethickness = max(1, am_linethickness - 2);
+			const int aa_linethickness = max(1, thickness - 2);
 
 			if (aa_linethickness >= 2) {
 				// Top row.
@@ -1780,7 +1825,7 @@ void DAutomap::drawMline (mline_t *ml, const AMColor &color)
 			} else {
 				// Use more efficient thin line drawing routine.
 				// Top row.
-				if (am_linethickness >= 3) {
+				if (thickness >= 3) {
 					// If original line thickness is 2, do not add diagonal lines to allow thin lines to be represented.
 					// This part is not needed for thick antialiased drawing, as original line thickness is always greater than 3.
 					twod->AddLine(DVector2(x1 - 1, y1 - 1), DVector2(x2 - 1, y2 - 1), nullptr, color.RGB, uint8_t(am_linealpha * 255 / aa_alpha_divide));
@@ -1794,7 +1839,7 @@ void DAutomap::drawMline (mline_t *ml, const AMColor &color)
 				twod->AddLine(DVector2(x1, y1), DVector2(x2, y2), nullptr, color.RGB, uint8_t(am_linealpha * 255 / aa_alpha_divide));
 
 				// Bottom row.
-				if (am_linethickness >= 3) {
+				if (thickness >= 3) {
 					// If original line thickness is 2, do not add diagonal lines to allow thin lines to be represented.
 					// This part is not needed for thick antialiased drawing, as original line thickness is always greater than 3.
 					twod->AddLine(DVector2(x1 - 1, y1 + 1), DVector2(x2 - 1, y2 + 1), nullptr, color.RGB, uint8_t(am_linealpha * 255 / aa_alpha_divide));
@@ -1803,8 +1848,8 @@ void DAutomap::drawMline (mline_t *ml, const AMColor &color)
 				twod->AddLine(DVector2(x1, y1 - 1), DVector2(x2, y2 - 1), nullptr, color.RGB, uint8_t(am_linealpha * 255 / aa_alpha_divide));
 			}
 		} else {
-			if (am_linethickness >= 2) {
-				twod->AddThickLine(DVector2(x1, y1), DVector2(x2, y2), am_linethickness, color.RGB, uint8_t(am_linealpha * 255));
+			if (thickness >= 2) {
+				twod->AddThickLine(DVector2(x1, y1), DVector2(x2, y2), thickness, color.RGB, uint8_t(am_linealpha * 255));
 			} else {
 				// Use more efficient thin line drawing routine.
 				twod->AddLine(DVector2(x1, y1), DVector2(x2, y2), nullptr, color.RGB, uint8_t(am_linealpha * 255));

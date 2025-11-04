@@ -1,10 +1,10 @@
-# Welcome to GZDoom!
+# Welcome to UZDoom!
 
-[![Continuous Integration](https://github.com/ZDoom/gzdoom/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/ZDoom/gzdoom/actions/workflows/continuous_integration.yml)
+[![Continuous Integration](https://github.com/UZDoom/UZDoom/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/UZDoom/UZDoom/actions/workflows/continuous_integration.yml)
 
-## GZDoom is a modder-friendly OpenGL and Vulkan source port based on the DOOM engine
+## UZDoom is a modder-friendly OpenGL and Vulkan source port based on the DOOM engine
 
-Copyright (c) 1998-2025 ZDoom + GZDoom teams, and contributors
+Copyright (c) 1998-2025 ZDoom + GZDoom + UZDoom teams, and contributors
 
 Doom Source (c) 1997 id Software, Raven Software, and contributors
 
@@ -16,9 +16,15 @@ Special thanks to Coraline of the EDGE team for allowing us to use her [README.m
 ##### https://www.gnu.org/licenses/quick-guide-gplv3.en.html
 ---
 
-## How to build GZDoom
+## How to build UZDoom
 
-To build GZDoom, please see the [wiki](https://zdoom.org/wiki/) and see the "Programmer's Corner" on the bottom-right corner of the page to build for your platform.
+To build UZDoom, please see UZDoom's Github [wiki](https://github.com/UZDoom/UZDoom/wiki/) for full list.
+
+Build For [Linux](https://github.com/UZDoom/UZDoom/wiki/Compilation#linux).
+
+Build For [MacOS](https://github.com/UZDoom/UZDoom/wiki/Compilation#macos).
+
+Build For [Windows](https://github.com/UZDoom/UZDoom/wiki/Compilation#windows).
 
 # Resources
 - https://zdoom.org/ - Home Page

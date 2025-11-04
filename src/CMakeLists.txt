@@ -278,7 +278,7 @@ if( DEM_CMAKE_COMPILER_IS_GNUCXX_COMPATIBLE )
 		set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC" )
 		set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC" )
 	endif()
-	
+
 	if(${CMAKE_SYSTEM_NAME} MATCHES "NetBSD")
 		set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ljemalloc")
 	endif()
@@ -324,8 +324,8 @@ option(BUILD_FLATPAK "Enable Flatpak-specific build options" OFF)
 # Update gitinfo.h
 
 add_custom_target( revision_check ALL
-	COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_SOURCE_DIR}/tools/updaterevision/UpdateRevision.cmake" src/gitinfo.h
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_SOURCE_DIR}/tools/updaterevision/UpdateRevision.cmake" "${CMAKE_BINARY_DIR}/gitinfo.h"
+	WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
 
 # required libraries
@@ -419,7 +419,7 @@ if (MSVC AND ${TARGET_ARCHITECTURE} MATCHES "arm")
 	set (PLAT_WIN32_SOURCES ${PLAT_WIN32_SOURCES} common/platform/win32/i_crash_arm.cpp )
 	add_definitions( -DNO_SSE -D__ARM__ -DRAPIDJSON_ENDIAN=RAPIDJSON_LITTLEENDIAN)
 endif()
-	
+
 set( PLAT_POSIX_SOURCES
 	posix/i_steam.cpp
 	common/platform/posix/i_system_posix.cpp )
@@ -732,7 +732,7 @@ set( FASTMATH_SOURCES
 	rendering/hwrenderer/scene/hw_weapon.cpp
 	common/utility/matrix.cpp
 )
-	
+
 #Vulkan stuff must go into a separate list because it needs to be disabled for some platforms
 set (VULKAN_SOURCES
 	common/rendering/vulkan/system/vk_renderdevice.cpp
@@ -1007,7 +1007,7 @@ set (PCH_SOURCES
 	common/fonts/font.cpp
 	common/fonts/hexfont.cpp
 	common/fonts/v_font.cpp
-	common/fonts/v_text.cpp	
+	common/fonts/v_text.cpp
 	common/textures/hw_ihwtexture.cpp
 	common/textures/hw_material.cpp
 	common/textures/bitmap.cpp
@@ -1068,7 +1068,7 @@ set (PCH_SOURCES
 	common/cutscenes/movieplayer.cpp
 	common/cutscenes/screenjob.cpp
 	common/utility/engineerrors.cpp
-	
+
 	common/utility/gitinfo.cpp
 	common/utility/m_alloc.cpp
 	common/utility/utf8.cpp
@@ -1119,7 +1119,7 @@ set (PCH_SOURCES
 	common/menu/menudef.cpp
 	common/menu/savegamemanager.cpp
 	common/statusbar/base_sbar.cpp
-	
+
 	common/rendering/v_framebuffer.cpp
 	common/rendering/v_video.cpp
 	common/rendering/r_thread.cpp
@@ -1275,6 +1275,8 @@ list( REMOVE_ITEM GAME_NONPCH_SOURCES ${PCH_SOURCES} )
 
 add_executable( zdoom WIN32 MACOSX_BUNDLE ${GAME_SOURCES} )
 
+target_include_directories( zdoom PRIVATE ${CMAKE_BINARY_DIR} )
+
 target_precompile_headers( zdoom PRIVATE g_pch.h )
 
 set_source_files_properties( ${FASTMATH_SOURCES} PROPERTIES COMPILE_FLAGS ${ZD_FASTMATH_FLAG} )
@@ -1428,7 +1430,7 @@ endif()
 
 add_custom_command(TARGET zdoom POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-	${CMAKE_SOURCE_DIR}/soundfont/gzdoom.sf2 $<TARGET_FILE_DIR:zdoom>/soundfonts/gzdoom.sf2
+	${CMAKE_SOURCE_DIR}/soundfont/uzdoom.sf2 $<TARGET_FILE_DIR:zdoom>/soundfonts/uzdoom.sf2
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 	${CMAKE_SOURCE_DIR}/fm_banks/GENMIDI.GS.wopl $<TARGET_FILE_DIR:zdoom>/fm_banks/GENMIDI.GS.wopl
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -1438,17 +1440,18 @@ add_custom_command(TARGET zdoom POST_BUILD
 if ( NOT ZMUSIC_SYSTEM_INSTALL AND (NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS))
 	# bring zmusic in
 	add_custom_command(TARGET zdoom POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:zmusic> $<TARGET_FILE_DIR:zdoom>
-		DEPENDS zmusic )
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			$<TARGET_FILE:zmusic> $<TARGET_FILE_DIR:zdoom>)
 	if ( NOT WIN32 )
 		add_custom_command(TARGET zdoom POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_NAME:zmusic> $<TARGET_SONAME_FILE_NAME:zmusic>
-			COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_SONAME_FILE_NAME:zmusic> $<TARGET_LINKER_FILE_NAME:zmusic>
-			WORKING_DIRECTORY $<TARGET_FILE_DIR:zdoom>
-			DEPENDS zmusic )
+			COMMAND ${CMAKE_COMMAND} -E create_symlink
+				$<TARGET_FILE_NAME:zmusic> $<TARGET_SONAME_FILE_NAME:zmusic>
+			COMMAND ${CMAKE_COMMAND} -E create_symlink
+				$<TARGET_SONAME_FILE_NAME:zmusic> $<TARGET_LINKER_FILE_NAME:zmusic>
+			WORKING_DIRECTORY $<TARGET_FILE_DIR:zdoom>)
 	endif()
+	add_dependencies(zdoom zmusic)
 endif()
-
 
 if (VCPKG_TOOLCHAIN)
 	x_vcpkg_install_local_dependencies(TARGETS zdoom DESTINATION ".")
@@ -1465,16 +1468,16 @@ install(DIRECTORY "${PROJECT_BINARY_DIR}/soundfonts" "${PROJECT_BINARY_DIR}/fm_b
 
 # Install Linux desktop launcher, icon and metadata
 if( UNIX AND NOT APPLE )
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.GZDoom.desktop
+	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.UZDoom.desktop
 			DESTINATION share/applications
 			PERMISSIONS WORLD_EXECUTE WORLD_READ GROUP_READ GROUP_EXECUTE OWNER_READ OWNER_WRITE OWNER_EXECUTE)
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.GZDoom.metainfo.xml
+	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.UZDoom.metainfo.xml
 			DESTINATION share/metainfo
 			PERMISSIONS WORLD_READ GROUP_READ GROUP_EXECUTE OWNER_READ OWNER_WRITE)
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.GZDoom.svg
+	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.UZDoom.svg
 			DESTINATION share/icons/hicolor/scalable/apps
 			PERMISSIONS WORLD_READ GROUP_READ GROUP_EXECUTE OWNER_READ OWNER_WRITE)
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.GZDoom-mime.xml
+	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/posix/freedesktop/org.zdoom.UZDoom-mime.xml
 			DESTINATION share/mime/packages
 			PERMISSIONS WORLD_READ GROUP_READ GROUP_EXECUTE OWNER_READ OWNER_WRITE)
 	# note:
@@ -1502,7 +1505,7 @@ if( APPLE )
 	set_target_properties(zdoom PROPERTIES
 		LINK_FLAGS "${LINK_FRAMEWORKS}"
 		MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/posix/osx/zdoom-info.plist"
-		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.drdteam.gzdoom"
+		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.zdoom.UZDoom"
 		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "" )
 
 	# Dymanic libraries like libvulkan.dylib or libMoltenVK.dylib will be loaded by dlopen()
@@ -1516,6 +1519,7 @@ if ( NOT ZMUSIC_SYSTEM_INSTALL )
 	else()
 		install(TARGETS zmusic
 			LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 			COMPONENT "Game executable"
 		)
 	endif()

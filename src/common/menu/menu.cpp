@@ -64,7 +64,7 @@ CVAR (Int, m_showinputgrid, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, m_blockcontrollers, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 CVAR (Float, snd_menuvolume, 0.6f, CVAR_ARCHIVE)
-CVAR(Int, m_use_mouse, 2, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
+CVAR(Int, m_use_mouse, 1, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR(Int, m_show_backbutton, 0, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR(Bool, m_cleanscale, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // Option Search
@@ -72,10 +72,10 @@ CVAR(Bool, os_isanyof, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // Tooltip
 CVAR(Bool, m_tooltip_capwidth, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, m_tooltip_small, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CUSTOM_CVAR(Int, m_tooltip_lines, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CUSTOM_CVAR(Int, m_tooltip_lines, 3, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 {
-	if (self < 0)
-		self = 0;	// 0 means 'off'
+	if (self < 1)
+		self = 1;
 }
 CUSTOM_CVAR(Float, m_tooltip_delay, 9.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 {
@@ -294,6 +294,7 @@ DMenu::DMenu(DMenu *parent)
 	mTooltipScrollOffset = 0.0;
 	mTooltipScrollTimer = 0.0;
 	mCurrentTooltip = "";
+	DrawTooltips = false;
 	GC::WriteBarrier(this, parent);
 }
 
@@ -436,7 +437,9 @@ void DMenu::CallDrawer()
 	IFVIRTUAL(DMenu, Drawer)
 	{
 		VMValue params[] = { (DObject*)this };
+		InMenu++;
 		VMCall(func, params, 1, nullptr, 0);
+		InMenu--;
 		twod->ClearClipRect();	// make sure the scripts don't leave a valid clipping rect behind.
 	}
 }
@@ -675,8 +678,31 @@ bool M_Responder (event_t *ev)
 				// do we want mouse input?
 				if (ev->subtype >= EV_GUI_FirstMouseEvent && ev->subtype <= EV_GUI_LastMouseEvent)
 				{
-						if (!m_use_mouse)
+					if (!m_use_mouse)
+					{
+						LastMousePos.LastUpdate = -1;
+						return true;
+					}
+
+					// Ignore subtle mouse movements to make the menu less finnicky.
+					if (ev->subtype == EV_GUI_MouseMove)
+					{
+						static const int DormantTimer = int(GameTicRate * 0.5);
+						// If the mouse moved < 1% of the screen's height, it's probably the mouse itself bugging out.
+						const float limit = screen->GetHeight() * 0.01f;
+						if (LastMousePos.LastUpdate < 0 || MenuTime - LastMousePos.LastUpdate <= DormantTimer
+							|| fabs(LastMousePos.LastX - ev->data1) >= limit || fabs(LastMousePos.LastY - ev->data2) >= limit)
+						{
+							LastMousePos.LastX = ev->data1;
+							LastMousePos.LastY = ev->data2;
+						}
+						else
+						{
 							return true;
+						}
+					}
+
+					LastMousePos.LastUpdate = MenuTime;
 				}
 
 				// pass everything else on to the current menu
@@ -1048,6 +1074,7 @@ DEFINE_FIELD(DMenu, mCurrentTooltip)
 DEFINE_FIELD(DMenu, mTooltipScrollTimer)
 DEFINE_FIELD(DMenu, mTooltipScrollOffset)
 DEFINE_FIELD(DMenu, mTooltipFont)
+DEFINE_FIELD(DMenu, DrawTooltips)
 
 DEFINE_FIELD(DMenuDescriptor, mMenuName)
 DEFINE_FIELD(DMenuDescriptor, mNetgameMessage)

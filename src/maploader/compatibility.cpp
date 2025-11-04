@@ -54,6 +54,7 @@
 #include "p_setup.h"
 #include "maploader/maploader.h"
 #include "types.h"
+#include "doomdef.h"
 
 // MACROS ------------------------------------------------------------------
 
@@ -68,7 +69,9 @@ union FMD5Holder
 
 struct FCompatValues
 {
-	int CompatFlags[3];
+	ELevelCompatFlags Flags1;
+	ELevelCompatFlags2 Flags2;
+	ELevelBugCompatFlags BugCompatFlags;
 	unsigned int ExtCommandIndex;
 };
 
@@ -94,11 +97,12 @@ struct FCompatOption
 	int WhichSlot;
 };
 
-enum
+enum ECompatSlot
 {
 	SLOT_COMPAT,
 	SLOT_COMPAT2,
-	SLOT_BCOMPAT
+	SLOT_BCOMPAT,
+	COMPATSLOT_COUNT
 };
 
 // EXTERNAL FUNCTION PROTOTYPES --------------------------------------------
@@ -255,13 +259,22 @@ void ParseCompatibility()
 			md5array.Push(md5);
 			sc.MustGetString();
 		} while (!sc.Compare("{"));
-		memset(flags.CompatFlags, 0, sizeof(flags.CompatFlags));
+		
+		flags.Flags1 = 0;
+		flags.Flags2 = 0;
+		flags.BugCompatFlags = 0;
 		flags.ExtCommandIndex = ~0u;
+
 		while (sc.GetString())
 		{
 			if ((i = sc.MatchString(&Options[0].Name, sizeof(*Options))) >= 0)
 			{
-				flags.CompatFlags[Options[i].WhichSlot] |= Options[i].CompatFlags;
+				switch (ECompatSlot(Options[i].WhichSlot))
+				{
+					case SLOT_COMPAT: flags.Flags1 |= ELevelCompatFlags::FromInt(Options[i].CompatFlags); break;
+					case SLOT_COMPAT2: flags.Flags2 |= ELevelCompatFlags2::FromInt(Options[i].CompatFlags); break;
+					case SLOT_BCOMPAT: flags.BugCompatFlags |= ELevelBugCompatFlags::FromInt(Options[i].CompatFlags); break;
+				}
 			}
 			else
 			{
@@ -302,7 +315,7 @@ FName MapLoader::CheckCompatibility(MapData *map)
 	{
 		if ((gameinfo.flags & GI_COMPATSHORTTEX) && Level->maptype == MAPTYPE_DOOM)
 		{
-			Level->ii_compatflags = COMPATF_SHORTTEX | COMPATF_LIGHT;
+			Level->ii_compatflags = (COMPATF_SHORTTEX | COMPATF_LIGHT);
 			if (gameinfo.flags & GI_COMPATSTAIRS) Level->ii_compatflags |= COMPATF_STAIRINDEX;
 		}
 		if (gameinfo.flags & GI_NOSECTIONMERGE)
@@ -328,7 +341,7 @@ FName MapLoader::CheckCompatibility(MapData *map)
 		if (flags != NULL)
 		{
 			Printf(", cflags = %08x, cflags2 = %08x, bflags = %08x\n",
-				flags->CompatFlags[SLOT_COMPAT], flags->CompatFlags[SLOT_COMPAT2], flags->CompatFlags[SLOT_BCOMPAT]);
+				flags->Flags1, flags->Flags2, flags->BugCompatFlags);
 		}
 		else
 		{
@@ -338,9 +351,9 @@ FName MapLoader::CheckCompatibility(MapData *map)
 
 	if (flags != NULL)
 	{
-		Level->ii_compatflags |= flags->CompatFlags[SLOT_COMPAT];
-		Level->ii_compatflags2 |= flags->CompatFlags[SLOT_COMPAT2];
-		Level->ib_compatflags |= flags->CompatFlags[SLOT_BCOMPAT];
+		Level->ii_compatflags |= flags->Flags1;
+		Level->ii_compatflags2 |= flags->Flags2;
+		Level->ib_compatflags |= flags->BugCompatFlags;
 	}
 
 	// Reset i_compatflags
