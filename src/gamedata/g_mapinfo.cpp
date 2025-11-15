@@ -142,7 +142,8 @@ static level_info_t *FindLevelByWarpTrans (int num)
 
 bool CheckWarpTransMap (FString &mapname, bool substitute)
 {
-	if (mapname[0] == '&' && (mapname[1] & 0xDF) == 'W' &&
+	if (mapname.Len() > 4 &&
+		mapname[0] == '&' && (mapname[1] & 0xDF) == 'W' &&
 		(mapname[2] & 0xDF) == 'T' && mapname[3] == '@')
 	{
 		level_info_t *lev = FindLevelByWarpTrans (atoi (&mapname[4]));
@@ -151,7 +152,7 @@ bool CheckWarpTransMap (FString &mapname, bool substitute)
 			mapname = lev->MapName;
 			return true;
 		}
-		else if (substitute)
+		else if (substitute && mapname.Len() > 5)
 		{
 			char a = mapname[4], b = mapname[5];
 			mapname = "MAP";

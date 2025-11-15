@@ -132,7 +132,7 @@ function( add_pk3 PK3_NAME PK3_DIR )
 	if( WIN32 )
 		set( INSTALL_PK3_PATH . CACHE STRING "Directory where zdoom.pk3 will be placed during install." )
 	else()
-		set( INSTALL_PK3_PATH share/games/doom CACHE STRING "Directory where zdoom.pk3 will be placed during install." )
+		set( INSTALL_PK3_PATH share/games/${ZDOOM_EXE_NAME} CACHE STRING "Directory where zdoom.pk3 will be placed during install." )
 	endif()
 	install(FILES "${PROJECT_BINARY_DIR}/${PK3_NAME}"
 			DESTINATION ${INSTALL_PK3_PATH}
@@ -345,7 +345,7 @@ set( CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${REL_C_F
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEB_C_FLAGS} -D_DEBUG" )
 
 option(FORCE_INTERNAL_BZIP2 "Use internal bzip2")
-option(FORCE_INTERNAL_ZMUSIC "Use internal zmusic")
+option(FORCE_INTERNAL_ZMUSIC "Use internal zmusic" ON)
 option(FORCE_INTERNAL_ASMJIT "Use internal asmjit" ON)
 option(FORCE_INTERNAL_CPPDAP "Use internal cppdap" ON)
 
@@ -419,6 +419,7 @@ if( ZMUSIC_FOUND AND NOT FORCE_INTERNAL_ZMUSIC )
 	set( ZMUSIC_SYSTEM_INSTALL TRUE )
 else()
 	message( STATUS "Using internal zmusic library" )
+	set( BUILD_SHARED_LIBS OFF CACHE INTERNAL "" FORCE )
 	add_subdirectory( libraries/ZMusic )
 	set( ZMUSIC_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/zmusic" )
 	set( ZMUSIC_INCLUDE_DIR ${ZMUSIC_ROOT_PATH}/include )

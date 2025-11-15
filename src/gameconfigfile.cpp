@@ -36,21 +36,23 @@
 
 #include <stdio.h>
 
-#include "gameconfigfile.h"
+#include "c_bind.h"
 #include "c_cvars.h"
 #include "c_dispatch.h"
-#include "c_bind.h"
-#include "m_argv.h"
 #include "cmdlib.h"
-#include "version.h"
+#include "d_main.h"
+#include "doomstat.h"
+#include "gameconfigfile.h"
+#include "gi.h"
+#include "i_specialpaths.h"
+#include "m_argv.h"
+#include "m_joy.h"
 #include "m_misc.h"
 #include "v_font.h"
-#include "a_pickups.h"
-#include "doomstat.h"
-#include "gi.h"
-#include "d_main.h"
 #include "v_video.h"
-#include "m_joy.h"
+#include "version.h"
+#include "zstring.h"
+
 #if !defined _MSC_VER && !defined __APPLE__
 #include "i_system.h"  // for SHARE_DIR
 #endif // !_MSC_VER && !__APPLE__
@@ -99,6 +101,16 @@ FGameConfigFile::FGameConfigFile ()
 	M_GetMacSearchDirectories(user_docs, user_app_support, local_app_support);
 #endif
 
+#if defined(__HAIKU__) || ( defined(__unix__) && !defined(__APPLE__) )
+#   ifdef __HAIKU__
+#       define DEFAULT_SHARE_DIR "/boot/system/data"
+#   else
+#       define DEFAULT_SHARE_DIR "/usr/local/share"
+#   endif
+	bool shareDirChanged = 0 != strcmp(SHARE_DIR, DEFAULT_SHARE_DIR);
+	FString dataDir = GetDataPath();
+#endif
+
 	FString pathname;
 
 	OkayToWrite = false;	// Do not allow saving of the config before DoKeySetup()
@@ -124,22 +136,31 @@ FGameConfigFile::FGameConfigFile ()
 		SetValueForKey ("Path", user_app_support.GetChars(), true);
 		SetValueForKey ("Path", "$PROGDIR", true);
 		SetValueForKey ("Path", local_app_support.GetChars(), true);
-#elif !defined(__unix__)
+#elif !defined(__unix__) && !defined(__HAIKU__)
 		SetValueForKey ("Path", "$HOME", true);
 		SetValueForKey ("Path", "$PROGDIR", true);
 #else
-		SetValueForKey ("Path", "$HOME/" GAME_DIR, true);
-		SetValueForKey ("Path", "$HOME/.local/share/games/doom", true);
-		// Arch Linux likes them in /usr/share/doom
-		// Debian likes them in /usr/share/games/doom
-		// I assume other distributions don't do anything radically different
-		SetValueForKey ("Path", "/usr/local/share/doom", true);
-		SetValueForKey ("Path", "/usr/local/share/games/doom", true);
-		SetValueForKey ("Path", "/usr/share/doom", true);
-		SetValueForKey ("Path", "/usr/share/games/doom", true);
-		SetValueForKey ("Path", SHARE_DIR "/doom", true);
+		SetValueForKey ("Path", dataDir + "/games/" GAMENAMELOWERCASE, true);
+		SetValueForKey ("Path", dataDir + "/games/doom", true);
+		SetValueForKey ("Path", dataDir + "/doom", true);
+		SetValueForKey ("Path", SHARE_DIR "/games/" GAMENAMELOWERCASE, true);
 		SetValueForKey ("Path", SHARE_DIR "/games/doom", true);
-
+		SetValueForKey ("Path", SHARE_DIR "/doom", true);
+		if (shareDirChanged)
+		{
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/games/" GAMENAMELOWERCASE, true);
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/games/doom", true);
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/doom", true);
+		}
+	#ifdef __HAIKU__
+		SetValueForKey ("Path", "$HOME/config/data/games/" GAMENAMELOWERCASE, true);
+		SetValueForKey ("Path", "$HOME/config/data/games/doom", true);
+		SetValueForKey ("Path", "$HOME/config/data/doom", true);
+	#else
+		SetValueForKey ("Path", "/usr/share/games/" GAMENAMELOWERCASE, true);
+		SetValueForKey ("Path", "/usr/share/games/doom", true);
+		SetValueForKey ("Path", "/usr/share/doom", true);
+	#endif
 #endif
 	}
 
@@ -147,25 +168,37 @@ FGameConfigFile::FGameConfigFile ()
 	if (!SetSection ("FileSearch.Directories"))
 	{
 		SetSection ("FileSearch.Directories", true);
+		SetValueForKey ("Path", "$DOOMWADDIR", true);
 #ifdef __APPLE__
 		SetValueForKey ("Path", user_docs.GetChars(), true);
 		SetValueForKey ("Path", user_app_support.GetChars(), true);
 		SetValueForKey ("Path", "$PROGDIR", true);
 		SetValueForKey ("Path", local_app_support.GetChars(), true);
-#elif !defined(__unix__)
+#elif !defined(__unix__) && !defined(__HAIKU__)
 		SetValueForKey ("Path", "$PROGDIR", true);
 #else
-		SetValueForKey ("Path", "$HOME/" GAME_DIR, true);
-		SetValueForKey ("Path", "$HOME/.local/share/games/doom", true);
-		SetValueForKey ("Path", SHARE_DIR, true);
-		SetValueForKey ("Path", SHARE_DIR "/doom", true);
+		SetValueForKey ("Path", dataDir + "/games/" GAMENAMELOWERCASE, true);
+		SetValueForKey ("Path", dataDir + "/games/doom", true);
+		SetValueForKey ("Path", dataDir + "/doom", true);
+		SetValueForKey ("Path", SHARE_DIR "/games/" GAMENAMELOWERCASE, true);
 		SetValueForKey ("Path", SHARE_DIR "/games/doom", true);
-		SetValueForKey ("Path", "/usr/local/share/doom", true);
-		SetValueForKey ("Path", "/usr/local/share/games/doom", true);
-		SetValueForKey ("Path", "/usr/share/doom", true);
+		SetValueForKey ("Path", SHARE_DIR "/doom", true);
+		if (shareDirChanged)
+		{
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/games/" GAMENAMELOWERCASE, true);
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/games/doom", true);
+			SetValueForKey ("Path", DEFAULT_SHARE_DIR "/doom", true);
+		}
+	#ifdef __HAIKU__
+		SetValueForKey ("Path", "$HOME/config/data/games/" GAMENAMELOWERCASE, true);
+		SetValueForKey ("Path", "$HOME/config/data/games/doom", true);
+		SetValueForKey ("Path", "$HOME/config/data/doom", true);
+	#else
+		SetValueForKey ("Path", "/usr/share/games/" GAMENAMELOWERCASE, true);
 		SetValueForKey ("Path", "/usr/share/games/doom", true);
+		SetValueForKey ("Path", "/usr/share/doom", true);
+	#endif
 #endif
-		SetValueForKey ("Path", "$DOOMWADDIR", true);
 	}
 
 	// Set default search paths if none present
@@ -181,27 +214,49 @@ FGameConfigFile::FGameConfigFile ()
 		SetValueForKey("Path", "$PROGDIR/fm_banks", true);
 		SetValueForKey("Path", (local_app_support + "/soundfonts").GetChars(), true);
 		SetValueForKey("Path", (local_app_support + "/fm_banks").GetChars(), true);
-#elif !defined(__unix__)
+#elif !defined(__unix__) && !defined(__HAIKU__)
 		SetValueForKey("Path", "$PROGDIR/soundfonts", true);
 		SetValueForKey("Path", "$PROGDIR/fm_banks", true);
 #else
-		SetValueForKey("Path", "$HOME/" GAME_DIR "/soundfonts", true);
-		SetValueForKey("Path", "$HOME/" GAME_DIR "/fm_banks", true);
-		SetValueForKey("Path", "$HOME/.local/share/games/doom/soundfonts", true);
-		SetValueForKey("Path", "$HOME/.local/share/games/doom/fm_banks", true);
-		SetValueForKey("Path", "/usr/local/share/doom/soundfonts", true);
-		SetValueForKey("Path", "/usr/local/share/doom/fm_banks", true);
-		SetValueForKey("Path", "/usr/local/share/games/doom/soundfonts", true);
-		SetValueForKey("Path", "/usr/local/share/games/doom/fm_banks", true);
-		SetValueForKey("Path", "/usr/share/doom/soundfonts", true);
-		SetValueForKey("Path", "/usr/share/doom/fm_banks", true);
-		SetValueForKey("Path", "/usr/share/games/doom/soundfonts", true);
-		SetValueForKey("Path", "/usr/share/games/doom/fm_banks", true);
-		SetValueForKey("Path", SHARE_DIR "/doom/soundfonts", true);
-		SetValueForKey("Path", SHARE_DIR "/doom/fm_banks", true);
+		SetValueForKey ("Path", dataDir + "/games/" GAMENAMELOWERCASE "/soundfonts", true);
+		SetValueForKey ("Path", dataDir + "/games/" GAMENAMELOWERCASE "/fm_banks", true);
+		SetValueForKey ("Path", dataDir + "/games/doom/soundfonts", true);
+		SetValueForKey ("Path", dataDir + "/games/doom/fm_banks", true);
+		SetValueForKey ("Path", dataDir + "/doom/soundfonts", true);
+		SetValueForKey ("Path", dataDir + "/doom/fm_banks", true);
+		SetValueForKey("Path", SHARE_DIR "/games/" GAMENAMELOWERCASE "/soundfonts", true);
+		SetValueForKey("Path", SHARE_DIR "/games/" GAMENAMELOWERCASE "/fm_banks", true);
 		SetValueForKey("Path", SHARE_DIR "/games/doom/soundfonts", true);
 		SetValueForKey("Path", SHARE_DIR "/games/doom/fm_banks", true);
+		SetValueForKey("Path", SHARE_DIR "/doom/soundfonts", true);
+		SetValueForKey("Path", SHARE_DIR "/doom/fm_banks", true);
+		if (shareDirChanged)
+		{
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/games/" GAMENAMELOWERCASE "/soundfonts", true);
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/games/" GAMENAMELOWERCASE "/fm_banks", true);
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/games/doom/soundfonts", true);
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/games/doom/fm_banks", true);
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/doom/soundfonts", true);
+			SetValueForKey("Path", DEFAULT_SHARE_DIR "/doom/fm_banks", true);
+		}
+	#ifdef __HAIKU__
+		SetValueForKey ("Path", "$HOME/config/data/games/" GAMENAMELOWERCASE "/soundfonts", true);
+		SetValueForKey ("Path", "$HOME/config/data/games/" GAMENAMELOWERCASE "/fm_banks", true);
+		SetValueForKey ("Path", "$HOME/config/data/games/doom/soundfonts", true);
+		SetValueForKey ("Path", "$HOME/config/data/games/doom/fm_banks", true);
+		SetValueForKey ("Path", "$HOME/config/data/doom/soundfonts", true);
+		SetValueForKey ("Path", "$HOME/config/data/doom/fm_banks", true);
+	#else
+		SetValueForKey("Path", "/usr/share/games/" GAMENAMELOWERCASE "/soundfonts", true);
+		SetValueForKey("Path", "/usr/share/games/" GAMENAMELOWERCASE "/fm_banks", true);
+		SetValueForKey("Path", "/usr/share/games/doom/soundfonts", true);
+		SetValueForKey("Path", "/usr/share/games/doom/fm_banks", true);
+		SetValueForKey("Path", "/usr/share/doom/soundfonts", true);
+		SetValueForKey("Path", "/usr/share/doom/fm_banks", true);
+		SetValueForKey("Path", "$HOME/.local/share/soundfonts", true);
+		SetValueForKey("Path", "/usr/local/share/soundfonts", true);
 		SetValueForKey("Path", "/usr/share/soundfonts", true);
+	#endif
 #endif
 	}
 
@@ -216,6 +271,10 @@ FGameConfigFile::FGameConfigFile ()
 	SetSectionNote("SoundfontSearch.Directories",
 		"# These are the directories to search for soundfonts that let listed in the menu.\n"
 		"# Layout is the same as for IWADSearch.Directories\n");
+
+#ifdef DEFAULT_SHARE_DIR
+#   undef DEFAULT_SHARE_DIR
+#endif
 }
 
 FGameConfigFile::~FGameConfigFile ()
@@ -350,7 +409,7 @@ void FGameConfigFile::DoGlobalSetup ()
 				while (more)
 				{
 					name = GetCurrentSection();
-					if (name != NULL && 
+					if (name != NULL &&
 						(namelen = strlen(name)) > 12 &&
 						strcmp(name + namelen - 12, ".WeaponSlots") == 0)
 					{
@@ -663,7 +722,7 @@ void FGameConfigFile::DoGameSetup (const char *gamename)
 	sublen = countof(section) - 1 - mysnprintf (section, countof(section), "%s.", gamename);
 	subsection = section + countof(section) - sublen - 1;
 	section[countof(section) - 1] = '\0';
-	
+
 	strncpy (subsection, "UnknownConsoleVariables", sublen);
 	if (SetSection (section))
 	{

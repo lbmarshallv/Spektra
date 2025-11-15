@@ -618,9 +618,14 @@ ADD_STAT(statistics)
 ADD_STAT(velocity)
 {
 	FString compose;
-	if (players[consoleplayer].mo != NULL && gamestate == GS_LEVEL) {
-		compose.AppendFormat("Current velocity: %.2f\n", players[consoleplayer].mo->Vel.Length());
-		compose.AppendFormat("Level %s - Velocity Max: %.2f, Velocity Average: %.2f\n", primaryLevel->MapName.GetChars(), primaryLevel->max_velocity, primaryLevel->avg_velocity);
+	auto cam = players[consoleplayer].camera;
+	if (cam == nullptr || cam->player == nullptr)
+		cam = players[consoleplayer].mo;
+	if (cam != nullptr && gamestate == GS_LEVEL) {
+		auto level = cam->Level;
+		const auto& vel = level->velocities[cam->player - players];
+		compose.AppendFormat("Current velocity: %.2f\n", vel.cur_velocity);
+		compose.AppendFormat("Level %s - Velocity Max: %.2f, Velocity Average: %.2f\n", level->MapName.GetChars(), vel.max_velocity, vel.avg_velocity);
 	}
 	return compose;
 }
