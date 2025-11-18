@@ -236,6 +236,7 @@ struct FDynamicLight
 	int GetSecondaryIntensity() const { return pArgs[LIGHT_SECONDARY_INTENSITY]; }
 	double GetLightDefIntensity() const { return lightDefIntensity; }
 	int GetFade() const { return pArgs[LIGHT_FADE]; }
+	int GetTimer() const { return target->IsClientSide() ? Level->LocalTimer : Level->LocalWorldTimer; }
 
 	bool IsSubtractive() const { return !!((*pLightFlags) & LF_SUBTRACTIVE); }
 	bool IsAdditive() const { return !!((*pLightFlags) & LF_ADDITIVE); }
@@ -274,7 +275,6 @@ public:
 	// To avoid having to copy these around every tic, these are pointers to the source data.
 	const DAngle *pSpotInnerAngle;
 	const DAngle *pSpotOuterAngle;
-	const DAngle *pPitch;	// This is to handle pitch overrides through GLDEFS, it can either point to the target's pitch or the light definition.
 	const int *pArgs;
 	const LightFlags *pLightFlags;
 
@@ -285,6 +285,8 @@ public:
 	TObjPtr<AActor *> target;
 	FLightNode * touching_sides;
 	FLightNode * touching_sector;
+	DAngle            Yaw, Pitch;
+
 	float radius;			// The maximum size the light can be with its current settings.
 	float m_currentRadius;	// The current light size.
 	int m_tickCount;

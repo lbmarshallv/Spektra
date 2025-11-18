@@ -1208,8 +1208,8 @@ void D_Display ()
 	}
 
 	screen->FrameTime = I_msTimeFS();
-	TexAnim.UpdateAnimations(screen->FrameTime);
-	R_UpdateSky(screen->FrameTime);
+	TexAnim.UpdateAnimations(static_cast<uint64_t>(((primaryLevel->LocalWorldTimer + I_GetTimeFrac()) * 1000.0) / TICRATE));
+	R_UpdateSky(I_GetTimeFrac());
 	screen->BeginFrame();
 	twod->ClearClipRect();
 	if ((gamestate == GS_LEVEL || gamestate == GS_TITLELEVEL) && gametic != 0)
@@ -3052,6 +3052,11 @@ static bool System_DisableTextureFilter()
 	return !V_IsHardwareRenderer();
 }
 
+static bool System_DisableAnisotropicFiltering()
+{
+	return V_DisableIntelMipmap();
+}
+
 static void System_OnScreenSizeChanged()
 {
 	if (StatusBar != NULL)
@@ -3956,7 +3961,8 @@ static int D_DoomMain_Internal (void)
 		OkForLocalization,
 		[]() ->FConfigFile* { return GameConfig; },
 		nullptr,
-		RemapUserTranslation
+		RemapUserTranslation,
+		System_DisableAnisotropicFiltering
 	};
 
 	std::set_new_handler(NewFailure);

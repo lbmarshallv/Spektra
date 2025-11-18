@@ -48,6 +48,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) 
 
 find_package(Threads REQUIRED)
+find_package(Python 3.6 REQUIRED)
 
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake )
 include( FindPackageHandleStandardArgs )
@@ -138,6 +139,17 @@ function( add_pk3 PK3_NAME PK3_DIR )
 			DESTINATION ${INSTALL_PK3_PATH}
 			COMPONENT "Game resources")
 endfunction()
+
+macro( generate_language_files target source destination )
+	set(lang_target "${target}_${source}")
+	set(lang_script "${CMAKE_CURRENT_SOURCE_DIR}/../libraries/Translation/compile.py")
+	set(lang_src "${CMAKE_CURRENT_SOURCE_DIR}/../libraries/Translation/${source}")
+	set(lang_dst "${CMAKE_CURRENT_SOURCE_DIR}/${destination}")
+
+	add_custom_target(${lang_target} COMMAND python -B -E -s "${lang_script}" "${lang_src}" "${lang_dst}")
+	add_dependencies(${target} ${lang_target})
+	add_custom_command(TARGET ${target} POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove "${lang_dst}")
+endmacro()
 
 # Macro for building libraries without debugging information
 macro( make_release_only )

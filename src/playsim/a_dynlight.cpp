@@ -115,7 +115,8 @@ void AttachLight(AActor *self)
 	light->pSpotInnerAngle = &self->AngleVar(NAME_SpotInnerAngle);
 	light->pSpotOuterAngle = &self->AngleVar(NAME_SpotOuterAngle);
 	light->lightDefIntensity = 1.0;
-	light->pPitch = &self->Angles.Pitch;
+	light->Yaw = self->Angles.Yaw;
+	light->Pitch = self->Angles.Pitch;
 	light->pLightFlags = (LightFlags*)&self->IntVar(NAME_lightflags);
 	light->pArgs = self->args;
 	light->specialf1 = DAngle::fromDeg(double(self->SpawnAngle)).Normalized360().Degrees();
@@ -232,7 +233,7 @@ void FDynamicLight::Activate()
 	{
 		float pulseTime = float(specialf1 / TICRATE);
 
-		m_lastUpdate = Level->maptime;
+		m_lastUpdate = GetTimer();
 		if (!swapped) m_cycler.SetParams(float(GetSecondaryIntensity()), float(GetIntensity()), pulseTime);
 		else m_cycler.SetParams(float(GetIntensity()), float(GetSecondaryIntensity()), pulseTime);
 		m_cycler.ShouldCycle(true);
@@ -298,6 +299,8 @@ void FDynamicLight::Tick()
 
 	// Don't bother if the light won't be shown
 	if (!IsActive()) return;
+	if (!target->IsClientSide() && WorldPaused())
+		return;
 
 	// I am doing this with a type field so that I can dynamically alter the type of light
 	// without having to create or maintain multiple objects.
@@ -305,9 +308,10 @@ void FDynamicLight::Tick()
 	{
 	case PulseLight:
 	{
-		float diff = (Level->maptime - m_lastUpdate) / (float)TICRATE;
+		const int timer = GetTimer();
+		float diff = (timer - m_lastUpdate) / (float)TICRATE;
 		
-		m_lastUpdate = Level->maptime;
+		m_lastUpdate = timer;
 		m_cycler.Update(diff);
 		m_currentRadius = float(m_cycler.GetVal());
 		break;
@@ -411,6 +415,12 @@ void FDynamicLight::UpdateLocation()
 		DAngle angle = target->Angles.Yaw;
 		double s = angle.Sin();
 		double c = angle.Cos();
+		if (IsSpot())
+		{
+			Yaw = angle;
+			if (!explicitpitch)
+				Pitch = target->Angles.Pitch;
+		}
 
 		Pos = target->Vec3Offset(m_off.X * c + m_off.Y * s, m_off.X * s - m_off.Y * c, m_off.Z + target->GetBobOffset());
 		Sector = target->subsector->sector;	// Get the render sector. target->Sector is the sector according to play logic.

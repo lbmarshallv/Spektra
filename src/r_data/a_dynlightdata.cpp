@@ -133,15 +133,17 @@ void FLightDefaults::ApplyProperties(FDynamicLight * light) const
 	{
 		light->pSpotInnerAngle = &m_spotInnerAngle;
 		light->pSpotOuterAngle = &m_spotOuterAngle;
-		if (m_explicitPitch) light->pPitch = &m_pitch;
-		else light->pPitch = &light->target->Angles.Pitch;
+		light->explicitpitch   = m_explicitPitch;
+		light->Yaw             = light->target->Angles.Yaw;
+		if (m_explicitPitch) light->Pitch = m_pitch;
+		else light->Pitch = light->target->Angles.Pitch;
 	}
 	light->m_tickCount = 0;
 	if (m_type == PulseLight)
 	{
 		float pulseTime = float(m_Param / TICRATE);
 
-		light->m_lastUpdate = light->Level->maptime;
+		light->m_lastUpdate = light->GetTimer();
 		if (m_swapped) light->m_cycler.SetParams(float(m_Args[LIGHT_SECONDARY_INTENSITY]), float(m_Args[LIGHT_INTENSITY]), pulseTime, oldtype == PulseLight);
 		else light->m_cycler.SetParams(float(m_Args[LIGHT_INTENSITY]), float(m_Args[LIGHT_SECONDARY_INTENSITY]), pulseTime, oldtype == PulseLight);
 		light->m_cycler.ShouldCycle(true);

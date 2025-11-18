@@ -1308,6 +1308,7 @@ void P_PlayerThink (player_t *player)
 		player->angleOffsetTargets[i] = nullAngle;
 	}
 
+	// TODO: Should this be moved to the client-side logic like inventory tics?
 	if (player->SubtitleCounter > 0)
 	{
 		player->SubtitleCounter--;
@@ -1353,6 +1354,11 @@ void P_PlayerThink (player_t *player)
 		VMValue param = player->mo;
 		VMCall(func, &param, 1, nullptr, 0);
 	}
+
+	if (BobType == PSPB_2D)
+		P_BobWeapon(player);
+	else if (BobType == PSPB_3D)
+		P_BobWeapon3D(player);
 
 	// Moved this to directly after player thinking to get more accurate velocity values. Also takes
 	// 3D vs 2D movement into account now.
@@ -1642,6 +1648,8 @@ void P_UnPredictPlayer ()
 		auto InvSel = actInvSel;
 		int inventorytics = player->inventorytics;
 		const bool settings_controller = player->settings_controller;
+		FArray attached = *(FArray*)&act->AttachedLights;
+		FArray userLights = *(FArray*)&act->UserLights;
 
 		player->CopyFrom(PredictionPlayerBackup, false);
 
@@ -1712,6 +1720,9 @@ void P_UnPredictPlayer ()
 
 		act->UpdateRenderSectorList();
 		act->renderflags &= ~RF_NOINTERPOLATEVIEW;
+		act->flags8 &= ~MF8_RECREATELIGHTS;
+		memcpy(&act->AttachedLights, &attached, sizeof(FArray));
+		memcpy(&act->UserLights, &userLights, sizeof(FArray));
 
 		actInvSel = InvSel;
 		player->inventorytics = inventorytics;
