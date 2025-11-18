@@ -4106,7 +4106,7 @@ void AActor::SetDynLightLevel ()
 					if (light->IsSpot())
 					{
 						L *= -1.0f / dist;
-						DAngle negPitch = -*light->pPitch;
+						DAngle negPitch = -light->Pitch;
 						DAngle Angle = light->target->Angles.Yaw;
 						double xyLen = negPitch.Cos();
 						double spotDirX = -Angle.Cos() * xyLen;
