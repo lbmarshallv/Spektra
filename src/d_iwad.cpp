@@ -54,14 +54,16 @@
 
 EXTERN_CVAR(Bool, queryiwad);
 EXTERN_CVAR(String, queryiwad_key);
-EXTERN_CVAR(Bool, disableautoload)
-EXTERN_CVAR(Bool, autoloadlights)
-EXTERN_CVAR(Bool, autoloadbrightmaps)
-EXTERN_CVAR(Bool, autoloadwidescreen)
-EXTERN_CVAR(String, language)
+EXTERN_CVAR(Bool, disableautoload);
+EXTERN_CVAR(Bool, autoloadlights);
+EXTERN_CVAR(Bool, autoloadbrightmaps);
+EXTERN_CVAR(Bool, autoloadwidescreen);
+EXTERN_CVAR(String, language);
+EXTERN_CVAR(Int, i_exit_on_not_found);
 
 CVAR(Bool, i_loadsupportwad, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG) // Disabled in net games.
-EXTERN_CVAR(Int, i_exit_on_not_found);
+CVAR(Bool, i_is_new_release, true, 0)
+CVAR(Int, i_display_new_release, 1, CVAR_ARCHIVE|CVAR_GLOBALCONFIG) // 0:no, 1: yes, 2: always for testing
 
 EXTERN_FARG(iwad);
 EXTERN_FARG(host);
@@ -791,23 +793,26 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 #elif defined(__APPLE__)
 		gamedir = "~/Library/Application Support/" GAMENAMELOWERCASE "/";
 		cfgfile = "~/Library/Preferences/" GAMENAMELOWERCASE ".ini";
-#elif defined(IS_FLATPAK)
-		gamedir = "~/.var/app/" APPID "/.config/" GAMENAMELOWERCASE "/";
-		cfgfile = "~/.var/app/" APPID "/.config/" GAMENAMELOWERCASE "/" GAMENAMELOWERCASE ".ini";
-		extrasteps = "\n3. Validate your Flatpak permissions, so that Flatpak has access to your directories with wads";
 #else
-		gamedir = "~/.config/" GAMENAMELOWERCASE "/";
-		cfgfile = "~/.config/" GAMENAMELOWERCASE "/" GAMENAMELOWERCASE ".ini";
+		auto gd = FStringf("%s/games/" GAMENAMELOWERCASE, GetDataPath());
+		auto cd = FStringf("%s/" GAMENAMELOWERCASE ".ini", GetConfigPath());
+		gd.Substitute("$HOME/", "~/");
+		cd.Substitute("$HOME/", "~/");
+		gamedir = gd.GetChars();
+		cfgfile = cd.GetChars();
+#	if defined(IS_FLATPAK)
+		extrasteps = "\n3. Validate your Flatpak permissions, so that Flatpak has access to your directories with wads\n";
+#	endif
 #endif
 
 		I_FatalError(
-			"Cannot find a game IWAD (doom.wad, doom2.wad, heretic.wad, etc.).\n"
-			"Did you install " GAMENAME " properly? You can do either of the following:\n"
+			"Cannot find a game IWAD (doom.wad, heretic.wad, etc)!\n"
+			"Did you install " GAMENAME " properly?\n"
 			"\n"
+			"You can do any of the following:\n"
 			"1. Place one or more of these wads in %s\n"
-			"2. Edit your %s and add the\n"
-			"directories of your iwads to the list beneath [IWADSearch.Directories]"
-			"%s\n",
+			"2. Edit your %s by adding your iwad folders beneath [IWADSearch.Directories]"
+			"%s",
 			gamedir, cfgfile, extrasteps
 		);
 	}
@@ -835,7 +840,11 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 		if (i_loadsupportwad) flags |= 16;
 
 		FStartupSelectionInfo info = FStartupSelectionInfo(wads, *Args, flags);
+
 		info.DefaultFileLoadBehaviour = i_exit_on_not_found;
+		info.isNewRelease = (i_display_new_release>1) || i_is_new_release;
+		info.notifyNewRelease = !!i_display_new_release;
+
 		if (I_PickIWad(queryiwad || HoldingQueryKey(queryiwad_key), info))
 		{
 			pick = info.SaveInfo();
@@ -845,6 +854,8 @@ int FIWadManager::IdentifyVersion (std::vector<std::string>&wadfiles, const char
 			autoloadwidescreen = !!(info.DefaultStartFlags & 8);
 			i_loadsupportwad = !!(info.DefaultStartFlags & 16);
 			i_exit_on_not_found = info.DefaultFileLoadBehaviour;
+			if (!info.notifyNewRelease)
+				i_display_new_release = 0; // don't change truthy values
 		}
 		else
 		{

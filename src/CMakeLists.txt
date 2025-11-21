@@ -585,6 +585,7 @@ file( GLOB HEADER_FILES
 	common/textures/hires/xbr/*.h
 	common/thirdparty/*.h
 	common/thirdparty/rapidjson/*.h
+	common/thirdparty/rapidxml/*.hpp
 	common/thirdparty/math/*h
 	common/thirdparty/libsmackerdec/include/*.h
 	common/thirdparty/utf8proc/*.h
@@ -974,6 +975,8 @@ set (PCH_SOURCES
 	launcher/playgamepage.cpp
 	launcher/settingspage.cpp
 	launcher/networkpage.cpp
+	launcher/releasepage.cpp
+	launcher/aboutpage.cpp
 
 	common/audio/sound/i_sound.cpp
 	common/audio/sound/oalsound.cpp
@@ -1372,24 +1375,8 @@ include_directories(
 
 add_dependencies( zdoom revision_check )
 
-# Due to some quirks, we need to do this in this order
-if( NOT ZDOOM_OUTPUT_OLDSTYLE )
-	# RUNTIME_OUTPUT_DIRECTORY does not exist in CMake 2.4.
-	# Linux distributions are slow to adopt 2.6. :(
-	set_target_properties( zdoom PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ZDOOM_OUTPUT_DIR} )
-	set_target_properties( zdoom PROPERTIES OUTPUT_NAME ${ZDOOM_EXE_NAME} )
-else()
-	set_target_properties( zdoom PROPERTIES
-		RUNTIME_OUTPUT_NAME ${ZDOOM_EXE_NAME}
-		RUNTIME_OUTPUT_DIRECTORY_RELEASE ${ZDOOM_OUTPUT_DIR}
-		RUNTIME_OUTPUT_NAME_DEBUG ${ZDOOM_EXE_NAME}d
-		RUNTIME_OUTPUT_DIRECTORY_DEBUG ${ZDOOM_OUTPUT_DIR}
-		RUNTIME_OUTPUT_NAME_MINSIZEREL ${ZDOOM_EXE_NAME}msr
-		RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${ZDOOM_OUTPUT_DIR}
-		RUNTIME_OUTPUT_NAME_RELWITHDEBINFO ${ZDOOM_EXE_NAME}rd
-		RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${ZDOOM_OUTPUT_DIR}
-	)
-endif()
+set_target_properties( zdoom PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ZDOOM_OUTPUT_DIR} )
+set_target_properties( zdoom PROPERTIES OUTPUT_NAME ${ZDOOM_EXE_NAME} )
 
 if( MSVC )
 	option ( CONSOLE_MODE "Compile as a console application" OFF )
@@ -1616,6 +1603,7 @@ source_group("Common\\Textures\\Formats" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SO
 source_group("Common\\Third Party" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/.+")
 source_group("Common\\Third Party\\Math" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/math/.+")
 source_group("Common\\Third Party\\RapidJSON" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/rapidjson/.+")
+source_group("Common\\Third Party\\RapidXML" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/rapidxml/.+")
 source_group("Common\\Third Party\\SFMT" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/sfmt/.+")
 source_group("Common\\Third Party\\stb" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/stb/.+")
 source_group("Common\\Third Party\\utf8proc" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/common/thirdparty/utf8proc/.+")
