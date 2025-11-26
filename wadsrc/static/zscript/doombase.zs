@@ -650,7 +650,7 @@ struct LevelLocals native
 	native play VisualThinker SpawnVisualThinker(Class<VisualThinker> type);
 	native clearscope VisualThinker SpawnClientSideVisualThinker(Class<VisualThinker> type);
 
-	clearscope native static bool WorldPaused(bool checkLag = true);
+	clearscope native static bool WorldPaused(bool checkLag = false);
 }
 
 // a few values of this need to be readable by the play code.
