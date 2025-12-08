@@ -157,7 +157,7 @@ struct FLevelLocals
 	ELevelCompatFlags2 GetCompatibility2(ELevelCompatFlags2 mask);
 	void ApplyCompatibility();
 	void ApplyCompatibility2();
-	AActor* SelectActorFromTID(int tid, size_t index, AActor* defactor);
+	AActor* SelectActorFromTID(int tid, size_t index, bool clientSide, AActor* defactor);
 
 	void Init();
 
@@ -347,9 +347,9 @@ public:
 	{
 		return NActorIterator(ClientSideTIDHash, type, tid);
 	}
-	AActor *SingleActorFromTID(int tid, AActor *defactor)
+	AActor *SingleActorFromTID(int tid, bool clientSide, AActor *defactor)
 	{
-		return tid == 0 ? defactor : GetActorIterator(tid).Next();
+		return tid == 0 ? defactor : (clientSide ? GetClientSideActorIterator(tid).Next() : GetActorIterator(tid).Next());
 	}
 
 	bool SectorHasTags(sector_t *sector)

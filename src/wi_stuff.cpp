@@ -1168,6 +1168,12 @@ IMPLEMENT_CLASS(DInterBackground, true, false)
 DObject* WI_Start(wbstartstruct_t *wbstartstruct)
 {
 	FName screenclass = deathmatch ? gameinfo.statusscreen_dm : multiplayer ? gameinfo.statusscreen_coop : gameinfo.statusscreen_single;
+	if (screenclass == NAME_None)
+	{
+		// Keyword to explicitly disable the intermission
+		return nullptr;
+	}
+
 	auto cls = PClass::FindClass(screenclass);
 
 	if (cls == nullptr || !cls->IsDescendantOf("StatusScreen"))
