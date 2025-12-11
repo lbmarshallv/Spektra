@@ -1,6 +1,31 @@
+/*
+** widgetresourcedata.cpp
+**
+**---------------------------------------------------------------------------
+**
+** Copyright 2024-2025 GZDoom Maintainers and Contributors
+** Copyright 2025 UZDoom Maintainers and Contributors
+**
+** This program is free software: you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation, either version 3 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program.  If not, see http://www.gnu.org/licenses/
+**
+**---------------------------------------------------------------------------
+**
+*/
 
 #include <zwidget/core/resourcedata.h>
 #include <zwidget/core/theme.h>
+
 #include "c_cvars.h"
 #include "filesystem.h"
 #include "printf.h"
@@ -109,31 +134,28 @@ std::vector<SingleFontData> LoadWidgetFontData(const std::string& name)
 	std::vector<SingleFontData> returnv;
 	if (!stricmp(name.c_str(), "notosans"))
 	{
-		returnv.resize(3);
-		returnv[0].fontdata = LoadFile("widgets/noto/notosans-regular.ttf");
-		returnv[1].fontdata = LoadFile("widgets/noto/notosansarmenian-regular.ttf");
-		returnv[2].fontdata = LoadFile("widgets/noto/notosansgeorgian-regular.ttf");
-#ifdef _WIN32
-		wchar_t wbuffer[256];
-		if (GetWindowsDirectoryW(wbuffer, 256))
-		{
-			returnv.resize(5);
-			FString windir(wbuffer);
-			returnv[3].fontdata = LoadDiskFile((windir + "/fonts/yugothm.ttc").GetChars());
-			returnv[3].language = "ja";
-			returnv[4].fontdata = LoadDiskFile((windir + "/fonts/malgun.ttf").GetChars());
-			returnv[4].language = "ko";
-			// Don't fail if these cannot be found
-			if (returnv[4].fontdata.size() == 0) returnv.erase(returnv.begin() + 4);
-			if (returnv[3].fontdata.size() == 0) returnv.erase(returnv.begin() + 3);
-		}
-#endif
-		return returnv;
+		// to update/add fonts:
+		// tools/download-fonts.sh wadsrc/static widgets/noto 'Noto Sans' 'Noto Sans Armenian' 'Noto Sans Georgian' 'Noto Sans JP' 'Noto Sans KR'
+		const char* fonts[] = {
+			"widgets/noto/noto-sans.ttf",
+			"widgets/noto/noto-sans-armenian.ttf",
+			"widgets/noto/noto-sans-georgian.ttf",
+			"widgets/noto/noto-sans-jp.ttf",
+			"widgets/noto/noto-sans-kr.ttf"
+		};
 
+		auto count = sizeof(fonts) / sizeof(fonts[0]);
+		returnv.resize(count);
+		for (unsigned i = 0; i < count; i++)
+			returnv[i].fontdata = LoadFile(fonts[i]);
+
+		return returnv;
 	}
+
 	returnv.resize(1);
-	std::string fn = "widgets/font/" +name + ".ttf";
+	std::string fn = "widgets/font/" + name + ".ttf";
 	returnv[0].fontdata = LoadFile(fn.c_str());
+
 	return returnv;
 }
 

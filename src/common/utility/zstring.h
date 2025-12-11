@@ -1,9 +1,12 @@
 #pragma once
+
 /*
 ** zstring.h
 **
 **---------------------------------------------------------------------------
 ** Copyright 2005-2007 Randy Heit
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025 UZDoom Maintainers and Contributors
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -32,15 +35,17 @@
 **
 */
 
-
-#include <stdio.h>
 #include <stdarg.h>
-#include <string.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 #include <string>
+
+#ifdef _WIN32
+#include <utf8.h>
+#endif
+
 #include "tarray.h"
-#include "utf8.h"
-#include "filesystem.h"
 
 #ifdef __GNUC__
 #define PRINTFISH(x) __attribute__((format(printf, 2, x)))
@@ -135,6 +140,7 @@ public:
 	FString (char oneChar);
 	FString(const TArray<char> & source) : FString(source.Data(), source.Size()) {}
 	FString(const TArray<uint8_t> & source) : FString((char*)source.Data(), source.Size()) {}
+
 	// This is intentionally #ifdef'd. The only code which needs this is parts of the Windows backend that receive Unicode text from the system.
 #ifdef _WIN32
 	explicit FString(const wchar_t *copyStr);
@@ -173,7 +179,8 @@ public:
 
 	const char &operator[] (int index) const
 	{
-		if(index < 0 || index >= Len()) ThrowStringBoundsException((int64_t)index, Len());
+		assert(index >= 0);
+		if(index < 0 || (unsigned)index >= Len()) ThrowStringBoundsException((int64_t)index, Len());
 		return Chars[index];
 	}
 #if defined(_WIN32) && !defined(_WIN64) && defined(_MSC_VER)
