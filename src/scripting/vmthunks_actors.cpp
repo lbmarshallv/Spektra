@@ -903,9 +903,9 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, ClearCounters, ClearCounters)
 	return 0;
 }
 
-static int GetModifiedDamage(AActor *self, int type, int damage, bool passive, AActor *inflictor, AActor *source, int flags)
+static int GetModifiedDamage(AActor *self, int type, int damage, bool passive, AActor *inflictor, AActor *source, int flags, double ang)
 {
-	return self->GetModifiedDamage(ENamedName(type), damage, passive, inflictor, source, flags);
+	return self->GetModifiedDamage(ENamedName(type), damage, passive, inflictor, source, flags, DAngle::fromDeg(ang));
 }
 
 DEFINE_ACTION_FUNCTION_NATIVE(AActor, GetModifiedDamage, GetModifiedDamage)
@@ -917,7 +917,8 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, GetModifiedDamage, GetModifiedDamage)
 	PARAM_OBJECT(inflictor, AActor);
 	PARAM_OBJECT(source, AActor);
 	PARAM_INT(flags);
-	ACTION_RETURN_INT(self->GetModifiedDamage(type, damage, passive, inflictor, source, flags));
+	PARAM_ANGLE(ang);
+	ACTION_RETURN_INT(self->GetModifiedDamage(type, damage, passive, inflictor, source, flags, ang));
 }
 
 static int ApplyDamageFactor(AActor *self, int type, int damage)
@@ -1918,7 +1919,11 @@ static void SetViewPos(AActor *self, double x, double y, double z, int flags)
 {
 	if (!self->ViewPos)
 	{
-		self->ViewPos = Create<DViewPosition>();
+		auto vp = Create<DViewPosition>();
+		vp->ObjectFlags |= (self->ObjectFlags & (OF_ClientSide | OF_Transient));
+
+		self->ViewPos = vp;
+		GC::WriteBarrier(self, vp);
 	}
 
 	DVector3 pos = { x,y,z };

@@ -1169,7 +1169,7 @@ class Inventory : Actor
 	//
 	//===========================================================================
 
-	virtual void ModifyDamage(int damage, Name damageType, out int newdamage, bool passive, Actor inflictor = null, Actor source = null, int flags = 0) {}
+	virtual void ModifyDamage(int damage, Name damageType, out int newdamage, bool passive, Actor inflictor = null, Actor source = null, int flags = 0, double angle = 0.0) {}
 
 	virtual Vector2 ModifyBob(Vector2 Bob, double ticfrac) {return Bob;}
 
@@ -1267,7 +1267,7 @@ class Inventory : Actor
 	//
 	//===========================================================================
 
-	virtual void AbsorbDamage (int damage, Name damageType, out int newdamage, Actor inflictor = null, Actor source = null, int flags = 0) {}
+	virtual void AbsorbDamage (int damage, Name damageType, out int newdamage, Actor inflictor = null, Actor source = null, int flags = 0, double angle = 0.0) {}
 	
 	//===========================================================================
 	//
