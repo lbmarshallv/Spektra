@@ -1481,6 +1481,7 @@ void P_PredictPlayer (player_t *player)
 	if (demoplayback || gamestate != GS_LEVEL ||
 		player->mo == NULL ||
 		player != player->mo->Level->GetConsolePlayer() ||
+		(player->mo->ObjectFlags & OF_JustSpawned) ||
 		(player->cheats & CF_PREDICTING))
 	{
 		return;
