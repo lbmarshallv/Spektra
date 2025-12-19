@@ -36,9 +36,12 @@ public:
 
 	void BlitSceneToPostprocess();
 	void BlitCurrentToImage(VkTextureImage *image, VkImageLayout finallayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	void CopyCurrentToImage(VkTextureImage *image, VkImageLayout finallayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	void DrawPresentTexture(const IntRect &box, bool applyGamma, bool screenshot);
 
 	int GetCurrentPipelineImage() const { return mCurrentPipelineImage; }
+
+	VulkanBuffer* GetAutomaticUniformsBuffer() { return AutomaticUniformsBuffer.get(); }
 
 private:
 	void NextEye(int eyeCount);
@@ -46,6 +49,8 @@ private:
 	VulkanRenderDevice* fb = nullptr;
 
 	int mCurrentPipelineImage = 0;
+
+	std::unique_ptr<VulkanBuffer> AutomaticUniformsBuffer;
 
 	friend class VkPPRenderState;
 };
