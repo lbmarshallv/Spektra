@@ -51,6 +51,12 @@ CUSTOM_CVARD(Int, i_exit_on_not_found, REQUIRE_DEFAULT, CVAR_ARCHIVE|CVAR_GLOBAL
 	if (self != masked) self = masked;
 };
 
+#ifdef _WIN32
+static constexpr char PATH_SEPARATOR = ';';
+#else
+static constexpr char PATH_SEPARATOR = ':';
+#endif
+
 //==========================================================================
 //
 // D_AddFile
@@ -301,6 +307,24 @@ const char* BaseFileSearch(const char* file, const char* ext, bool lookfirstinpr
 					if (path.IsNotEmpty())
 					{
 						return path.GetChars();
+					}
+				}
+			}
+			else if (stricmp(key, "PathList") == 0)
+			{
+				FString dir;
+				TArray<FString> dirlist = ExpandEnvVars(value).Split(PATH_SEPARATOR, FString::TOK_SKIPEMPTY);
+
+				for (FString& dirname : dirlist)
+				{
+					dir = NicePath(dirname.GetChars());
+					if (dir.IsNotEmpty())
+					{
+						BFSwad.Format("%s%s%s", dir.GetChars(), dir.Back() == '/' ? "" : "/", file);
+						if (DirEntryExists(BFSwad.GetChars()))
+						{
+							return BFSwad.GetChars();
+						}
 					}
 				}
 			}
