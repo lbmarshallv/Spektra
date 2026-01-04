@@ -1,31 +1,21 @@
-//-----------------------------------------------------------------------------
-//
-// Copyright 1993-1996 id Software
-// Copyright 1999-2016 Randy Heit
-// Copyright 2002-2016 Christoph Oelckers
-// Copyright 2017-2025 GZDoom Maintainers and Contributors
-// Copyright 2025 UZDoom Maintainers and Contributors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see http://www.gnu.org/licenses/
-//
-//-----------------------------------------------------------------------------
-//
-// DESCRIPTION:
-//		DOOM Network game communication and protocol,
-//		all OS independent parts.
-//
-//-----------------------------------------------------------------------------
+/*
+** d_net.cpp
+**
+** DOOM Network game communication and protocol, all OS independent parts.
+**
+**---------------------------------------------------------------------------
+**
+** Copyright 1993-1996 id Software
+** Copyright 1999-2016 Marisa Heit
+** Copyright 2002-2016 Christoph Oelckers
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025-2026 UZDoom Maintainers and Contributors
+**
+** SPDX-License-Identifier: GPL-3.0-or-later
+**
+**---------------------------------------------------------------------------
+**
+*/
 
 #include <stddef.h>
 
@@ -2381,6 +2371,96 @@ static int RemoveClass(FLevelLocals *Level, const PClass *cls)
 	return removecount;
 
 }
+
+EXTERN_CVAR(Int, displaynametags)
+EXTERN_CVAR(Int, nametagcolor)
+
+static void SelectWeapon(int player, int slot)
+{
+	auto mo = players[player].mo;
+	if (mo == nullptr || gamestate != GS_LEVEL || paused
+		|| players[player].playerstate != PST_LIVE)
+	{
+		return;
+	}
+
+	AActor* weap = nullptr;
+	if (slot >= 0 && slot < NUM_WEAPON_SLOTS)
+	{
+		IFVIRTUALPTRNAME(mo, NAME_PlayerPawn, PickWeapon)
+			weap = CallVM<AActor*>(func, mo, slot, (int)!(dmflags2 & DF2_DONTCHECKAMMO));
+	}
+	else if (slot == WST_NEXT)
+	{
+		IFVIRTUALPTRNAME(mo, NAME_PlayerPawn, PickNextWeapon)
+			weap = CallVM<AActor*>(func, mo);
+	}
+	else if (slot == WST_PREV)
+	{
+		IFVIRTUALPTRNAME(mo, NAME_PlayerPawn, PickPrevWeapon)
+			weap = CallVM<AActor*>(func, mo);
+	}
+
+	if (weap == nullptr)
+		return;
+
+	// Make sure the returned weapon actually exists in that player's inventory.
+	const unsigned id = weap->InventoryID;
+	AActor* invItem = mo->Inventory;
+	for (; invItem != nullptr; invItem = invItem->Inventory)
+	{
+		if (invItem->InventoryID == id)
+			break;
+	}
+
+	if (invItem != weap)
+		return;
+
+	if (player == consoleplayer)
+	{
+		if (weap != players[player].ReadyWeapon)
+			S_Sound(mo, CHAN_AUTO, 0, "misc/weaponchange", 1.0, ATTN_NONE);
+
+		// [Nash] Option to display the name of the weapon being switched to.
+		if ((displaynametags & 2) && StatusBar != nullptr && SmallFont != nullptr)
+		{
+			StatusBar->AttachMessage(Create<DHUDMessageFadeOut>(nullptr, weap->GetTag(),
+				1.5f, 0.90f, 0, 0, (EColorRange)*nametagcolor, 2.f, 0.35f), MAKE_ID('W', 'E', 'P', 'N'));
+		}
+	}
+
+	mo->UseInventory(weap);
+}
+
+static void UseFlechette(int player)
+{
+	auto mo = players[player].mo;
+	if (mo == nullptr || gamestate != GS_LEVEL || paused
+		|| players[player].playerstate != PST_LIVE)
+	{
+		return;
+	}
+
+	AActor* item = nullptr;
+	IFVIRTUALPTRNAME(mo, NAME_PlayerPawn, GetFlechetteItem)
+		item = CallVM<AActor*>(func, mo);
+
+	if (item == nullptr)
+		return;
+
+	// Make sure the returned item actually exists in that player's inventory.
+	const unsigned id = item->InventoryID;
+	AActor* invItem = mo->Inventory;
+	for (; invItem != nullptr; invItem = invItem->Inventory)
+	{
+		if (invItem->InventoryID == id)
+			break;
+	}
+
+	if (invItem == item)
+		mo->UseInventory(item);
+}
+
 // [RH] Execute a special "ticcmd". The type byte should
 //		have already been read, and the stream is positioned
 //		at the beginning of the command's actual data.
@@ -2710,7 +2790,7 @@ void Net_DoCommand(int cmd, TArrayView<uint8_t>& stream, int player)
 		// For demo playback, DEM_DOAUTOSAVE already exists in the demo if the
 		// autosave happened. And if it doesn't, we must not generate it.
 		if (!netgame && !demoplayback && disableautosave < 2 && autosavecount
-			&& players[player].playerstate == PST_LIVE)
+			&& players[player].playerstate == PST_LIVE && !deathmatch)
 		{
 			Net_WriteInt8(DEM_DOAUTOSAVE);
 		}
@@ -2969,6 +3049,14 @@ void Net_DoCommand(int cmd, TArrayView<uint8_t>& stream, int player)
 			}
 		}
 		break;
+
+	case DEM_WEAPSELECT:
+		SelectWeapon(player, ReadInt8(stream));
+		break;
+
+	case DEM_USEFLECHETTE:
+		UseFlechette(player);
+		break;
 		
 	default:
 		I_Error("Unknown net command: %d", cmd);
@@ -3074,6 +3162,7 @@ void Net_SkipCommand(int cmd, TArrayView<uint8_t>& stream)
 		case DEM_ADDCONTROLLER:
 		case DEM_DELCONTROLLER:
 		case DEM_KICK:
+		case DEM_WEAPSELECT:
 			skip = 1;
 			break;
 

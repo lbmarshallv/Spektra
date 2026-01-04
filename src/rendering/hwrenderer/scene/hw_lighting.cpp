@@ -1,29 +1,19 @@
-// 
-//---------------------------------------------------------------------------
-//
-// Copyright(C) 2002-2018 Christoph Oelckers
-// All rights reserved.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with this program.  If not, see http://www.gnu.org/licenses/
-//
-//--------------------------------------------------------------------------
-//
 /*
-** gl_light.cpp
+** hw_lighting.cpp
+**
 ** Light level / fog management / dynamic lights
 **
-**/
+**---------------------------------------------------------------------------
+**
+** Copyright 2002-2018 Christoph Oelckers
+** Copyright 2017-2025 GZDoom Maintainers and Contributors
+** Copyright 2025-2026 UZDoom Maintainers and Contributors
+**
+** SPDX-License-Identifier: GPL-3.0-or-later
+**
+**---------------------------------------------------------------------------
+**
+*/
 
 #include "c_cvars.h"
 #include "r_sky.h"
@@ -187,7 +177,7 @@ float GetFogDensity(FLevelLocals* Level, ELightMode lightmode, int lightlevel, P
 		// case 2: black fog
 		if ((!isDoomSoftwareLighting(lightmode) || blendfactor > 0) && !(Level->flags3 & LEVEL3_NOLIGHTFADE))
 		{
-			density = distfogtable[lightmode != ELightMode::LinearStandard][hw_ClampLight(lightlevel, false)];
+			density = distfogtable[lightmode != ELightMode::LinearStandard][hw_ClampLight(lightlevel)];
 		}
 		else
 		{

@@ -1,3 +1,19 @@
+/*
+** present.fp
+**
+**
+**
+**---------------------------------------------------------------------------
+**
+** Copyright 2021-2025 GZDoom Maintainers and Contributors
+** Copyright 2025-2026 UZDoom Maintainers and Contributors
+**
+** SPDX-License-Identifier: GPL-3.0-or-later
+**
+**---------------------------------------------------------------------------
+**
+*/
+
 varying vec2 TexCoord;
 
 uniform sampler2D InputTexture;

@@ -1,3 +1,21 @@
+/*
+** gammatest.fp
+**
+** Gamma Test pattern shown in image calibration screen
+**
+**---------------------------------------------------------------------------
+**
+** Copyright 2025 Marcus Minhorst
+** Copyright 2025 Dileep V. Reddy
+** Copyright 2025-2026 UZDoom Maintainers and Contributors
+**
+** SPDX-License-Identifier: GPL-3.0-or-later
+**
+**---------------------------------------------------------------------------
+**
+** https://phinet.ca/projects/gamma/description/
+*/
+
 void main()
 {
 	vec3 colour = texture(InputTexture, TexCoord).rgb;
