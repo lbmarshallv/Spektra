@@ -4449,7 +4449,7 @@ void AActor::GetBoneMatrix(int model_index, int bone_index, bool with_override, 
 	}
 }
 
-DVector3 AActor::GetBoneEulerAngles(int model_index, int bone_index, bool with_override)
+DVector3 AActor::GetBoneEulerAngles(FModel * mdl, int model_index, int bone_index, bool with_override)
 {
 	if(modelData && (modelData->flags & MODELDATA_GET_BONE_INFO) && model_index >= 0 && bone_index >= 0 && modelData->modelBoneInfo.SSize() > model_index && modelData->modelBoneInfo[model_index].positions.SSize() > bone_index)
 	{
@@ -4459,7 +4459,10 @@ DVector3 AActor::GetBoneEulerAngles(int model_index, int bone_index, bool with_o
 
 		FVector3 objPos = FVector3(Pos() + WorldOffset);
 
-		VSMatrix boneMatrix = (with_override ? modelData->modelBoneInfo[model_index].positions_with_override : modelData->modelBoneInfo[model_index].positions)[bone_index];
+		VSMatrix boneRotMatrix = (with_override ? modelData->modelBoneInfo[model_index].positions_with_override : modelData->modelBoneInfo[model_index].positions)[bone_index];
+
+		FQuaternion baseRot = mdl->GetJointRotation(bone_index);
+		boneRotMatrix.multQuaternion(baseRot);
 		VSMatrix worldMatrix = smf->ObjectToWorldMatrix(this, objPos.X, objPos.Y, objPos.Z, 1.0);
 
 		FVector4 oldFwd(1.0, 0.0, 0.0, 0.0);
@@ -4467,8 +4470,8 @@ DVector3 AActor::GetBoneEulerAngles(int model_index, int bone_index, bool with_o
 		FVector4 oldUp(0.0, 1.0, 0.0, 0.0);
 		FVector4 newUp;
 
-		boneMatrix.multMatrixPoint(&oldFwd.X, &newFwd.X);
-		boneMatrix.multMatrixPoint(&oldUp.X, &newUp.X);
+		boneRotMatrix.multMatrixPoint(&oldFwd.X, &newFwd.X);
+		boneRotMatrix.multMatrixPoint(&oldUp.X, &newUp.X);
 
 		oldFwd = FVector4(FVector3(newFwd.X, newFwd.Y, newFwd.Z).Unit(), 0.0);
 		oldUp = FVector4(FVector3(newUp.X, newUp.Y, newUp.Z).Unit(), 0.0);
@@ -4529,7 +4532,7 @@ DVector3 AActor::GetBoneEulerAngles(int model_index, int bone_index, bool with_o
 	return DVector3(0,0,0);
 }
 
-void AActor::GetBonePosition(int model_index, int bone_index, bool with_override, DVector3 &pos, DVector3 &fwd, DVector3 &up)
+void AActor::GetBonePosition(FModel * mdl, int model_index, int bone_index, bool with_override, DVector3 &pos, DVector3 &fwd, DVector3 &up)
 {
 	if(modelData && (modelData->flags & MODELDATA_GET_BONE_INFO) && model_index >= 0 && bone_index >= 0 && modelData->modelBoneInfo.SSize() > model_index && modelData->modelBoneInfo[model_index].positions.SSize() > bone_index)
 	{
@@ -4540,6 +4543,11 @@ void AActor::GetBonePosition(int model_index, int bone_index, bool with_override
 		FVector3 objPos = FVector3(Pos() + WorldOffset);
 
 		VSMatrix boneMatrix = (with_override ? modelData->modelBoneInfo[model_index].positions_with_override : modelData->modelBoneInfo[model_index].positions)[bone_index];
+		VSMatrix boneRotMatrix = boneMatrix;
+
+		FQuaternion baseRot = mdl->GetJointRotation(bone_index);
+		boneRotMatrix.multQuaternion(baseRot);
+
 		VSMatrix worldMatrix = smf->ObjectToWorldMatrix(this, objPos.X, objPos.Y, objPos.Z, 1.0);
 
 		FVector4 oldPos(pos.X, pos.Z, pos.Y, 1.0);
@@ -4550,8 +4558,8 @@ void AActor::GetBonePosition(int model_index, int bone_index, bool with_override
 		FVector4 newUp;
 
 		boneMatrix.multMatrixPoint(&oldPos.X, &newPos.X);
-		boneMatrix.multMatrixPoint(&oldFwd.X, &newFwd.X);
-		boneMatrix.multMatrixPoint(&oldUp.X, &newUp.X);
+		boneRotMatrix.multMatrixPoint(&oldFwd.X, &newFwd.X);
+		boneRotMatrix.multMatrixPoint(&oldUp.X, &newUp.X);
 
 		oldPos = FVector4(FVector3(newPos.X, newPos.Y, newPos.Z) / newPos.W, 1.0);
 		oldFwd = FVector4(FVector3(newFwd.X, newFwd.Y, newFwd.Z).Unit(), 0.0);
