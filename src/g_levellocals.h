@@ -46,6 +46,7 @@
 #include "doom_aabbtree.h"
 #include "doom_levelmesh.h"
 #include "p_visualthinker.h"
+#include <bullet/btBulletCollisionCommon.h>
 #include <memory>
 
 struct FGlobalDLightLists
@@ -172,6 +173,8 @@ private:
 public:
 	void SnapshotLevel();
 	void UnSnapshotLevel(bool hubLoad);
+
+
 
 	void FinalizePortals();
 	bool ChangePortal(line_t *ln, int thisid, int destid);
@@ -883,8 +886,37 @@ public:
 		return savegamerestore
 			|| (info != nullptr && info->Snapshot.mBuffer != nullptr && info->isValid());
 	}
-};
 
+// bullet
+  public:
+	btCollisionWorld *collisionWorld;
+	void              InitCollisionWorld();
+	btCollisionWorld  *GetCollisionWorld(){
+		return collisionWorld;
+	};
+	void              AddCollisionObject(btCollisionObject *obj);
+	void              AddCollisionObject(AActor *thing);
+	void              AddCollisionObject(AdvancedCollisionModel *model);
+
+	void RemoveCollisionObject(btCollisionObject *obj);
+	void RemoveCollisionObject(AActor *thing);
+
+	void ClearAllCollisionObjects();
+
+	void UpdateCollisionModel(AActor *thing);
+
+	void AddAllCollisionObjects();
+
+	bool CanCollide(AActor *tmthing, AActor *thing);
+	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
+
+	TArray<AActor *> CollidingActors(AActor *thing); //get every actor currently colliding with a given actor's collision model
+	TArray<AActor *> CollidingActors(AActor *thing, int flags); //get every actor currently colliding with a given actor's collision model
+
+	void                             PerformCollisions();
+	void                             PerformCollisionRayTest();
+	TArray<AdvancedCollisionModel*> collisionModels;
+};
 
 extern FLevelLocals level;
 extern FLevelLocals *primaryLevel;	// level for which to display the user interface. This will always be the one the current consoleplayer is in.

@@ -332,7 +332,7 @@ add_custom_target( revision_check ALL
 
 # required libraries
 
-set( PROJECT_LIBRARIES ${PROJECT_LIBRARIES} miniz "${BZIP2_LIBRARIES}" "${CMAKE_DL_LIBS}" "${DRPC_LIBRARIES}")
+set( PROJECT_LIBRARIES ${PROJECT_LIBRARIES} miniz "${BZIP2_LIBRARIES}" "${CMAKE_DL_LIBS}" "${DRPC_LIBRARIES}" "${BULLET_LIBRARIES}")
 if (HAVE_VULKAN)
 	list( APPEND PROJECT_LIBRARIES "zvulkan" )
 endif()
@@ -373,6 +373,7 @@ else()
 endif()
 
 include_directories( SYSTEM "${BZIP2_INCLUDE_DIR}" "${LZMA_INCLUDE_DIR}" "${ZMUSIC_INCLUDE_DIR}" "${DRPC_INCLUDE_DIR}")
+
 
 if( ${HAVE_VM_JIT} )
 	add_definitions( -DHAVE_VM_JIT )
@@ -817,6 +818,7 @@ set (PCH_SOURCES
 	hu_scores.cpp
 	m_cheat.cpp
 	m_misc.cpp
+	playsim/p_collision.cpp
 	playsim/p_acs.cpp
 	playsim/p_actionfunctions.cpp
 	p_conversation.cpp

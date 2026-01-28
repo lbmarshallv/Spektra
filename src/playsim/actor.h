@@ -40,6 +40,7 @@
 #include "tflags.h"
 #include "portal.h"
 #include "bonecomponents.h"
+#include "p_collision.h"
 
 struct subsector_t;
 struct FBlockNode;
@@ -1202,6 +1203,9 @@ public:
 	FSection *			section;
 	double			floorz, ceilingz;	// closest together of contacted secs
 	double			dropoffz;		// killough 11/98: the lowest floor over all contacted Sectors.
+
+	AdvancedCollisionModel *collisionModel;
+	FName               collisionModelName;
 
 	uint32_t		ThruBits;
 	FTextureID		floorpic;			// contacted sec floorpic

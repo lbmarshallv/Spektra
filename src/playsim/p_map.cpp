@@ -59,6 +59,7 @@
 #include "r_utility.h"
 #include "shadowinlines.h"
 #include "vm.h"
+#include <bullet/btBulletCollisionCommon.h>
 
 // State.
 
@@ -113,6 +114,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, ShouldPassThroughPlayer, P_ShouldPassThrou
 //
 //==========================================================================
 
+#include "effects.h"
 bool P_CanCollideWith(AActor *tmthing, AActor *thing)
 {
 	static unsigned VIndex = ~0u;
@@ -145,7 +147,19 @@ bool P_CanCollideWith(AActor *tmthing, AActor *thing)
 		VMCall(func, params, 3, &ret, 1);
 		if (!retval) return false;
 	}
-	return true;
+
+	if (!(tmthing->flags & MF_MISSILE))
+	{
+		for (auto p : level.GetCollisionPoints(tmthing, thing))
+		{
+			P_SpawnParticle(&level, p, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255), 255.0, 350, 4., 0,
+			                0,
+			                SPF_FULLBRIGHT);
+		}
+	}
+
+
+	return level.CanCollide(tmthing, thing);
 }
 
 void P_CollidedWith(AActor* const collider, AActor* const collidee)
@@ -1358,6 +1372,7 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, DoMissileDamage, P_DoMissileDamage)
 bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::CheckResult &cres, const FBoundingBox &box, FCheckPosition &tm)
 {
 	AActor *thing = cres.thing;
+	FLevelLocals *level = thing->Level; 
 	double topz;
 	bool 	solid;
 	int 	damage;
@@ -1471,7 +1486,9 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		if (!P_CanCollideWith(tm.thing, thing)) return true;
+		//if (!P_CanCollideWith(tm.thing, thing))
+		if (!P_CanCollideWith(tm.thing, thing))
+			return true;
 	}
 
 	if (tm.thing->player == NULL || !(tm.thing->player->cheats & CF_PREDICTING))

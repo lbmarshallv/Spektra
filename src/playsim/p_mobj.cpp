@@ -276,6 +276,7 @@ void AActor::Serialize(FSerializer &arc)
 		("tracer", tracer)
 		A("floorclip", Floorclip)
 		A("maxfloorclip", MaxFloorclip)
+		A("collisionModelName", collisionModelName)
 		A("tid", tid)
 		A("special", special)
 		A("accuracy", accuracy)
@@ -5681,6 +5682,13 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 	}
 	// force scroller check in the first tic.
 	actor->flags8 |= MF8_INSCROLLSEC;
+
+	// advanced collisions
+	//Printf("%s collisionModelName == %s\n", actor->GetTag(), actor->collisionModelName);
+	if (actor->collisionModelName == "cylinder")
+		actor->collisionModel = new CylinderCollisionModel(actor->radius, actor->Height);
+	else
+		actor->collisionModel = new DoomStandardCollisionModel(actor->radius, actor->Height);
 }
 
 AActor *AActor::StaticSpawn(FLevelLocals *Level, PClassActor *type, const DVector3 &pos, replace_t allowreplacement, bool SpawningMapThing)

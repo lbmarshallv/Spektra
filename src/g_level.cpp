@@ -1915,6 +1915,7 @@ FLevelLocals::~FLevelLocals()
 {
 	if (localEventManager) delete localEventManager;
 	if (aabbTree) delete aabbTree;
+	if (collisionWorld) delete collisionWorld;
 }
 
 //==========================================================================
@@ -2025,6 +2026,7 @@ void FLevelLocals::Init()
 	lightadditivesurfaces = info->lightadditivesurfaces < 0 ? gl_lightadditivesurfaces : !!info->lightadditivesurfaces;
 	notexturefill = info->notexturefill < 0 ? gl_notexturefill : !!info->notexturefill;
 	compassadjustment = info->compassadjustment;
+	InitCollisionWorld();
 }
 
 //==========================================================================
@@ -2381,6 +2383,7 @@ void FLevelLocals::Tick ()
 	{
 		memset (&Scrolls[0], 0, sizeof(Scrolls[0])*Scrolls.Size());
 	}
+	//PerformCollisions();
 }
 
 //==========================================================================

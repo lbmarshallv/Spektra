@@ -269,6 +269,8 @@ else()
 	option (HAVE_GLES2 "Enable GLES2 support" ON)
 endif()
 
+find_package(Bullet REQUIRED CONFIG)
+
 # no, we're not using external asmjit for now, we made too many modifications to our's.
 # if the asmjit author uses our changes then we'll update this.
 
