@@ -31,8 +31,34 @@ class CylinderCollisionModel : public AdvancedCollisionModel
 		this->radius = radius;
 		this->height = height;
 		btCylinderShape *bs = new btCylinderShape(btVector3(radius, height/2, radius ));
-		bs->setMargin(0);
+		bs->setMargin(0.005);
 		collider     = new btCollisionObject();
+		collider->setCollisionShape(bs);
+		collider->setUserPointer(this);
+	}
+
+	void setWorldPos(DVector3 pos) override
+	{
+		btTransform transform;
+		transform.setIdentity();
+		// cylinder's height is along the Y axis where Doom's is on the Z
+		transform.setRotation(btQuaternion(0, SIMD_HALF_PI, 0));
+		transform.setOrigin(btVector3(pos.X, pos.Y, pos.Z + height / 2));
+		collider->setWorldTransform(transform);
+	}
+};
+
+class CapsuleCollisionModel : public AdvancedCollisionModel
+{
+  public:
+	int radius, height;
+	CapsuleCollisionModel(int radius, int height)
+	{
+		this->radius        = radius;
+		this->height        = height;
+		btCapsuleShape *bs  = new btCapsuleShape(radius, height / 2);
+		bs->setMargin(0.005);
+		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
 	}
@@ -59,7 +85,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 		this->radius = radius;
 		this->height = height;
 		auto bs = new btBoxShape(btVector3(radius, radius, height/2));
-		bs->setMargin(0);
+		bs->setMargin(0.005);
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -74,6 +100,63 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 		collider->setWorldTransform(transform);		
 	}
 };
+
+class ConvexHullCollisionModel : public AdvancedCollisionModel
+{
+  public:
+	static btConvexHullShape *fromOBJModel(FName filename);
+
+	ConvexHullCollisionModel(FName filename)
+	{
+		btConvexHullShape *bs = fromOBJModel(filename);
+		bs->setMargin(0.005f);
+		collider = new btCollisionObject();
+		collider->setCollisionShape(bs);
+		collider->setUserPointer(this);
+	}
+};
+
+class MeshCollisionModel : public AdvancedCollisionModel
+{
+  public:
+	btTriangleMesh *trimesh;
+
+	static btTriangleMesh *fromOBJModel(FName filename);
+	TArray<DVector3> getPoints();
+
+	 MeshCollisionModel(FName filename)
+	{
+		trimesh                    = fromOBJModel(filename);
+		btBvhTriangleMeshShape *bs = new btBvhTriangleMeshShape(trimesh, true);
+		bs->setMargin(0.005f);
+		collider = new btCollisionObject();
+		collider->setCollisionShape(bs);
+		collider->setUserPointer(this);
+	}
+
+	struct WorldVertexCollector : public btTriangleCallback
+	{
+		btTransform worldTx;
+		TArray<DVector3> WorldPoints;
+
+		WorldVertexCollector(const btTransform &tx) : worldTx(tx)
+		{
+		}
+
+		void processTriangle(btVector3 *triangle, int, int) override
+		{
+			btVector3 v0 = worldTx * triangle[0];
+			btVector3 v1 = worldTx * triangle[1];
+			btVector3 v2 = worldTx * triangle[2];
+
+			WorldPoints.Push(DVector3(v0.x(), v0.y(), v0.z()));
+			WorldPoints.Push(DVector3(v1.x(), v1.y(), v1.z()));
+			WorldPoints.Push(DVector3(v2.x(), v2.y(), v2.z()));
+		}
+	};
+};
+
+
 
 	struct lwContactPoint
 {

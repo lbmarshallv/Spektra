@@ -5687,6 +5687,10 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 	//Printf("%s collisionModelName == %s\n", actor->GetTag(), actor->collisionModelName);
 	if (actor->collisionModelName == "cylinder")
 		actor->collisionModel = new CylinderCollisionModel(actor->radius, actor->Height);
+	else if (actor->collisionModelName == "capsule")
+		actor->collisionModel = new CapsuleCollisionModel(actor->radius, actor->Height);
+	else if (actor->collisionModelName != NULL && actor->collisionModelName != "")
+		actor->collisionModel = new MeshCollisionModel(actor->collisionModelName);
 	else
 		actor->collisionModel = new DoomStandardCollisionModel(actor->radius, actor->Height);
 }

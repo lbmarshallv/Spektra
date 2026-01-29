@@ -1,9 +1,12 @@
 #include <bullet/btBulletCollisionCommon.h>
 #include <g_levellocals.h>
 #include <p_collision.h>
+#include "filesystem.h"
 
 void FLevelLocals::InitCollisionWorld()
 {
+	if (collisionWorld)
+		delete collisionWorld;
 	auto config     = new btDefaultCollisionConfiguration();
 	auto dispatcher = new btCollisionDispatcher(config);
 	auto broadphase = new btDbvtBroadphase();
@@ -67,7 +70,8 @@ void FLevelLocals::ClearAllCollisionObjects()
 {
 	for (auto c : collisionModels)
 	{
-		RemoveCollisionObject(c->collider);
+		if (c->collider)
+			RemoveCollisionObject(c->collider);
 	}
 	collisionModels.clear();
 }
@@ -204,7 +208,8 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 		ret.Push(DVector3(btv.x(), btv.y(), btv.z()));
 	}
 	
-	ClearAllCollisionObjects();
+	RemoveCollisionObject(thing);
+	RemoveCollisionObject(tmthing);
 	return ret;
 }
 
@@ -239,34 +244,123 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing)
 	RemoveCollisionObject(tmthing);
 	RemoveCollisionObject(thing);
 	return numContacts > 0;
+}
 
-	/*
-	collisionWorld->performDiscreteCollisionDetection();
-
-	int numManifolds = collisionWorld->getDispatcher()->getNumManifolds();
-
-	bool colliding = false;
-
-	for (int i = 0; i < numManifolds; ++i)
+bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
+{
+	if (tmthing->Level != thing->Level)
 	{
-		btPersistentManifold *manifold = collisionWorld->getDispatcher()->getManifoldByIndexInternal(i);
+		Printf(TEXTCOLOR_RED "Two objects compared for CanCollide belong to different levels\n");
+		return false;
+	}
 
-		const btCollisionObject *objA = static_cast<const btCollisionObject *>(manifold->getBody0());
-		const btCollisionObject *objB = static_cast<const btCollisionObject *>(manifold->getBody1());
+	if (!collisionWorld)
+	{
+		Printf(TEXTCOLOR_RED "CanCollide was called without a CollisionWorld\n");
+		return false;
+	}
 
-		if ((objA == a && objB == b) || (objA == b && objB == a))
+	UpdateCollisionModel(tmthing);
+	tmthing->collisionModel->setWorldPos(pos);
+	UpdateCollisionModel(thing);
+	lwContactPoint pointsOut[1000];
+
+	btCollisionObject *a = tmthing->collisionModel->collider;
+	btCollisionObject *b = thing->collisionModel->collider;
+	AdvancedCollisionContactResultCallback cb(pointsOut, 1000);
+
+	AddCollisionObject(thing);
+	AddCollisionObject(tmthing);
+	
+	collisionWorld->contactPairTest(a, b, cb);
+	int numContacts = cb.m_numContacts;
+
+	RemoveCollisionObject(tmthing);
+	RemoveCollisionObject(thing);
+	
+	return numContacts > 0;
+}
+
+TArray<DVector3> MeshCollisionModel::getPoints()
+{
+	TArray<DVector3> ret;
+	btBvhTriangleMeshShape *shape = static_cast<btBvhTriangleMeshShape *>(collider->getCollisionShape());
+
+	WorldVertexCollector callback(collider->getWorldTransform());
+
+	btVector3 aabbMin(-BT_LARGE_FLOAT, -BT_LARGE_FLOAT, -BT_LARGE_FLOAT);
+	btVector3 aabbMax(BT_LARGE_FLOAT, BT_LARGE_FLOAT, BT_LARGE_FLOAT);
+
+	shape->processAllTriangles(&callback, aabbMin, aabbMax);
+
+	return callback.WorldPoints;
+}
+
+btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
+{
+	btTriangleMesh *trimesh = new btTriangleMesh();
+	int             lastLump = 0;
+	int lump = fileSystem.FindLumpFullName(filename.GetChars(), &lastLump, false);
+
+
+	FScanner sc(lump);
+
+	TArray<btVector3> verts;
+	while (sc.GetString())
+	{
+		if (strlen(sc.String) == 1 && sc.String[0] == 'v')
 		{
-			if (manifold->getNumContacts() > 0)
+			sc.MustGetFloat();
+			double x = sc.Float;
+			sc.MustGetFloat();
+			double y = sc.Float;
+			sc.MustGetFloat();
+			double z = sc.Float;
+			verts.Push(btVector3(x,-z,y));
+		}
+		else if (strlen(sc.String) == 1 && sc.String[0] == 'f')
+		{
+			int ind[3];
+			for (int i = 0; i < 3; i++)
 			{
-				colliding = true;
-				break;
+				sc.MustGetString();
+				FString s = FString(sc.String);
+				TArray<FString> ss = s.Split("/");
+				ind[i]             = ss.begin()->ToLong();
 			}
+			
+
+			trimesh->addTriangle(verts[ind[0]-1], verts[ind[1]-1], verts[ind[2]-1]);
 		}
 	}
-	RemoveCollisionObject(a);
-	RemoveCollisionObject(b);
-	if (colliding)
-		Printf(" %s touch %s", tmthing->GetTag(), thing->GetTag());
-	return colliding;
-	*/
+	Printf("%s: Pushed %d verts and %d tris\n", filename.GetChars(), verts.size(), trimesh->getNumTriangles());
+
+	
+	return trimesh;
+}
+
+btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
+{
+	btConvexHullShape *hullshape = new btConvexHullShape();
+	int             lastLump = 0;
+	int             lump     = fileSystem.FindLumpFullName(filename.GetChars(), &lastLump, false);
+
+	FScanner sc(lump);
+
+	while (sc.GetString())
+	{
+		if (strlen(sc.String) == 1 && sc.String[0] == 'v')
+		{
+			sc.MustGetFloat();
+			double x = sc.Float;
+			sc.MustGetFloat();
+			double y = sc.Float;
+			sc.MustGetFloat();
+			double z = sc.Float;
+			hullshape->addPoint(btVector3(x, -z, y));
+		}
+	}
+
+	Printf("%s: Pushed %d verts\n", filename.GetChars(), hullshape->getNumPoints());
+	return hullshape;
 }

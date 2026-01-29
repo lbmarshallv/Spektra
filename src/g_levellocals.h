@@ -908,6 +908,7 @@ public:
 	void AddAllCollisionObjects();
 
 	bool CanCollide(AActor *tmthing, AActor *thing);
+	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 
 	TArray<AActor *> CollidingActors(AActor *thing); //get every actor currently colliding with a given actor's collision model

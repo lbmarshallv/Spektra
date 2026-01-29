@@ -148,18 +148,7 @@ bool P_CanCollideWith(AActor *tmthing, AActor *thing)
 		if (!retval) return false;
 	}
 
-	if (!(tmthing->flags & MF_MISSILE))
-	{
-		for (auto p : level.GetCollisionPoints(tmthing, thing))
-		{
-			P_SpawnParticle(&level, p, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255), 255.0, 350, 4., 0,
-			                0,
-			                SPF_FULLBRIGHT);
-		}
-	}
-
-
-	return level.CanCollide(tmthing, thing);
+	return true;
 }
 
 void P_CollidedWith(AActor* const collider, AActor* const collidee)
@@ -528,8 +517,8 @@ bool	P_TeleportMove(AActor* thing, const DVector3 &pos, bool telefrag, bool modi
 					continue;
 			}
 		}
-
-		if (!P_CanCollideWith(tmf.thing, th))
+		
+		if (!tmf.thing->Level->CanCollide(tmf.thing, th, tmf.pos) || !P_CanCollideWith(tmf.thing, th))
 			continue;
 
 		// Don't let players and monsters block item teleports (all other actor types will still block.)
@@ -1486,8 +1475,15 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		//if (!P_CanCollideWith(tm.thing, thing))
-		if (!P_CanCollideWith(tm.thing, thing))
+		if ((tm.thing->flags & MF_MISSILE) && (typeid(*thing->collisionModel) == typeid(MeshCollisionModel)))
+		{
+			for (auto p : level->GetCollisionPoints(tm.thing, thing))
+			{
+				P_SpawnParticle(level, p, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255), 255.0, 350,
+				                4., 0, 0, SPF_FULLBRIGHT);
+			}
+		}
+		if (!level->CanCollide(tm.thing, thing, tm.pos) || !P_CanCollideWith(tm.thing, thing))
 			return true;
 	}
 
@@ -2141,7 +2137,7 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{ // under thing
 			continue;
 		}
-		if (!P_CanCollideWith(actor, thing))
+		if (!actor->Level->CanCollide(actor, thing) || !P_CanCollideWith(actor, thing))
 		{ // If they cannot collide, they cannot block each other.
 			continue;
 		}
@@ -6725,7 +6721,7 @@ int P_PushUp(AActor *thing, FChangePosition *cpos)
 			continue;
 		if ((thing->flags & MF_MISSILE) && (intersect->flags2 & MF2_REFLECTIVE) && (intersect->flags7 & MF7_THRUREFLECT))
 			continue;
-		if (!P_CanCollideWith(thing, intersect))
+		if (!thing->Level->CanCollide(thing, intersect) || !P_CanCollideWith(thing, intersect))
 			continue;
 
 		if (thing->player && P_ShouldPassThroughPlayer(thing, intersect))
@@ -6792,7 +6788,7 @@ int P_PushDown(AActor *thing, FChangePosition *cpos)
 			continue;
 		if ((thing->flags & MF_MISSILE) && (intersect->flags2 & MF2_REFLECTIVE) && (intersect->flags7 & MF7_THRUREFLECT))
 			continue;
-		if (!P_CanCollideWith(thing, intersect))
+		if (!thing->Level->CanCollide(thing, intersect) || !P_CanCollideWith(thing, intersect))
 			continue;
 
 		if (thing->player && P_ShouldPassThroughPlayer(thing, intersect))
