@@ -31,7 +31,7 @@ class CylinderCollisionModel : public AdvancedCollisionModel
 		this->radius = radius;
 		this->height = height;
 		btCylinderShape *bs = new btCylinderShape(btVector3(radius, height/2, radius ));
-		bs->setMargin(0.005);
+		bs->setMargin(0.1);
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -57,7 +57,7 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 		this->radius        = radius;
 		this->height        = height;
 		btCapsuleShape *bs  = new btCapsuleShape(radius, height / 2);
-		bs->setMargin(0.005);
+		bs->setMargin(0.1);
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -85,7 +85,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 		this->radius = radius;
 		this->height = height;
 		auto bs = new btBoxShape(btVector3(radius, radius, height/2));
-		bs->setMargin(0.005);
+		bs->setMargin(0.05);
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -109,7 +109,7 @@ class ConvexHullCollisionModel : public AdvancedCollisionModel
 	ConvexHullCollisionModel(FName filename)
 	{
 		btConvexHullShape *bs = fromOBJModel(filename);
-		bs->setMargin(0.005f);
+		bs->setMargin(0.05f);
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -128,7 +128,7 @@ class MeshCollisionModel : public AdvancedCollisionModel
 	{
 		trimesh                    = fromOBJModel(filename);
 		btBvhTriangleMeshShape *bs = new btBvhTriangleMeshShape(trimesh, true);
-		bs->setMargin(0.005f);
+		bs->setMargin(0.1f);
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);

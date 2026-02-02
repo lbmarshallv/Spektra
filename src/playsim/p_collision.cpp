@@ -200,7 +200,6 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	AddCollisionObject(tmthing);
 
 	collisionWorld->contactPairTest(a, b, cb);
-	int numContacts = cb.m_numContacts;
 
 	for (auto point : cb.manifoldPoints)
 	{
@@ -210,6 +209,59 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	
 	RemoveCollisionObject(thing);
 	RemoveCollisionObject(tmthing);
+	return ret;
+}
+
+TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &pos, bool moving)
+{
+	TArray<DVector3> ret;
+	if (tmthing->Level != thing->Level)
+	{
+		Printf(TEXTCOLOR_RED "Two objects compared for GetCollisionPoints belong to different levels\n");
+		return ret;
+	}
+
+	if (!collisionWorld)
+	{
+		Printf(TEXTCOLOR_RED "GetCollisionPoints was called without a CollisionWorld\n");
+		return ret;
+	}
+
+	btCollisionObject *a = tmthing->collisionModel->collider;
+	btCollisionObject *b = thing->collisionModel->collider;
+
+	UpdateCollisionModel(tmthing);
+	UpdateCollisionModel(thing);
+
+	DVector3 diff  = pos - tmthing->Pos();
+	double steps = std::max(1.f,std::ceil(diff.length()));
+
+	for (double step = moving ? 1 : steps; step <= steps; step++)
+	{
+		DVector3 ptry(0, 0, tmthing->Pos().Z);
+		ptry.X = tmthing->Pos().X + ((step / steps) * diff.X);
+		ptry.Y = tmthing->Pos().Y + ((step / steps) * diff.Y);
+
+		tmthing->collisionModel->setWorldPos(ptry);
+		AddCollisionObject(tmthing);
+		AddCollisionObject(thing);
+		lwContactPoint pointsOut[1000];
+
+		AdvancedCollisionContactResultCallback cb(pointsOut, 1000);
+		
+
+		collisionWorld->contactPairTest(a, b, cb);
+
+		for (auto &point : cb.manifoldPoints)
+		{
+			auto &btv = point.getPositionWorldOnA();
+			ret.Push(DVector3(btv.x(), btv.y(), btv.z()));
+		}
+
+		RemoveCollisionObject(tmthing);
+		RemoveCollisionObject(thing);
+	}
+
 	return ret;
 }
 
@@ -243,7 +295,7 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing)
 
 	RemoveCollisionObject(tmthing);
 	RemoveCollisionObject(thing);
-	return numContacts > 0;
+	return cb.manifoldPoints.size() > 0;
 }
 
 bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
@@ -329,13 +381,14 @@ btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
 				ind[i]             = ss.begin()->ToLong();
 			}
 			
-
-			trimesh->addTriangle(verts[ind[0]-1], verts[ind[1]-1], verts[ind[2]-1]);
+			btVector3 v1 = verts[ind[0] - 1];
+			btVector3 v2 = verts[ind[1] - 1];
+			btVector3 v3 = verts[ind[2] - 1];
+			
+			trimesh->addTriangle(v1,v2,v3,true);
 		}
 	}
 	Printf("%s: Pushed %d verts and %d tris\n", filename.GetChars(), verts.size(), trimesh->getNumTriangles());
-
-	
 	return trimesh;
 }
 
@@ -363,4 +416,16 @@ btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
 
 	Printf("%s: Pushed %d verts\n", filename.GetChars(), hullshape->getNumPoints());
 	return hullshape;
+}
+
+void AActor::initCollisions()
+{
+	if (collisionModelName == "cylinder")
+		collisionModel = new CylinderCollisionModel(radius, Height);
+	else if (collisionModelName == "capsule")
+		collisionModel = new CapsuleCollisionModel(radius, Height);
+	else if (collisionModelName != NULL && collisionModelName != "")
+		collisionModel = new MeshCollisionModel(collisionModelName);
+	else
+		collisionModel = new DoomStandardCollisionModel(radius, Height);
 }

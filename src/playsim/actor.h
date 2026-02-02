@@ -1719,6 +1719,8 @@ public:
 
 	bool				hasmodel;
 
+	void initCollisions();
+
 };
 
 class FActorIterator

@@ -1469,21 +1469,27 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		}
 	}
 
+	TArray<DVector3> colPoints;
+
 	// Call the script callback. This must be done before any other checks that perform some actual action or may already return a 'block'.
 	// The checks here are to do this only for conditions that would later result in an action, calling this for everything would be too much of a drag if
 	// too many scripted overrides were being used, as PIT_CheckThing is even called for touching all the monster corpses lying around.
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		if ((tm.thing->flags & MF_MISSILE) && (typeid(*thing->collisionModel) == typeid(MeshCollisionModel)))
+		colPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE);
+		#ifdef _DEBUG
+		if (tm.thing->player)
 		{
-			for (auto p : level->GetCollisionPoints(tm.thing, thing))
+			for (const auto &p : colPoints)
 			{
 				P_SpawnParticle(level, p, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255), 255.0, 350,
 				                4., 0, 0, SPF_FULLBRIGHT);
 			}
 		}
-		if (!level->CanCollide(tm.thing, thing, tm.pos) || !P_CanCollideWith(tm.thing, thing))
+		#endif
+
+		if (colPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
 			return true;
 	}
 
@@ -1739,7 +1745,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	// despite another solid thing being in the way.
 	// killough 4/11/98: Treat no-clipping things as not blocking
 
-	return !solid || unblocking;
+	return (!solid || unblocking) && colPoints.size() == 0;
 
 	// return !(thing->flags & MF_SOLID);	// old code -- killough
 }

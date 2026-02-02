@@ -2404,7 +2404,7 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 	DVector2 move;
 	const secplane_t * walkplane;
 	static const double windTab[3] = { 5 / 32., 10 / 32., 25 / 32. };
-	int steps, step, totalsteps;
+	double steps, step, totalsteps;
 	DVector2 start;
 	double Oldfloorz = mo->floorz;
 	double oldz = mo->Z();
@@ -2543,7 +2543,7 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 	DVector2 onestep = startmove / steps;
 
 	start = mo->Pos().XY();
-	step = 1;
+	step = 0;
 	totalsteps = steps;
 
 	// [RH] Instead of doing ripping damage each step, do it each tic.
@@ -2565,10 +2565,13 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 		if (mo->Level->i_compatflags & COMPATF_WALLRUN) pushtime++;
 		tm.PushTime = pushtime;
 
-		ptry = start + move * step / steps;
+		DVector2 change = (move * (step / steps));
+		change.X        = move.X * (step / steps);
+		change.Y        = move.Y * (step / steps);
+		ptry = start + change;
 
 		DVector2 startvel = mo->Vel.XY();
-
+		DVector2 diff     = ptry - mo->Pos();
 		// killough 3/15/98: Allow objects to drop off
 		// [RH] If walking on a slope, stay on the slope
 		if (!P_TryMove (mo, ptry, true, walkplane, tm))
@@ -5684,15 +5687,7 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 	actor->flags8 |= MF8_INSCROLLSEC;
 
 	// advanced collisions
-	//Printf("%s collisionModelName == %s\n", actor->GetTag(), actor->collisionModelName);
-	if (actor->collisionModelName == "cylinder")
-		actor->collisionModel = new CylinderCollisionModel(actor->radius, actor->Height);
-	else if (actor->collisionModelName == "capsule")
-		actor->collisionModel = new CapsuleCollisionModel(actor->radius, actor->Height);
-	else if (actor->collisionModelName != NULL && actor->collisionModelName != "")
-		actor->collisionModel = new MeshCollisionModel(actor->collisionModelName);
-	else
-		actor->collisionModel = new DoomStandardCollisionModel(actor->radius, actor->Height);
+	actor->initCollisions();
 }
 
 AActor *AActor::StaticSpawn(FLevelLocals *Level, PClassActor *type, const DVector3 &pos, replace_t allowreplacement, bool SpawningMapThing)
