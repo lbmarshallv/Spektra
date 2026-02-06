@@ -5078,6 +5078,17 @@ void AActor::Tick ()
 				}
 				else
 				{
+					double   maxZ = Pos().Z;
+					DVector3         checkPoint(Pos().X, Pos().Y, Pos().Z);
+	
+					for (auto const &p : level.GetCollisionPoints(this, onmo, checkPoint,true))
+					{
+						double r = (p.XY()  - Pos().XY()).Length();
+						maxZ = max(maxZ, p.Z);
+					}
+
+					Printf("maxZ %f, posZ %f\n",maxZ,Pos().Z);
+						
 					if (player)
 					{
 						if (Vel.Z < Level->gravity * Sector->gravity * (-1./100)// -655.36f)
@@ -5086,18 +5097,18 @@ void AActor::Tick ()
 							PlayerLandedOnThing (this, onmo);
 						}
 					}
-					if (onmo->Top() - Z() <= MaxStepHeight)
+					if (maxZ - Z() <= MaxStepHeight)
 					{
 						if (player && player->mo == this)
 						{
-							player->viewheight -= onmo->Top() - Z();
+							player->viewheight -= maxZ - Z();
 							double deltaview = player->GetDeltaViewHeight();
 							if (deltaview > player->deltaviewheight)
 							{
 								player->deltaviewheight = deltaview;
 							}
 						} 
-						SetZ(onmo->Top());
+						SetZ(maxZ);
 					}
 					// Check for MF6_BUMPSPECIAL
 					// By default, only players can activate things by bumping into them

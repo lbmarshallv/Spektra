@@ -8,13 +8,20 @@ class AdvancedCollisionModel
 	btCollisionObject *collider;
 	AActor            *owner;
 
-	virtual void setWorldPos(DVector3 pos)
+	virtual DVector3 toWorldPoint(btVector3 b)
 	{
-		btTransform transform;
-		transform.setIdentity();
-		transform.setOrigin(btVector3(pos.X, pos.Y, pos.Z));
-		collider->setWorldTransform(transform);
+		return DVector3(b.x(), b.y(), b.z());
 	}
+
+	virtual btVector3 toBulletPoint(DVector3 w)
+	{
+		return btVector3(w.X,w.Y,w.Z);
+	}
+
+	virtual void setWorldPos(DVector3 pos);
+	virtual void setRotation(DRotator d);
+
+	virtual void updateTransform();
 
 	btCollisionShape *getCollisionShape()
 	{
@@ -35,16 +42,24 @@ class CylinderCollisionModel : public AdvancedCollisionModel
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
+
+		btTransform transform;
+		transform.setIdentity();
+		collider->setWorldTransform(transform);
 	}
 
 	void setWorldPos(DVector3 pos) override
 	{
-		btTransform transform;
-		transform.setIdentity();
+		btTransform transform = collider->getWorldTransform();
 		// cylinder's height is along the Y axis where Doom's is on the Z
 		transform.setRotation(btQuaternion(0, SIMD_HALF_PI, 0));
-		transform.setOrigin(btVector3(pos.X, pos.Y, pos.Z + height / 2));
+		transform.setOrigin(toBulletPoint(pos));
 		collider->setWorldTransform(transform);
+	}
+
+	virtual btVector3 toBulletPoint(DVector3 w)
+	{
+		return btVector3(w.X, w.Y, w.Z + height / 2);
 	}
 };
 
@@ -61,16 +76,24 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
+
+		btTransform transform;
+		transform.setIdentity();
+		collider->setWorldTransform(transform);
 	}
 
 	void setWorldPos(DVector3 pos) override
 	{
-		btTransform transform;
-		transform.setIdentity();
+		btTransform transform = collider->getWorldTransform();
 		// cylinder's height is along the Y axis where Doom's is on the Z
 		transform.setRotation(btQuaternion(0, SIMD_HALF_PI, 0));
-		transform.setOrigin(btVector3(pos.X, pos.Y, pos.Z + height / 2));
+		transform.setOrigin(toBulletPoint(pos));
 		collider->setWorldTransform(transform);
+	}
+
+	virtual btVector3 toBulletPoint(DVector3 w)
+	{
+		return btVector3(w.X, w.Y, w.Z + height / 2);
 	}
 };
 
@@ -89,15 +112,23 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
+
+		btTransform transform;
+		transform.setIdentity();
+		collider->setWorldTransform(transform);
 	}
 
 	
 	void setWorldPos(DVector3 pos) override
 	{
-		btTransform transform;
-		transform.setIdentity();
-		transform.setOrigin(btVector3(pos.X, pos.Y, pos.Z+height/2));
+		btTransform transform = collider->getWorldTransform();
+		transform.setOrigin(toBulletPoint(pos));
 		collider->setWorldTransform(transform);		
+	}
+
+	virtual btVector3 toBulletPoint(DVector3 w)
+	{
+		return btVector3(w.X, w.Y, w.Z + height / 2);
 	}
 };
 
@@ -113,6 +144,10 @@ class ConvexHullCollisionModel : public AdvancedCollisionModel
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
+
+		btTransform transform;
+		transform.setIdentity();
+		collider->setWorldTransform(transform);
 	}
 };
 
@@ -132,6 +167,10 @@ class MeshCollisionModel : public AdvancedCollisionModel
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
+
+		btTransform transform;
+		transform.setIdentity();
+		collider->setWorldTransform(transform);
 	}
 
 	struct WorldVertexCollector : public btTriangleCallback

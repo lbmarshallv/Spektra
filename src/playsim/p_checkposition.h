@@ -54,6 +54,7 @@ struct FCheckPosition
 	int				portalgroup;
 
 	int				PushTime;
+	TArray<DVector3> collisionPoints;
 
 	FCheckPosition(bool rip=false)
 	{

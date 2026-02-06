@@ -3,6 +3,28 @@
 #include <p_collision.h>
 #include "filesystem.h"
 
+void AdvancedCollisionModel::setWorldPos(DVector3 pos)
+{
+	btTransform transform = collider->getWorldTransform();
+	transform.setOrigin(toBulletPoint(pos));
+	collider->setWorldTransform(transform);
+}
+
+void AdvancedCollisionModel::setRotation(DRotator d)
+{
+	btTransform transform = collider->getWorldTransform();
+	transform.setRotation(btQuaternion(d.Pitch.Radians(), d.Roll.Radians(), d.Yaw.Radians()));
+	collider->setWorldTransform(transform);
+}
+
+void AdvancedCollisionModel::updateTransform()
+{
+	btTransform transform = collider->getWorldTransform();
+	transform.setIdentity();
+	setRotation(owner->Angles);
+	setWorldPos(owner->Pos());
+}
+
 void FLevelLocals::InitCollisionWorld()
 {
 	if (collisionWorld)
@@ -29,7 +51,7 @@ void FLevelLocals::AddCollisionObject(btCollisionObject *obj)
 
 void FLevelLocals::AddCollisionObject(AActor *thing)
 {
-	AddCollisionObject(thing->collisionModel);
+	this->AddCollisionObject(thing->collisionModel);
 }
 
 void FLevelLocals::AddCollisionObject(AdvancedCollisionModel *model)
@@ -79,8 +101,13 @@ void FLevelLocals::ClearAllCollisionObjects()
 void FLevelLocals::UpdateCollisionModel(AActor *thing)
 {
 	auto col = thing->collisionModel;
+	if (!col)
+	{
+		thing->initCollisions();
+		col = thing->collisionModel;
+	}
 	col->collider->setUserPointer(col);
-	col->setWorldPos(thing->Pos());
+	col->updateTransform();
 }
 
 void FLevelLocals::AddAllCollisionObjects()
@@ -204,7 +231,7 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	for (auto point : cb.manifoldPoints)
 	{
 		auto btv = point.getPositionWorldOnA();
-		ret.Push(DVector3(btv.x(), btv.y(), btv.z()));
+		ret.Push(tmthing->collisionModel->toWorldPoint(btv));
 	}
 	
 	RemoveCollisionObject(thing);
@@ -227,16 +254,21 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 		return ret;
 	}
 
-	btCollisionObject *a = tmthing->collisionModel->collider;
-	btCollisionObject *b = thing->collisionModel->collider;
+	if (tmthing == thing)
+	{
+		return ret;
+	}
 
 	UpdateCollisionModel(tmthing);
 	UpdateCollisionModel(thing);
 
+	btCollisionObject *a = tmthing->collisionModel->collider;
+	btCollisionObject *b = thing->collisionModel->collider;
+
 	DVector3 diff  = pos - tmthing->Pos();
 	double steps = std::max(1.f,std::ceil(diff.length()));
 
-	for (double step = moving ? 1 : steps; step <= steps; step++)
+	for (double step = steps; step <= steps; step++)
 	{
 		DVector3 ptry(0, 0, tmthing->Pos().Z);
 		ptry.X = tmthing->Pos().X + ((step / steps) * diff.X);
@@ -254,13 +286,25 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 
 		for (auto &point : cb.manifoldPoints)
 		{
-			auto &btv = point.getPositionWorldOnA();
-			ret.Push(DVector3(btv.x(), btv.y(), btv.z()));
+			auto &btv = point.getPositionWorldOnB();
+			DVector3 worldPoint = tmthing->collisionModel->toWorldPoint(btv);
+			ret.Push(worldPoint);
+			#ifdef _DEBUG
+			if (tmthing->player && moving)
+			{
+				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255),
+					            255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+				Printf("(%f, %f, %f) (%f, %f, %f)\n", worldPoint.X, worldPoint.Y, worldPoint.Z, point.m_localPointA.x(),
+				       point.m_localPointA.y(), point.m_localPointA.z());
+			}
+			#endif
 		}
 
 		RemoveCollisionObject(tmthing);
 		RemoveCollisionObject(thing);
 	}
+
+
 
 	return ret;
 }
@@ -331,6 +375,11 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 	RemoveCollisionObject(thing);
 	
 	return numContacts > 0;
+}
+
+DVector3 FLevelLocals::GetTopPoint(AActor *tmthing, AActor *thing)
+{
+	return DVector3(0, 0, 0);
 }
 
 TArray<DVector3> MeshCollisionModel::getPoints()
@@ -428,4 +477,5 @@ void AActor::initCollisions()
 		collisionModel = new MeshCollisionModel(collisionModelName);
 	else
 		collisionModel = new DoomStandardCollisionModel(radius, Height);
+	collisionModel->owner = this;
 }

@@ -1478,19 +1478,14 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
 		colPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE);
-		#ifdef _DEBUG
-		if (tm.thing->player)
-		{
-			for (const auto &p : colPoints)
-			{
-				P_SpawnParticle(level, p, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255), 255.0, 350,
-				                4., 0, 0, SPF_FULLBRIGHT);
-			}
-		}
-		#endif
 
 		if (colPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
 			return true;
+		else if (colPoints.size())
+		{
+			tm.collisionPoints = colPoints;
+			unblocking = false;
+		}
 	}
 
 	if (tm.thing->player == NULL || !(tm.thing->player->cheats & CF_PREDICTING))
@@ -1745,7 +1740,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	// despite another solid thing being in the way.
 	// killough 4/11/98: Treat no-clipping things as not blocking
 
-	return (!solid || unblocking) && colPoints.size() == 0;
+	return !solid || unblocking;
 
 	// return !(thing->flags & MF_SOLID);	// old code -- killough
 }
@@ -2084,10 +2079,13 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 	FPortalGroupArray check;
 	FMultiBlockThingsIterator it(check, actor, -1, true);
 	FMultiBlockThingsIterator::CheckResult cres;
+	DVector3                               checkPos = actor->Pos() - (0,0,1);
 
 	while (it.Next(&cres))
 	{
 		AActor *thing = cres.thing;
+		TArray<DVector3> collisionPoints = level.GetCollisionPoints(actor, thing, checkPos);
+
 		if (!quick && onmobj != NULL && thing->Top() < onmobj->Top())
 		{ // something higher is in the way
 			continue;
@@ -2143,7 +2141,7 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{ // under thing
 			continue;
 		}
-		if (!actor->Level->CanCollide(actor, thing) || !P_CanCollideWith(actor, thing))
+		if (!collisionPoints.size() || !P_CanCollideWith(actor, thing))
 		{ // If they cannot collide, they cannot block each other.
 			continue;
 		}
@@ -2368,13 +2366,20 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 		}
 		else
 		{
+			double maxZ = thing->Pos().Z;
+			for (auto const &p : tm.collisionPoints)
+			{
+				maxZ = max(maxZ, p.Z);
+			}
+
 			if (BlockingMobj->player || !thing->player)
 			{
 				goto pushline;
 			}
-			else if (BlockingMobj->Top() - thing->Z() > thing->MaxStepHeight
-				|| ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - (BlockingMobj->Top()) < thing->Height) && BlockingMobj->Sector->PortalBlocksMovement(sector_t::ceiling))
-				|| (tm.ceilingz - (BlockingMobj->Top()) < thing->Height))
+			else if (maxZ - thing->Z() > thing->MaxStepHeight ||
+			         ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - (maxZ) < thing->Height) &&
+			          BlockingMobj->Sector->PortalBlocksMovement(sector_t::ceiling)) ||
+			         (tm.ceilingz - (maxZ) < thing->Height))
 			{
 				goto pushline;
 			}
