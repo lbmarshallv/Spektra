@@ -254,7 +254,7 @@ struct FDynamicLight
 	int GetSecondaryIntensity() const { return pArgs[LIGHT_SECONDARY_INTENSITY]; }
 	double GetLightDefIntensity() const { return lightDefIntensity; }
 	int GetFade() const { return pArgs[LIGHT_FADE]; }
-	int GetTimer() const { return target->IsClientSide() ? Level->LocalTimer : Level->LocalWorldTimer; }
+	int GetTimer() const { return Level->LocalWorldTimer; }
 
 	bool IsSubtractive() const { return !!((*pLightFlags) & LF_SUBTRACTIVE); }
 	bool IsAdditive() const { return !!((*pLightFlags) & LF_ADDITIVE); }

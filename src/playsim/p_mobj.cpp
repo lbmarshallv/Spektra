@@ -34,7 +34,8 @@
 #include "a_morph.h"
 #include "a_sharedglobal.h"
 #include "actorinlines.h"
-#include "b_bot.h"	//Added by MC:
+#include "b_bot.h"
+#include "basics.h"
 #include "c_dispatch.h"
 #include "cmdlib.h"
 #include "d_event.h"
@@ -65,7 +66,7 @@
 #include "r_sky.h"
 #include "r_utility.h"
 #include "sbar.h"
-#include "serialize_obj.h"
+#include "serialize_obj.h" // IWYU pragma: keep
 #include "serializer_doom.h"
 #include "shadowinlines.h"
 #include "teaminfo.h"
@@ -394,11 +395,9 @@ void AActor::Serialize(FSerializer &arc)
 		A("SpriteOffset", SpriteOffset)
 		("viewpos", ViewPos)
 		A("lightlevel", LightLevel)
-		A("userlights", UserLights)
 		A("WorldOffset", WorldOffset)
 		("modelData", modelData)
 		A("LandingSpeed", LandingSpeed)
-
 		("unmorphtime", UnmorphTime)
 		("morphflags", MorphFlags)
 		("premorphproperties", PremorphProperties)
@@ -410,6 +409,10 @@ void AActor::Serialize(FSerializer &arc)
 		SerializeTerrain(arc, "floorterrain", floorterrain, &def->floorterrain);
 		SerializeArgs(arc, "args", args, def->args, special);
 
+		if (!arc.IsRollback())
+		{
+			arc("userlights", UserLights, def->UserLights);
+		}
 }
 
 #undef A
@@ -511,7 +514,7 @@ DBehavior* AActor::AddBehavior(PClass& type)
 			return nullptr;
 
 		b->Owner = this;
-		b->ObjectFlags |= (ObjectFlags & (OF_ClientSide | OF_Transient));
+		b->ObjectFlags |= (ObjectFlags & OF_TransferrableFlags);
 
 		Behaviors[type.TypeName] = b;
 		Level->AddActorBehavior(*b);
@@ -1342,7 +1345,7 @@ DEFINE_ACTION_FUNCTION(AActor, CheckLocalView)
 
 void AActor::DisableLocalRendering(const unsigned int pNum, const bool disable)
 {
-	if (pNum == consoleplayer)
+	if (pNum == static_cast<unsigned>(consoleplayer))
 		NoLocalRender = disable;
 }
 
@@ -6415,9 +6418,10 @@ AActor *FLevelLocals::SpawnPlayer (FPlayerStart *mthing, int playernum, int flag
 		&& p->mo != nullptr && p->playerstate == PST_REBORN
 		&& gameaction != ga_worlddone
 		&& !(p->mo->Sector->Flags & SECF_NORESPAWN)
-		&& p->LastDamageType != NAME_Suicide)
+		&& p->LastDamageType != NAME_Suicide
+		&& p->LastSafePos.IsSafe(p->mo->tid))
 	{
-		spawn = p->LastSafePos;
+		spawn = p->LastSafePos.Pos;
 		SpawnAngle = p->mo->Angles.Yaw;
 	}
 	else
