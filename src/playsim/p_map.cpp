@@ -2085,7 +2085,6 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 	while (it.Next(&cres))
 	{
 		AActor *thing = cres.thing;
-		TArray<DVector3> collisionPoints = level.GetCollisionPoints(actor, thing, checkPos);
 
 		if (!quick && onmobj != NULL && thing->Top() < onmobj->Top())
 		{ // something higher is in the way
@@ -2113,6 +2112,10 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 			continue;
 		}
 		const double blockdist = thing->radius + actor->radius;
+
+		TArray<DVector3> collisionPoints = level.GetCollisionPoints(actor, thing, checkPos, true);
+		double           colTop          = level.GetTop(actor, thing);
+
 		if (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist)
 		{
 			continue;
@@ -2134,7 +2137,7 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{
 			continue;
 		}
-		if (actor->Z() > thing->Top())
+		if (actor->Z() > thing->Top() || actor->Z() > colTop)
 		{ // over thing
 			continue;
 		}
@@ -2142,7 +2145,8 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{ // under thing
 			continue;
 		}
-		if (!collisionPoints.size() || !P_CanCollideWith(actor, thing))
+		//if (!collisionPoints.size() || !P_CanCollideWith(actor, thing))
+		if (!P_CanCollideWith(actor, thing))
 		{ // If they cannot collide, they cannot block each other.
 			continue;
 		}

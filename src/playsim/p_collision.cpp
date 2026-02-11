@@ -270,9 +270,10 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 
 	for (double step = steps; step <= steps; step++)
 	{
-		DVector3 ptry(0, 0, tmthing->Pos().Z);
+		DVector3 ptry(0, 0, 0);
 		ptry.X = tmthing->Pos().X + ((step / steps) * diff.X);
 		ptry.Y = tmthing->Pos().Y + ((step / steps) * diff.Y);
+		ptry.Z = tmthing->Pos().Z + ((step / steps) * diff.Z);
 
 		tmthing->collisionModel->setWorldPos(ptry);
 		AddCollisionObject(tmthing);
@@ -294,8 +295,6 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 			{
 				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255),
 					            255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
-				Printf("(%f, %f, %f) (%f, %f, %f)\n", worldPoint.X, worldPoint.Y, worldPoint.Z, point.m_localPointA.x(),
-				       point.m_localPointA.y(), point.m_localPointA.z());
 			}
 			#endif
 		}
@@ -377,9 +376,37 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 	return numContacts > 0;
 }
 
-DVector3 FLevelLocals::GetTopPoint(AActor *tmthing, AActor *thing)
+double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 {
-	return DVector3(0, 0, 0);
+	double t = tmthing->Top();
+	btVector3 from(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, t);
+	btVector3 to(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, thing->Pos().Z);
+
+	UpdateCollisionModel(tmthing);
+	UpdateCollisionModel(thing);
+	btCollisionObject *b = thing->collisionModel->collider;
+
+	AddCollisionObject(thing);
+
+	btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
+	collisionWorld->rayTest(from, to, closestResults);
+	RemoveCollisionObject(thing);
+
+	if (closestResults.hasHit())
+	{
+		#ifdef _DEBUG
+		DVector3 worldPoint(closestResults.m_hitPointWorld.x(), closestResults.m_hitPointWorld.y(),
+		                    closestResults.m_hitPointWorld.z());
+		if (tmthing->player)
+		{
+			P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
+			                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+		}
+		#endif
+		return closestResults.m_hitPointWorld.z();
+	}
+
+	return tmthing->Pos().Z-1;
 }
 
 TArray<DVector3> MeshCollisionModel::getPoints()

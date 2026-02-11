@@ -917,7 +917,7 @@ public:
 	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false);
-	DVector3 GetTopPoint(AActor *tmthing, AActor *thing);
+	double GetTop(AActor *tmthing, AActor *thing);
 
 	TArray<AActor *> CollidingActors(AActor *thing); //get every actor currently colliding with a given actor's collision model
 	TArray<AActor *> CollidingActors(AActor *thing, int flags); //get every actor currently colliding with a given actor's collision model

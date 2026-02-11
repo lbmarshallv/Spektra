@@ -5081,17 +5081,8 @@ void AActor::Tick ()
 				}
 				else
 				{
-					double   maxZ = Pos().Z;
-					DVector3         checkPoint(Pos().X, Pos().Y, Pos().Z);
-	
-					for (auto const &p : level.GetCollisionPoints(this, onmo, checkPoint,true))
-					{
-						double r = (p.XY()  - Pos().XY()).Length();
-						maxZ = max(maxZ, p.Z);
-					}
-
-					Printf("maxZ %f, posZ %f\n",maxZ,Pos().Z);
-						
+					double maxZ = level.GetTop(this, onmo);
+					Printf("%s OldZ: %f Top: %f\n", this->GetTag(), oldz, maxZ);	
 					if (player)
 					{
 						if (Vel.Z < Level->gravity * Sector->gravity * (-1./100)// -655.36f)
