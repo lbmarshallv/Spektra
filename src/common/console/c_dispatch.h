@@ -33,6 +33,7 @@
 #include "tarray.h"
 #include "c_commandline.h"
 #include "zstring.h"
+#include <array>
 
 class FConfigFile;
 
@@ -98,11 +99,11 @@ public:
 	FConsoleCommand *m_Next, **m_Prev;
 	FString m_Name;
 
-	enum { HASH_SIZE = 251 };	// Is this prime?
+	static constexpr int hash_size = 251;
 
 protected:
 	FConsoleCommand ();
-	bool AddToHash (FConsoleCommand **table);
+	bool AddToHash (std::array<FConsoleCommand*, FConsoleCommand::hash_size>& table);
 
 	CCmdRun m_RunFunc;
 
