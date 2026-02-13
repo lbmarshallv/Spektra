@@ -2113,7 +2113,6 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		}
 		const double blockdist = thing->radius + actor->radius;
 
-		TArray<DVector3> collisionPoints = level.GetCollisionPoints(actor, thing, checkPos, true);
 		double           colTop          = level.GetTop(actor, thing);
 
 		if (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist)
@@ -2145,7 +2144,7 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{ // under thing
 			continue;
 		}
-		//if (!collisionPoints.size() || !P_CanCollideWith(actor, thing))
+
 		if (!P_CanCollideWith(actor, thing))
 		{ // If they cannot collide, they cannot block each other.
 			continue;

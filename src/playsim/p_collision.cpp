@@ -33,7 +33,9 @@ void FLevelLocals::InitCollisionWorld()
 	auto dispatcher = new btCollisionDispatcher(config);
 	auto broadphase = new btDbvtBroadphase();
 	collisionWorld  = new btCollisionWorld(dispatcher, broadphase, config);
+#ifdef _DEBUG
 	Printf("Created CollisionWorld for %s\n", this->MapName);
+	#endif
 	//AddAllCollisionObjects();
 }
 
@@ -379,31 +381,62 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 {
 	double t = tmthing->Top();
-	btVector3 from(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, t);
-	btVector3 to(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, thing->Pos().Z);
-
+	
 	UpdateCollisionModel(tmthing);
 	UpdateCollisionModel(thing);
+
+	btCollisionShape  *shape = tmthing->collisionModel->getCollisionShape();
 	btCollisionObject *b = thing->collisionModel->collider;
 
 	AddCollisionObject(thing);
 
-	btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
-	collisionWorld->rayTest(from, to, closestResults);
-	RemoveCollisionObject(thing);
-
-	if (closestResults.hasHit())
+	if (shape->isConvex())
 	{
-		#ifdef _DEBUG
-		DVector3 worldPoint(closestResults.m_hitPointWorld.x(), closestResults.m_hitPointWorld.y(),
-		                    closestResults.m_hitPointWorld.z());
-		if (tmthing->player)
+		btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
+		transFrom.setOrigin(
+			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, tmthing->Pos().Z)));
+		btTransform transTo   = tmthing->collisionModel->collider->getWorldTransform();
+		transTo.setOrigin(
+			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, thing->Pos().Z - 1)));
+		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
+		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
+		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
+		RemoveCollisionObject(thing);
+		if (closestConvex.hasHit())
 		{
-			P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
-			                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+#ifdef _DEBUG
+			DVector3 worldPoint(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
+			                    closestConvex.m_hitPointWorld.z());
+			if (tmthing->player)
+			{
+				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
+				                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+			}
+#endif
+			return closestConvex.m_hitPointWorld.z();
 		}
-		#endif
-		return closestResults.m_hitPointWorld.z();
+	}
+	else
+	{
+		btVector3 from(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, t);
+		btVector3 to(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, thing->Pos().Z);
+		btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
+		collisionWorld->rayTest(from, to, closestResults);
+		RemoveCollisionObject(thing);
+
+		if (closestResults.hasHit())
+		{
+#ifdef _DEBUG
+			DVector3 worldPoint(closestResults.m_hitPointWorld.x(), closestResults.m_hitPointWorld.y(),
+			                    closestResults.m_hitPointWorld.z());
+			if (tmthing->player)
+			{
+				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
+				                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+			}
+#endif
+			return closestResults.m_hitPointWorld.z();
+		}
 	}
 
 	return tmthing->Pos().Z-1;
@@ -464,7 +497,9 @@ btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
 			trimesh->addTriangle(v1,v2,v3,true);
 		}
 	}
+#ifdef _DEBUG
 	Printf("%s: Pushed %d verts and %d tris\n", filename.GetChars(), verts.size(), trimesh->getNumTriangles());
+#endif
 	return trimesh;
 }
 
@@ -489,8 +524,9 @@ btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
 			hullshape->addPoint(btVector3(x, -z, y));
 		}
 	}
-
+#ifdef _DEBUG
 	Printf("%s: Pushed %d verts\n", filename.GetChars(), hullshape->getNumPoints());
+#endif
 	return hullshape;
 }
 

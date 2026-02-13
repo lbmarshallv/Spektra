@@ -5081,8 +5081,7 @@ void AActor::Tick ()
 				}
 				else
 				{
-					double maxZ = level.GetTop(this, onmo);
-					Printf("%s OldZ: %f Top: %f\n", this->GetTag(), oldz, maxZ);	
+					double topZ = level.GetTop(this, onmo);
 					if (player)
 					{
 						if (Vel.Z < Level->gravity * Sector->gravity * (-1./100)// -655.36f)
@@ -5091,18 +5090,18 @@ void AActor::Tick ()
 							PlayerLandedOnThing (this, onmo);
 						}
 					}
-					if (maxZ - Z() <= MaxStepHeight)
+					if (topZ - Z() <= MaxStepHeight)
 					{
 						if (player && player->mo == this)
 						{
-							player->viewheight -= maxZ - Z();
+							player->viewheight -= topZ - Z();
 							double deltaview = player->GetDeltaViewHeight();
 							if (deltaview > player->deltaviewheight)
 							{
 								player->deltaviewheight = deltaview;
 							}
 						} 
-						SetZ(maxZ);
+						SetZ(topZ);
 					}
 					// Check for MF6_BUMPSPECIAL
 					// By default, only players can activate things by bumping into them
