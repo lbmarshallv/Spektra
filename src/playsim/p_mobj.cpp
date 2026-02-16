@@ -2964,6 +2964,9 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 		mo->SetZ(mo->floorz + mo->specialf1);
 	}
 
+
+
+
 //
 // adjust height
 //
@@ -5081,7 +5084,11 @@ void AActor::Tick ()
 				}
 				else
 				{
+					
 					double topZ = level.GetTop(this, onmo);
+					DVector3 newPos            = this->Pos();
+					double   oldZ              = this->Pos().Z;
+
 					if (player)
 					{
 						if (Vel.Z < Level->gravity * Sector->gravity * (-1./100)// -655.36f)
@@ -5092,6 +5099,8 @@ void AActor::Tick ()
 					}
 					if (topZ - Z() <= MaxStepHeight)
 					{
+						SetZ(topZ);
+
 						if (player && player->mo == this)
 						{
 							player->viewheight -= topZ - Z();
@@ -5100,8 +5109,7 @@ void AActor::Tick ()
 							{
 								player->deltaviewheight = deltaview;
 							}
-						} 
-						SetZ(topZ);
+						}
 					}
 					// Check for MF6_BUMPSPECIAL
 					// By default, only players can activate things by bumping into them

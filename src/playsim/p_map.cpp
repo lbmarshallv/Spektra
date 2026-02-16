@@ -1392,6 +1392,8 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 
 	tm.thing->BlockingMobj = thing;
 	topz = thing->Top();
+	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE);
+
 
 	// Both things overlap in x or y direction
 	bool unblocking = false;
@@ -1470,21 +1472,16 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		}
 	}
 
-	TArray<DVector3> colPoints;
-
 	// Call the script callback. This must be done before any other checks that perform some actual action or may already return a 'block'.
 	// The checks here are to do this only for conditions that would later result in an action, calling this for everything would be too much of a drag if
 	// too many scripted overrides were being used, as PIT_CheckThing is even called for touching all the monster corpses lying around.
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		colPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE);
-
-		if (colPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
+		if (tm.collisionPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
 			return true;
-		else if (colPoints.size())
+		else if (tm.collisionPoints.size())
 		{
-			tm.collisionPoints = colPoints;
 			unblocking = false;
 		}
 	}
@@ -1892,6 +1889,8 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				// could end up stuck inside a wall.
 				AActor* BlockingMobj = thing->BlockingMobj.ForceGet();
 
+				double topZ = level.GetTop(thing, BlockingMobj);
+
 				// If this blocks through a restricted line portal, it will always completely block.
 				if (BlockingMobj == NULL || (thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) || (tcres.portalflags & FFCF_RESTRICTEDPORTAL))
 				{ // Thing slammed into something; don't let it move now.
@@ -1899,7 +1898,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					return false;
 				}
 				else if (!BlockingMobj->player && !(thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY)) &&
-					BlockingMobj->Top() - thing->Z() <= thing->MaxStepHeight)
+				         topZ > BlockingMobj->Z() && topZ - thing->Z() <= thing->MaxStepHeight)
 				{
 					if (thingblocker == NULL ||
 						BlockingMobj->Z() > thingblocker->Z())
@@ -2080,7 +2079,6 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 	FPortalGroupArray check;
 	FMultiBlockThingsIterator it(check, actor, -1, true);
 	FMultiBlockThingsIterator::CheckResult cres;
-	DVector3                               checkPos = actor->Pos() - (0,0,1);
 
 	while (it.Next(&cres))
 	{
@@ -2136,7 +2134,7 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{
 			continue;
 		}
-		if (actor->Z() > thing->Top() || actor->Z() > colTop)
+		if (actor->Z() > thing->Top() || colTop < thing->Z() || (actor->Z() - colTop) > 1.)
 		{ // over thing
 			continue;
 		}
@@ -2370,20 +2368,21 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 		}
 		else
 		{
-			double maxZ = thing->Pos().Z;
+			double topZ = thing->Pos().Z;
+
 			for (auto const &p : tm.collisionPoints)
 			{
-				maxZ = max(maxZ, p.Z);
+				topZ = max(topZ, p.Z);
 			}
 
 			if (BlockingMobj->player || !thing->player)
 			{
 				goto pushline;
 			}
-			else if (maxZ - thing->Z() > thing->MaxStepHeight ||
-			         ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - (maxZ) < thing->Height) &&
+			else if (topZ - thing->Z() > thing->MaxStepHeight ||
+			         ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - (topZ) < thing->Height) &&
 			          BlockingMobj->Sector->PortalBlocksMovement(sector_t::ceiling)) ||
-			         (tm.ceilingz - (maxZ) < thing->Height))
+			         (tm.ceilingz - (topZ) < thing->Height))
 			{
 				goto pushline;
 			}

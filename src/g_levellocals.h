@@ -918,6 +918,7 @@ public:
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false);
 	double GetTop(AActor *tmthing, AActor *thing);
+	DVector3         SweepTest(AActor *tmthing, AActor *thing, DVector3 pos);
 
 	TArray<AActor *> CollidingActors(AActor *thing); //get every actor currently colliding with a given actor's collision model
 	TArray<AActor *> CollidingActors(AActor *thing, int flags); //get every actor currently colliding with a given actor's collision model

@@ -107,10 +107,8 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 	{
 		this->radius = radius;
 		this->height = height;
-		auto bs = new btBoxShape(btVector3(radius, radius, height/2));
-		bs->setMargin(0.05);
 		collider     = new btCollisionObject();
-		collider->setCollisionShape(bs);
+		collider->setCollisionShape(initShape());
 		collider->setUserPointer(this);
 
 		btTransform transform;
@@ -118,13 +116,21 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 		collider->setWorldTransform(transform);
 	}
 
-	
+	btBoxShape *initShape()
+	{
+		auto bs = new btBoxShape(btVector3(radius, radius, height / 2));
+		bs->setMargin(0.05);
+		return bs;
+	}
+
 	void setWorldPos(DVector3 pos) override
 	{
 		btTransform transform = collider->getWorldTransform();
 		transform.setOrigin(toBulletPoint(pos));
 		collider->setWorldTransform(transform);		
 	}
+
+	void updateTransform() override;
 
 	virtual btVector3 toBulletPoint(DVector3 w)
 	{

@@ -25,6 +25,17 @@ void AdvancedCollisionModel::updateTransform()
 	setWorldPos(owner->Pos());
 }
 
+void DoomStandardCollisionModel::updateTransform()
+{
+	if (owner->radius != radius || owner->Height != height)
+	{
+		radius = owner->radius;
+		height = owner->Height;
+		collider->setCollisionShape(initShape());
+	}
+	AdvancedCollisionModel::updateTransform();
+}
+
 void FLevelLocals::InitCollisionWorld()
 {
 	if (collisionWorld)
@@ -378,6 +389,66 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 	return numContacts > 0;
 }
 
+struct MaxZConvexResultCallback : public btCollisionWorld::ConvexResultCallback
+{
+	btScalar maxZ;
+
+	MaxZConvexResultCallback() : maxZ(-std::numeric_limits<btScalar>::infinity())
+	{
+	}
+
+	btScalar addSingleResult(btCollisionWorld::LocalConvexResult &convexResult, bool normalInWorldSpace) override
+	{
+		// Hit point in world space
+		btVector3 hitPointWorld;
+
+		if (normalInWorldSpace)
+		{
+			// hitPointLocal is already in world space in this case
+			hitPointWorld = convexResult.m_hitPointLocal;
+		}
+		else
+		{
+			// Transform from local space of the hit object to world space
+			hitPointWorld = convexResult.m_hitCollisionObject->getWorldTransform() * convexResult.m_hitPointLocal;
+		}
+
+		maxZ = btMax(maxZ, hitPointWorld.getZ());
+
+		m_closestHitFraction = btMin(m_closestHitFraction, convexResult.m_hitFraction);
+
+		return convexResult.m_hitFraction;
+	}
+};
+
+DVector3 FLevelLocals::SweepTest(AActor *tmthing, AActor *thing, DVector3 pos)
+{
+	double t = tmthing->Top();
+
+	UpdateCollisionModel(tmthing);
+	UpdateCollisionModel(thing);
+
+
+
+	btCollisionShape  *shape = tmthing->collisionModel->getCollisionShape();
+	btCollisionObject *b     = thing->collisionModel->collider;
+
+	AddCollisionObject(thing);
+
+	btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
+	btTransform transTo = tmthing->collisionModel->collider->getWorldTransform();
+	transTo.setOrigin(tmthing->collisionModel->toBulletPoint(pos));
+	btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
+	btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
+	collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
+	RemoveCollisionObject(thing);
+	if (closestConvex.hasHit())
+	{
+		auto p = closestConvex.m_hitPointWorld;
+		return DVector3(p.x(),p.y(),p.z());
+	}
+}
+
 double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 {
 	double t = tmthing->Top();
@@ -393,17 +464,19 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 	if (shape->isConvex())
 	{
 		btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
-		transFrom.setOrigin(
-			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, tmthing->Pos().Z)));
+		//transFrom.setOrigin(
+		//	tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, tmthing->Pos().Z)));
 		btTransform transTo   = tmthing->collisionModel->collider->getWorldTransform();
 		transTo.setOrigin(
-			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, thing->Pos().Z - 1)));
+			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, thing->Pos().Z - tmthing->MaxStepHeight)));
 		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
-		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
-		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
+		//btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
+		MaxZConvexResultCallback    cb;
+		collisionWorld->convexSweepTest(cs, transFrom, transTo, cb);
 		RemoveCollisionObject(thing);
-		if (closestConvex.hasHit())
+		if (cb.hasHit())
 		{
+			/*
 #ifdef _DEBUG
 			DVector3 worldPoint(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
 			                    closestConvex.m_hitPointWorld.z());
@@ -412,8 +485,8 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
 				                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
 			}
-#endif
-			return closestConvex.m_hitPointWorld.z();
+#endif*/
+			return cb.maxZ;
 		}
 	}
 	else
@@ -439,22 +512,7 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 		}
 	}
 
-	return tmthing->Pos().Z-1;
-}
-
-TArray<DVector3> MeshCollisionModel::getPoints()
-{
-	TArray<DVector3> ret;
-	btBvhTriangleMeshShape *shape = static_cast<btBvhTriangleMeshShape *>(collider->getCollisionShape());
-
-	WorldVertexCollector callback(collider->getWorldTransform());
-
-	btVector3 aabbMin(-BT_LARGE_FLOAT, -BT_LARGE_FLOAT, -BT_LARGE_FLOAT);
-	btVector3 aabbMax(BT_LARGE_FLOAT, BT_LARGE_FLOAT, BT_LARGE_FLOAT);
-
-	shape->processAllTriangles(&callback, aabbMin, aabbMax);
-
-	return callback.WorldPoints;
+	return -INFINITY;
 }
 
 btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
