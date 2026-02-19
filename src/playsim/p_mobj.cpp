@@ -2939,6 +2939,7 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 {
 	double dist;
 	double delta;
+	double initVelZ = mo->Vel.Z;
 	double oldz = mo->Z();
 	double grav = mo->GetGravity();
 
@@ -2951,7 +2952,78 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 		mo->player->deltaviewheight = mo->player->GetDeltaViewHeight();
 	}
 
+	AActor *blockingMobj;
+	double realZ = P_TestMobjVelZ(mo, &blockingMobj).Z;
 	mo->AddZ(mo->Vel.Z);
+	
+	if (realZ != mo->Z())
+	{
+		double colBottomZ = realZ;
+		double colTopZ    = realZ + mo->Height;
+
+		if (blockingMobj && (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP))
+		{
+			mo->SetZ(realZ);
+			if (mo->BounceFlags & BOUNCE_Floors)
+			{
+
+			}
+			else if (mo->flags3 & MF3_NOEXPLODEFLOOR)
+			{
+
+			}
+			else if ((mo->flags3 & MF3_FLOORHUGGER) && !(mo->flags5 & MF5_NODROPOFF))
+			{ // Floor huggers can go up steps
+				return;
+			}
+			else
+			{
+				P_ExplodeMissile(mo, NULL, blockingMobj, false);
+				return;
+			}
+		}
+		else if (mo->BounceFlags & BOUNCE_MBF && mo->Vel.Z) // check for MBF-like bounce on non-missiles
+		{
+
+		}
+
+		if (colBottomZ > mo->floorz && mo->Z() < colBottomZ)
+		{
+			mo->SetZ(colBottomZ);
+			if (mo->Vel.Z < 0)
+			{
+				if (mo->flags7 & MF7_SMASHABLE)
+				{
+					P_DamageMobj(mo, nullptr, nullptr, mo->health, NAME_Smash);
+				}
+				if (mo->player)
+				{
+					if (mo->player->jumpTics < 0 || mo->Vel.Z < mo->LandingSpeed)
+					{ // delay any jumping for a short while
+						mo->player->jumpTics = 7;
+					}
+					if (mo->Vel.Z < mo->LandingSpeed && !(mo->flags & MF_NOGRAVITY))
+					{
+						// Squat down.
+						// Decrease viewheight for a moment after hitting the ground (hard),
+						// and utter appropriate sound.
+						PlayerLandedOnThing(mo, blockingMobj);
+					}
+				}
+				mo->Crash();
+				mo->Vel.Z = 0;
+			}
+		}
+		else if (colTopZ < mo->ceilingz && mo->Top() > colTopZ)
+		{
+			mo->SetZ(colTopZ - mo->Height);
+			if (mo->Vel.Z > 0)
+				mo->Vel.Z = 0;
+		}
+
+		//return;
+	}
+
 
 	mo->CallFallAndSink(grav, oldfloorz);
 
@@ -2963,8 +3035,6 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 	{
 		mo->SetZ(mo->floorz + mo->specialf1);
 	}
-
-
 
 
 //
@@ -3023,6 +3093,8 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 //
 // clip movement
 //
+
+
 	if (mo->Z() <= mo->floorz)
 	{	// Hit the floor
 		if ((!mo->player || !(mo->player->cheats & CF_PREDICTING)) &&
@@ -3187,6 +3259,7 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 			}
 		}
 	}
+
 	P_CheckFakeFloorTriggers (mo, oldz);
 }
 
@@ -4609,6 +4682,8 @@ void AActor::GetObjectToWorldMatrix(double *outMat)
 //
 void AActor::Tick ()
 {
+	bool debugt = !player && flags3 & MF3_ISMONSTER && Z() > 512.;
+
 	// [RH] Data for Heretic/Hexen scrolling sectors
 	static const int8_t HexenCompatSpeeds[] = {-25, 0, -10, -5, 0, 5, 10, 0, 25 };
 	static const int8_t HexenScrollies[24][2] =
@@ -4657,6 +4732,7 @@ void AActor::Tick ()
 	}
 
 	AActor *onmo;
+	double  topZ;
 
 	//assert (state != NULL);
 	if (state == NULL)
@@ -5084,10 +5160,7 @@ void AActor::Tick ()
 				}
 				else
 				{
-					
-					double topZ = level.GetTop(this, onmo);
-					DVector3 newPos            = this->Pos();
-					double   oldZ              = this->Pos().Z;
+					topZ = level.GetTop(this, onmo);
 
 					if (player)
 					{
@@ -5099,18 +5172,30 @@ void AActor::Tick ()
 					}
 					if (topZ - Z() <= MaxStepHeight)
 					{
-						SetZ(topZ);
+						double oldZ = Z();
+						double newZ = topZ;
+						
+						SetZ(newZ);
 
-						if (player && player->mo == this)
+						if (false)
 						{
-							player->viewheight -= topZ - Z();
-							double deltaview = player->GetDeltaViewHeight();
-							if (deltaview > player->deltaviewheight)
+							SetZ(oldZ);
+						}
+						else
+						{
+							if (player && player->mo == this)
 							{
-								player->deltaviewheight = deltaview;
+								player->viewheight -= topZ - Z();
+								double deltaview = player->GetDeltaViewHeight();
+								if (deltaview > player->deltaviewheight)
+								{
+									player->deltaviewheight = deltaview;
+								}
 							}
 						}
+						
 					}
+
 					// Check for MF6_BUMPSPECIAL
 					// By default, only players can activate things by bumping into them
 					// We trigger specials as long as we are on top of it and not just when
@@ -5217,6 +5302,8 @@ void AActor::Tick ()
 
 	UpdateRenderSectorList();
 
+	double oz = Z();
+
 	if (tics != -1)
 	{
 		// cycle through states, calling action functions at transitions
@@ -5227,7 +5314,7 @@ void AActor::Tick ()
 			if (!SetState(state->GetNextState()))
 				return; 		// freed itself
 		}
-	}
+	}	
 
 	if(!(flags9 & MF9_DECOUPLEDANIMATIONS) && modelData && !(modelData->flags & MODELDATA_GET_BONE_INFO_RECALC))
 	{

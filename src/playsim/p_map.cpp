@@ -59,7 +59,6 @@
 #include "r_utility.h"
 #include "shadowinlines.h"
 #include "vm.h"
-#include <bullet/btBulletCollisionCommon.h>
 
 // State.
 
@@ -2059,6 +2058,78 @@ AActor *P_CheckOnmobj(AActor *thing)
 
 	thing->SetZ(oldz);
 	return good ? NULL : onmobj;
+}
+
+//works similarly to TestMobjZ but factors in velocity in Z direction
+//do a sweep test (if possible) on calling actor to find collisions
+//returns the first collision point found.
+DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
+{
+	if (hitThing)
+		*hitThing = nullptr;
+	DVector3 oldPos = actor->Pos();
+	if (actor->Vel.Z == 0)
+		return oldPos;
+
+	DVector3 newPos = actor->Pos();
+
+	newPos.Z += actor->Vel.Z;
+
+	if ((actor->flags & MF_NOCLIP) || (actor->flags2 & MF2_THRUACTORS))
+	{
+		return newPos;
+	}
+
+	FPortalGroupArray                      check;
+	FMultiBlockThingsIterator              it(check, actor, -1, true);
+	FMultiBlockThingsIterator::CheckResult cres;
+
+	while (it.Next(&cres))
+	{
+		AActor *thing = cres.thing;
+
+		if (thing == actor)
+		{ // Don't clip against self.
+			continue;
+		}
+		if (thing->flags2 & MF2_THRUACTORS)
+		{
+			continue;
+		}
+		if ((actor->ThruBits & thing->ThruBits) && ((actor->flags8 | thing->flags8) & MF8_ALLOWTHRUBITS))
+		{
+			continue;
+		}
+		if (!(thing->flags & MF_SOLID))
+		{ // Can't hit thing
+			continue;
+		}
+		if ((thing->flags & (MF_SPECIAL | MF_NOCLIP)) || (thing->flags6 & MF6_TOUCHY))
+		{ // [RH] Specials and noclippers don't block moves
+			continue;
+		}
+		
+		if (!P_CanCollideWith(actor, thing))
+		{
+			// no collisions allowed
+			continue;
+		}
+
+		TArray<DVector3> points = level.GetCollisionPoints(actor, thing, newPos, true);
+		if (points.size())
+		{
+			auto p = points[0];
+			double newZ;
+			if (hitThing)
+				*hitThing = thing;
+			if(actor->Vel.Z > 0)
+				newZ = p.Z - actor->Height;
+			else
+				newZ = p.Z;
+			return DVector3(newPos.X, newPos.Y, newZ);
+		}
+	}
+	return newPos;
 }
 
 //=============================================================================

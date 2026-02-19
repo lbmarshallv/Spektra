@@ -243,6 +243,7 @@ extern TArray<spechit_t> portalhit;
 
 int	P_TestMobjLocation (AActor *mobj);
 int	P_TestMobjZ (AActor *mobj, bool quick=true, AActor **pOnmobj = NULL);
+DVector3 P_TestMobjVelZ(AActor *mobj, AActor **hitthing);
 bool P_CheckPosition(AActor *thing, const DVector2 &pos, bool actorsonly = false);
 void P_DoMissileDamage(AActor* inflictor, AActor* target);
 bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, bool actorsonly = false);

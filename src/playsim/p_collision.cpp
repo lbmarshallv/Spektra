@@ -141,78 +141,6 @@ void FLevelLocals::AddAllCollisionObjects()
 	Printf("Added %d collisionObjects to CollisionWorld\n", collisionModels.size());
 }
 
-TArray<AActor *> FLevelLocals::CollidingActors(AActor *thing)
-{
-	TArray<AActor *> colliders;
-	int manifoldCount = collisionWorld->getDispatcher()->getNumManifolds();
-	for (int i = 0; i < manifoldCount; ++i)
-	{
-		btPersistentManifold *manifold = collisionWorld->getDispatcher()->getManifoldByIndexInternal(i);
-
-		const btCollisionObject *objA = static_cast<const btCollisionObject *>(manifold->getBody0());
-		const btCollisionObject *objB = static_cast<const btCollisionObject *>(manifold->getBody1());
-
-		int contactCount = manifold->getNumContacts();
-
-		bool isColliding = false;
-
-		for (int j = 0; j < contactCount; ++j)
-		{
-			const btManifoldPoint &pt = manifold->getContactPoint(j);
-
-			if (pt.getDistance() < 0.0f)
-			{
-				isColliding = true;
-				break;
-			}
-		}
-
-		if (isColliding)
-		{
-			auto *advcola = static_cast<AdvancedCollisionModel *>(objA->getUserPointer());
-			auto *advcolb = static_cast<AdvancedCollisionModel *>(objB->getUserPointer());
-			auto  actorA  = advcola->owner;
-			auto  actorB  = advcolb->owner;
-			if (actorA == thing)
-			{
-				colliders.AddUnique(actorB);
-			}
-			else if (actorB == thing)
-			{
-				colliders.AddUnique(actorA);
-			}
-		}
-	}
-	return colliders;
-}
-
-void FLevelLocals::PerformCollisions()
-{
-	if (collisionWorld)
-	{
-		for (auto c : collisionModels)
-		{
-			UpdateCollisionModel(c->owner);
-		}
-
-		collisionWorld->performDiscreteCollisionDetection();
-		for (int pi = 0; pi < 64;pi++)
-		{
-			if (!PlayerInGame(pi))
-				continue;
-			auto a = players[pi].mo;
-			if (a)
-			{
-				auto colliders = CollidingActors(a);
-				for (auto col : colliders)
-				{
-					Printf("Colliding with: %s\n",col->GetTag());
-				}
-			}
-		}
-	}
-}
-
 TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing)
 {
 	TArray<DVector3> ret;
@@ -277,45 +205,65 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 
 	btCollisionObject *a = tmthing->collisionModel->collider;
 	btCollisionObject *b = thing->collisionModel->collider;
+	btCollisionShape  *shape = a->getCollisionShape();
+
 
 	DVector3 diff  = pos - tmthing->Pos();
 	double steps = std::max(1.f,std::ceil(diff.length()));
 
-	for (double step = steps; step <= steps; step++)
+	if (moving && shape->isConvex())
 	{
-		DVector3 ptry(0, 0, 0);
-		ptry.X = tmthing->Pos().X + ((step / steps) * diff.X);
-		ptry.Y = tmthing->Pos().Y + ((step / steps) * diff.Y);
-		ptry.Z = tmthing->Pos().Z + ((step / steps) * diff.Z);
-
-		tmthing->collisionModel->setWorldPos(ptry);
-		AddCollisionObject(tmthing);
 		AddCollisionObject(thing);
-		lwContactPoint pointsOut[1000];
+		btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
+		btTransform transTo = tmthing->collisionModel->collider->getWorldTransform();
+		transTo.setOrigin(tmthing->collisionModel->toBulletPoint(pos));
+		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
+		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
+		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
 
-		AdvancedCollisionContactResultCallback cb(pointsOut, 1000);
-		
-
-		collisionWorld->contactPairTest(a, b, cb);
-
-		for (auto &point : cb.manifoldPoints)
-		{
-			auto &btv = point.getPositionWorldOnB();
-			DVector3 worldPoint = tmthing->collisionModel->toWorldPoint(btv);
-			ret.Push(worldPoint);
-			#ifdef _DEBUG
-			if (tmthing->player && moving)
-			{
-				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255),
-					            255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
-			}
-			#endif
-		}
-
-		RemoveCollisionObject(tmthing);
 		RemoveCollisionObject(thing);
+		if (closestConvex.hasHit())
+		{
+			ret.Push(DVector3(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
+			                  closestConvex.m_hitPointWorld.z()));
+		}
 	}
+	else
+	{
+		for (double step = steps; step <= steps; step++)
+		{
+			DVector3 ptry(0, 0, 0);
+			ptry.X = tmthing->Pos().X + ((step / steps) * diff.X);
+			ptry.Y = tmthing->Pos().Y + ((step / steps) * diff.Y);
+			ptry.Z = tmthing->Pos().Z + ((step / steps) * diff.Z);
 
+			tmthing->collisionModel->setWorldPos(ptry);
+			AddCollisionObject(tmthing);
+			AddCollisionObject(thing);
+			lwContactPoint pointsOut[1000];
+
+			AdvancedCollisionContactResultCallback cb(pointsOut, 1000);
+
+			collisionWorld->contactPairTest(a, b, cb);
+
+			for (auto &point : cb.manifoldPoints)
+			{
+				auto    &btv        = point.getPositionWorldOnB();
+				DVector3 worldPoint = tmthing->collisionModel->toWorldPoint(btv);
+				ret.Push(worldPoint);
+#ifdef _DEBUG
+				if (tmthing->player && moving)
+				{
+					P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0),
+					                PalEntry(255, 255, 255), 255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+				}
+#endif
+			}
+
+			RemoveCollisionObject(tmthing);
+			RemoveCollisionObject(thing);
+		}
+	}
 
 
 	return ret;
@@ -470,23 +418,14 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 		transTo.setOrigin(
 			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, thing->Pos().Z - tmthing->MaxStepHeight)));
 		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
-		//btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
-		MaxZConvexResultCallback    cb;
-		collisionWorld->convexSweepTest(cs, transFrom, transTo, cb);
+		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
+		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
+
+
 		RemoveCollisionObject(thing);
-		if (cb.hasHit())
+		if (closestConvex.hasHit())
 		{
-			/*
-#ifdef _DEBUG
-			DVector3 worldPoint(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
-			                    closestConvex.m_hitPointWorld.z());
-			if (tmthing->player)
-			{
-				P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
-				                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
-			}
-#endif*/
-			return cb.maxZ;
+			return closestConvex.m_hitPointWorld.z();
 		}
 	}
 	else

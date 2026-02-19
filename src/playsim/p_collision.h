@@ -32,12 +32,12 @@ class AdvancedCollisionModel
 class CylinderCollisionModel : public AdvancedCollisionModel
 {
   public:
-	int radius, height;
-	CylinderCollisionModel(int radius, int height)
+	double radius, height;
+	CylinderCollisionModel(double radius, double height)
 	{
 		this->radius = radius;
 		this->height = height;
-		btCylinderShape *bs = new btCylinderShape(btVector3(radius, height/2, radius ));
+		btCylinderShape *bs = new btCylinderShape(btVector3(radius, height/2., radius ));
 		bs->setMargin(0.1);
 		collider     = new btCollisionObject();
 		collider->setCollisionShape(bs);
@@ -66,12 +66,12 @@ class CylinderCollisionModel : public AdvancedCollisionModel
 class CapsuleCollisionModel : public AdvancedCollisionModel
 {
   public:
-	int radius, height;
-	CapsuleCollisionModel(int radius, int height)
+	double radius, height;
+	CapsuleCollisionModel(double radius, double height)
 	{
 		this->radius        = radius;
 		this->height        = height;
-		btCapsuleShape *bs  = new btCapsuleShape(radius, height / 2);
+		btCapsuleShape *bs  = new btCapsuleShape(radius, height / 2.);
 		bs->setMargin(0.1);
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
@@ -93,7 +93,7 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 
 	virtual btVector3 toBulletPoint(DVector3 w)
 	{
-		return btVector3(w.X, w.Y, w.Z + height / 2);
+		return btVector3(w.X, w.Y, w.Z + height / 2.);
 	}
 };
 
@@ -102,8 +102,8 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 class DoomStandardCollisionModel : public AdvancedCollisionModel
 {
   public:
-	int radius, height;
-	DoomStandardCollisionModel(int radius, int height)
+	double radius, height;
+	DoomStandardCollisionModel(double radius, double height)
 	{
 		this->radius = radius;
 		this->height = height;
@@ -118,7 +118,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 
 	btBoxShape *initShape()
 	{
-		auto bs = new btBoxShape(btVector3(radius, radius, height / 2));
+		auto bs = new btBoxShape(btVector3(radius, radius, height / 2.));
 		bs->setMargin(0.05);
 		return bs;
 	}
@@ -134,7 +134,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 
 	virtual btVector3 toBulletPoint(DVector3 w)
 	{
-		return btVector3(w.X, w.Y, w.Z + height / 2);
+		return btVector3(w.X, w.Y, w.Z + height / 2.);
 	}
 };
 
