@@ -1703,8 +1703,8 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 			{
 				IFVIRTUALPTR(tm.thing, AActor, PlayerPushedSomethingMakeRumble)
 				{
-					VMValue params[1] = { thing };
-					VMCall(func, params, 1, nullptr, 0);
+					VMValue params[2] = { tm.thing, thing };
+					VMCall(func, params, 2, nullptr, 0);
 				}
 			}
 			else if (thing == players[consoleplayer].mo || thing == players[consoleplayer].camera)
@@ -2433,7 +2433,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			P_CollidedWith(thing, BlockingMobj);
 
 		// Solid wall or thing
-		if (!BlockingMobj || BlockingMobj->player || !thing->player)
+		if (!BlockingMobj || BlockingMobj->player || !(thing->player || (thing->flags3 & MF3_ISMONSTER)))
 		{
 			goto pushline;
 		}
@@ -2446,7 +2446,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				topZ = max(topZ, p.Z);
 			}
 
-			if (BlockingMobj->player || !thing->player)
+			if (BlockingMobj->player || !(thing->player || (thing->flags3 & MF3_ISMONSTER)))
 			{
 				goto pushline;
 			}

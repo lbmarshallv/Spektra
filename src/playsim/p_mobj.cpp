@@ -2960,31 +2960,27 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 	{
 		double colBottomZ = realZ;
 		double colTopZ    = realZ + mo->Height;
-
+		if (blockingMobj)
+		{
+			mo->BlockingMobj = blockingMobj;
+		}
 		if (blockingMobj && (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP))
 		{
 			mo->SetZ(realZ);
-			if (mo->BounceFlags & BOUNCE_Floors)
+			if (mo->BounceFlags & BOUNCE_Actors)
 			{
-
-			}
-			else if (mo->flags3 & MF3_NOEXPLODEFLOOR)
-			{
-
-			}
-			else if ((mo->flags3 & MF3_FLOORHUGGER) && !(mo->flags5 & MF5_NODROPOFF))
-			{ // Floor huggers can go up steps
+				// Bounce test and code moved to P_BounceActor
+				if (!P_BounceActor(mo, blockingMobj, mo->Vel.Z <= 0))
+				{ // Struck a player/creature
+					P_ExplodeMissile(mo, NULL, blockingMobj);
+				}
 				return;
 			}
 			else
 			{
-				P_ExplodeMissile(mo, NULL, blockingMobj, false);
+				P_ExplodeMissile(mo, NULL, blockingMobj);
 				return;
 			}
-		}
-		else if (mo->BounceFlags & BOUNCE_MBF && mo->Vel.Z) // check for MBF-like bounce on non-missiles
-		{
-
 		}
 
 		if (colBottomZ > mo->floorz && mo->Z() < colBottomZ)
@@ -5161,6 +5157,7 @@ void AActor::Tick ()
 				else
 				{
 					topZ = level.GetTop(this, onmo);
+					double diff = topZ - Z();
 
 					if (player)
 					{
@@ -5170,7 +5167,7 @@ void AActor::Tick ()
 							PlayerLandedOnThing (this, onmo);
 						}
 					}
-					if (topZ - Z() <= MaxStepHeight)
+					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz && abs(diff) <= MaxStepHeight)
 					{
 						double oldZ = Z();
 						double newZ = topZ;
