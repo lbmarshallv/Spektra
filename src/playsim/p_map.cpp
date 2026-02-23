@@ -1391,7 +1391,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 
 	tm.thing->BlockingMobj = thing;
 	topz = thing->Top();
-	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE);
+	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE,true);
 
 
 	// Both things overlap in x or y direction
@@ -2415,6 +2415,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 	int 		oldside;
 	sector_t*	oldsec = thing->Sector;	// [RH] for sector actions
 	sector_t*	newsec;
+	DVector2     newPos = pos;
 
 	tm.floatok = false;
 	tm.portalstep = false;
@@ -2457,6 +2458,18 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			{
 				goto pushline;
 			}
+			if (tm.collisionPoints.size())
+			{
+				auto closest = tm.collisionPoints[0];
+				tm.pos.X           = closest.X;
+				tm.pos.Y           = closest.Y;
+				auto s = level.GetCollisionPoints(thing, BlockingMobj, closest, false, true);
+				if (s.size())
+					goto pushline;
+				//if ((tm.pos.XY() - pos).Length() > thing->radius)
+				//	goto pushline;
+			}
+
 		}
 		if (!(tm.thing->flags2 & MF2_PASSMOBJ) || (tm.thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ))
 		{
@@ -2796,7 +2809,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 		thing->floorsector = tm.floorsector;
 		thing->ceilingpic = tm.ceilingpic;
 		thing->ceilingsector = tm.ceilingsector;
-		thing->SetXY(pos);
+		thing->SetXY(tm.pos.XY());
 
 		thing->LinkToWorld(&ctx);
 	}

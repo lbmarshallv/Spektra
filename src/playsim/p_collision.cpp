@@ -180,7 +180,7 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	return ret;
 }
 
-TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &pos, bool moving)
+TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &pos, bool moving, bool asOrigin)
 {
 	TArray<DVector3> ret;
 	if (tmthing->Level != thing->Level)
@@ -214,17 +214,26 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	if (moving && shape->isConvex())
 	{
 		AddCollisionObject(thing);
-		btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
-		btTransform transTo = tmthing->collisionModel->collider->getWorldTransform();
-		transTo.setOrigin(tmthing->collisionModel->toBulletPoint(pos));
+		btTransform fromTrans = tmthing->collisionModel->collider->getWorldTransform();
+		btTransform toTrans = tmthing->collisionModel->collider->getWorldTransform();
+		toTrans.setOrigin(tmthing->collisionModel->toBulletPoint(pos));
+		btVector3      fromPos = fromTrans.getOrigin();
+		btVector3      toPos   = toTrans.getOrigin();
 		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
-		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
-		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
+		btCollisionWorld::ClosestConvexResultCallback closestConvex(fromPos, toPos);
+		collisionWorld->convexSweepTest(cs, fromTrans, toTrans, closestConvex);
 
 		RemoveCollisionObject(thing);
 		if (closestConvex.hasHit())
 		{
-			ret.Push(DVector3(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
+			if (asOrigin)
+			{
+				btScalar t = closestConvex.m_closestHitFraction;
+				btVector3 hitOrigin = fromPos.lerp(toPos, t);
+				ret.Push(DVector3(hitOrigin.x(), hitOrigin.y(), closestConvex.m_hitPointWorld.z()));
+			}
+			else
+				ret.Push(DVector3(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
 			                  closestConvex.m_hitPointWorld.z()));
 		}
 	}

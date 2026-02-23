@@ -227,7 +227,7 @@ class PlayerPawn : Actor
 		if (player == NULL || player.mo != self)
 		{
 			FindFloorCeiling(FFCF_ONLYSPAWNPOS|FFCF_NOPORTALS);
-			SetZ(floorz);
+			//SetZ(floorz);
 			FindFloorCeiling(FFCF_ONLYSPAWNPOS);
 		}
 		else
