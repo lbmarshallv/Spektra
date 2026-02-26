@@ -43,6 +43,7 @@
 #include "r_utility.h"
 #include "actor.h"
 #include "actorinlines.h"
+#include <bullet/btBulletCollisionCommon.h>
 
 // State.
 #include "po_man.h"
@@ -1207,6 +1208,7 @@ void FPathTraverse::AddThingIntercepts (int bx, int by, FBlockThingsIterator &it
 			// [RH] Don't check a corner to corner crossection for hit.
 			// Instead, check against the actual bounding box (but not if compatibility optioned.)
 
+
 			// There's probably a smarter way to determine which two sides
 			// of the thing face the trace than by trying all four sides...
 			for (i = 0; i < 4; ++i)
@@ -1367,6 +1369,26 @@ void FPathTraverse::AddThingIntercepts (int bx, int by, FBlockThingsIterator &it
 //===========================================================================
 
 intercept_t *FPathTraverse::Next()
+{
+	intercept_t *in = NULL;
+
+	double dist = FLT_MAX;
+	for (unsigned scanpos = intercept_index; scanpos < intercepts.Size (); scanpos++)
+	{
+		intercept_t *scan = &intercepts[scanpos];
+		if (scan->frac < dist && !scan->done)
+		{
+			dist = scan->frac;
+			in = scan;
+		}
+	}
+	
+	if (dist > 1. || in == NULL) return NULL;	// checked everything in range			
+	in->done = true;
+	return in;
+}
+
+intercept_t *FThingPathTraverse::Next()
 {
 	intercept_t *in = NULL;
 
@@ -1598,6 +1620,254 @@ void FPathTraverse::init(double x1, double y1, double x2, double y2, int flags, 
 				count = 1000; //	Doom originally did not handle this case so do the same in compatibility mode.
 			}
 			break;
+		}
+	}
+}
+
+void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double startfrac, ActorFlags ActorMask)
+{
+	double x1 = Start.X;
+	double y1 = Start.Y;
+	double x2 = End.X;
+	double y2 = End.Y;
+	double xt1, yt1, xt2, yt2;
+	double xstep, ystep;
+	double partialx, partialy;
+	double xintercept, yintercept;
+
+	int mapx;
+	int mapy;
+
+	int mapxstep;
+	int mapystep;
+
+	int count;
+
+	TArray<AActor *> things;
+
+	trace.x = x1;
+	trace.y = y1;
+	if (flags & PT_DELTA)
+	{
+		trace.dx = x2;
+		trace.dy = y2;
+	}
+	else
+	{
+		trace.dx = x2 - x1;
+		trace.dy = y2 - y1;
+	}
+	if (startfrac > 0)
+	{
+		double startdx = trace.dx * startfrac;
+		double startdy = trace.dy * startfrac;
+
+		x1 += startdx;
+		y1 += startdy;
+		x2 = trace.dx - startdx;
+		y2 = trace.dy - startdy;
+		flags |= PT_DELTA;
+	}
+
+	validcount++;
+	intercept_index = intercepts.Size();
+	Startfrac       = startfrac;
+
+	if (flags & PT_DELTA)
+	{
+		x2 += x1;
+		y2 += y1;
+	}
+
+	x1 -= Level->blockmap.bmaporgx;
+	y1 -= Level->blockmap.bmaporgy;
+	xt1 = x1 / FBlockmap::MAPBLOCKUNITS;
+	yt1 = y1 / FBlockmap::MAPBLOCKUNITS;
+
+	x2 -= Level->blockmap.bmaporgx;
+	y2 -= Level->blockmap.bmaporgy;
+	xt2 = x2 / FBlockmap::MAPBLOCKUNITS;
+	yt2 = y2 / FBlockmap::MAPBLOCKUNITS;
+
+	mapx      = xs_FloorToInt(xt1);
+	mapy      = xs_FloorToInt(yt1);
+	int mapex = xs_FloorToInt(xt2);
+	int mapey = xs_FloorToInt(yt2);
+
+	if (mapex > mapx)
+	{
+		mapxstep = 1;
+		partialx = 1. - xt1 + xs_FloorToInt(xt1);
+		ystep    = (y2 - y1) / fabs(x2 - x1);
+	}
+	else if (mapex < mapx)
+	{
+		mapxstep = -1;
+		partialx = xt1 - xs_FloorToInt(xt1);
+		ystep    = (y2 - y1) / fabs(x2 - x1);
+	}
+	else
+	{
+		mapxstep = 0;
+		partialx = 1.;
+		ystep    = 256;
+	}
+	yintercept = yt1 + partialx * ystep;
+
+	if (mapey > mapy)
+	{
+		mapystep = 1;
+		partialy = 1. - yt1 + xs_FloorToInt(yt1);
+		xstep    = (x2 - x1) / fabs(y2 - y1);
+	}
+	else if (mapey < mapy)
+	{
+		mapystep = -1;
+		partialy = yt1 - xs_FloorToInt(yt1);
+		xstep    = (x2 - x1) / fabs(y2 - y1);
+	}
+	else
+	{
+		mapystep = 0;
+		partialy = 1;
+		xstep    = 256;
+	}
+	xintercept = xt1 + partialy * xstep;
+
+	// [RH] Fix for traces that pass only through blockmap corners. In that case,
+	// xintercept and yintercept can both be set ahead of mapx and mapy, so the
+	// for loop would never advance anywhere.
+
+	if (fabs(xstep) == 1. && fabs(ystep) == 1.)
+	{
+		if (ystep < 0)
+		{
+			partialx = 1. - partialx;
+		}
+		if (xstep < 0)
+		{
+			partialy = 1. - partialy;
+		}
+		if (partialx == partialy)
+		{
+			xintercept = xt1;
+			yintercept = yt1;
+		}
+	}
+
+	// Step through map blocks.
+	// Count is present to prevent a round off error
+	// from skipping the break statement.
+
+	bool compatible = (flags & PT_COMPATIBLE) && (Level->i_compatflags & COMPATF_HITSCAN);
+
+	// we want to use one list of checked actors for the entire operation
+	FBlockThingsIterator btit(Level);
+	for (count = 0; count < 1000; count++)
+	{
+
+		//if (flags & PT_ADDTHINGS)
+		//{
+		//	AddThingIntercepts(mapx, mapy, btit, compatible);
+		//}
+
+		AActor *thing;
+		btit.SwitchBlock(mapx, mapy);
+		while ((thing = btit.Next(compatible)))
+		{
+			if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+				things.Push(thing);
+		}
+
+		// both coordinates reached the end, so end the traversing.
+		if ((mapxstep | mapystep) == 0)
+			break;
+
+		// [RH] Handle corner cases properly instead of pretending they don't exist.
+		switch (((xs_FloorToInt(yintercept) == mapy) << 1) | (xs_FloorToInt(xintercept) == mapx))
+		{
+		case 0:           // neither xintercept nor yintercept match!
+			count = 1000; // Stop traversing, because somebody screwed up.
+			break;
+
+		case 1: // xintercept matches
+			xintercept += xstep;
+			mapy += mapystep;
+			if (mapy == mapey)
+				mapystep = 0;
+			break;
+
+		case 2: // yintercept matches
+			yintercept += ystep;
+			mapx += mapxstep;
+			if (mapx == mapex)
+				mapxstep = 0;
+			break;
+
+		case 3: // xintercept and yintercept both match
+			// The trace is exiting a block through its corner. Not only does the block
+			// being entered need to be checked (which will happen when this loop
+			// continues), but the other two blocks adjacent to the corner also need to
+			// be checked.
+			// Since Doom.exe did not do this, this code won't either if run in compatibility mode.
+			if (!compatible)
+			{
+
+
+				//if (flags & PT_ADDTHINGS)
+				//{
+				//	AddThingIntercepts(mapx + mapxstep, mapy, btit, false);
+				//	AddThingIntercepts(mapx, mapy + mapystep, btit, false);
+				//}
+
+				btit.SwitchBlock(mapx + mapxstep, mapy);
+				while ((thing = btit.Next(false)))
+				{
+					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+						things.Push(thing);
+				}
+
+				btit.SwitchBlock(mapx, mapy + mapystep);
+				while ((thing = btit.Next(false)))
+				{
+					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+						things.Push(thing);
+				}
+
+				xintercept += xstep;
+				yintercept += ystep;
+				mapx += mapxstep;
+				mapy += mapystep;
+				if (mapx == mapex)
+					mapxstep = 0;
+				if (mapy == mapey)
+					mapystep = 0;
+			}
+			else
+			{
+				count = 1000; //	Doom originally did not handle this case so do the same in compatibility mode.
+			}
+			break;
+		}
+	}
+
+	auto r = Level->TraceCollisionHit(Start, End, things);
+	if (r.hasHit())
+	{
+		for (int i = 0; i < r.m_collisionObjects.size(); i++)
+		{
+
+			const btCollisionObject *b = r.m_collisionObjects[i];
+			AdvancedCollisionModel   *a = static_cast<AdvancedCollisionModel*>(b->getUserPointer());
+			if (a && a->owner)
+			{
+				intercept_t newintercept;
+				newintercept.frac    = r.m_hitFractions[i];
+				newintercept.isaline = false;
+				newintercept.done    = false;
+				newintercept.d.thing = a->owner;
+				intercepts.Push(newintercept);
+			}
 		}
 	}
 }

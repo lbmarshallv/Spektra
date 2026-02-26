@@ -141,6 +141,60 @@ void FLevelLocals::AddAllCollisionObjects()
 	Printf("Added %d collisionObjects to CollisionWorld\n", collisionModels.size());
 }
 
+bool FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing)
+{
+	if (from == to)
+		return false;
+	btVector3                                  bFrom(from.X, from.Y, from.Z); 
+	btVector3                                  bTo(to.X, to.Y, to.Z);
+	UpdateCollisionModel(thing);
+	AddCollisionObject(thing);
+
+	btCollisionWorld::ClosestRayResultCallback closestResults(bFrom, bTo);
+	collisionWorld->rayTest(bFrom, bTo, closestResults);
+	RemoveCollisionObject(thing);
+
+
+
+#ifdef _DEBUG
+	if (closestResults.hasHit())
+	{
+		DVector3 hitPoint(closestResults.m_hitPointWorld.x(), closestResults.m_hitPointWorld.y(),
+		                  closestResults.m_hitPointWorld.z());
+		P_SpawnParticle(this, hitPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
+		                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
+	}
+#endif
+
+	return closestResults.hasHit();
+}
+
+btCollisionWorld::AllHitsRayResultCallback FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to,
+                                                                           TArray<AActor *>  things)
+{
+	btVector3                                  bFrom(from.X, from.Y, from.Z);
+	btVector3                                  bTo(to.X, to.Y, to.Z);
+	btCollisionWorld::AllHitsRayResultCallback allResults(bFrom, bTo);
+	if (from == to)
+		return allResults;
+
+	for (AActor *thing : things)
+	{
+		UpdateCollisionModel(thing);
+		AddCollisionObject(thing);
+	}
+
+	
+	collisionWorld->rayTest(bFrom, bTo, allResults);
+	
+	for (AActor *thing : things)
+	{
+		RemoveCollisionObject(thing);
+	}
+
+	return allResults;
+}
+
 TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing)
 {
 	TArray<DVector3> ret;

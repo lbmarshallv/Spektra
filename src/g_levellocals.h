@@ -919,12 +919,9 @@ public:
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false, bool asOrigin = false);
 	double GetTop(AActor *tmthing, AActor *thing);
 	DVector3         SweepTest(AActor *tmthing, AActor *thing, DVector3 pos);
+	bool     TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing);
+	btCollisionWorld::AllHitsRayResultCallback TraceCollisionHit(DVector3 &from, DVector3 &to, TArray<AActor *> things);
 
-	TArray<AActor *> CollidingActors(AActor *thing); //get every actor currently colliding with a given actor's collision model
-	TArray<AActor *> CollidingActors(AActor *thing, int flags); //get every actor currently colliding with a given actor's collision model
-
-	void                             PerformCollisions();
-	void                             PerformCollisionRayTest();
 	TArray<AdvancedCollisionModel*> collisionModels;
 };
 

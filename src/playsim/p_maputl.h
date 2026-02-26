@@ -34,6 +34,7 @@
 #include "doomdata.h"
 #include "m_bbox.h"
 #include "cmdlib.h"
+#include "actor.h"
 
 extern int validcount;
 struct FBlockNode;
@@ -342,6 +343,7 @@ class FBlockThingsIterator
 	FBlockThingsIterator(FLevelLocals *);
 
 	friend class FPathTraverse;
+	friend class FThingPathTraverse;
 	friend class FMultiBlockThingsIterator;
 
 public:
@@ -418,7 +420,7 @@ public:
 		Level = l;
 		init(x1, y1, x2, y2, flags, startfrac);
 	}
-	void init(double x1, double y1, double x2, double y2, int flags, double startfrac = 0);
+	virtual void init(double x1, double y1, double x2, double y2, int flags, double startfrac = 0);
 	int PortalRelocate(intercept_t *in, int flags, DVector3 *optpos = nullptr);
 	void PortalRelocate(const DVector2 &disp, int flags, double hitfrac);
 	virtual ~FPathTraverse();
@@ -433,6 +435,29 @@ public:
 		};
 	}
 
+};
+
+class FThingPathTraverse 
+{
+  protected:
+	TArray<intercept_t> intercepts;
+
+	FLevelLocals *Level;
+	divline_t     trace;
+	double        Startfrac;
+	ActorFlags     ActorMask;
+	unsigned int  intercept_index;
+	unsigned int  intercept_count;
+	unsigned int  count;
+  public:
+	intercept_t *Next();
+	FThingPathTraverse(FLevelLocals *l, DVector3 Start, DVector3 End, int flags, double startfrac,
+	                   ActorFlags ActorMask)
+	{
+		Level = l;
+		init(Start, End, flags, startfrac, ActorMask);
+	}
+	void init(DVector3 Start, DVector3 End, int flags, double startfrac, ActorFlags ActorMask);
 };
 
 //

@@ -802,6 +802,23 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 	intercept_t *in;
 	int lastsplashsector = -1;
 
+	if (ptflags & PT_ADDTHINGS)
+	{
+		DVector3           End = Start + Vec * MaxDist;
+		FThingPathTraverse it2(Level, Start, End, ptflags | PT_DELTA,
+		                       startfrac, ActorMask);
+		while ((in = it2.Next()))
+		{
+			double   dist = MaxDist * in->frac;
+			DVector3 hit  = Start + Vec * dist;
+			if (((in->d.thing->flags & ActorMask) || ActorMask == 0xffffffff) && in->d.thing != IgnoreThis)
+			{
+				if (!ThingCheck(in, dist, hit))
+					break;
+			}
+		}
+	}
+
 	while ((in = it.Next()))
 	{
 		// Deal with splashes in 3D floors (but only run once per sector, not each iteration - and stop if something was found.)
@@ -872,12 +889,13 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 			}
 			if (!LineCheck(in, dist, hit, false)) break;
 		}
-		else if (((in->d.thing->flags & ActorMask) || ActorMask == 0xffffffff) && in->d.thing != IgnoreThis)
-		{
-			if (!ThingCheck(in, dist, hit)) break;
-		}
+		//else if (((in->d.thing->flags & ActorMask) || ActorMask == 0xffffffff) && in->d.thing != IgnoreThis)
+		//{
+		//	if (!ThingCheck(in, dist, hit) && hitThings.Contains(in->d.thing))
+		//		break;
+		//}
 	}
-
+	
 	if (Results->HitType == TRACE_HitNone)
 	{
 		if (CurSector->PortalBlocksMovement(sector_t::floor) && CheckSectorPlane(CurSector, true))
