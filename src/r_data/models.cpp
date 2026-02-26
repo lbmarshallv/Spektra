@@ -120,7 +120,7 @@ VSMatrix FSpriteModelFrame::ObjectToWorldMatrix(AActor * actor, float x, float y
 	// [Nash] take SpriteRotation into account
 	angle += actor->SpriteRotation.Degrees();
 
-	double tic = actor->Level->totaltime;
+	double tic = actor->GetModelTimer();
 
 	if (!WorldPaused(true) && !actor->isFrozen())
 	{
@@ -170,6 +170,9 @@ VSMatrix FSpriteModelFrame::ObjectToWorldMatrix(FLevelLocals *Level, DVector3 tr
 		objectToWorldMatrix.scale(1, stretch, 1);
 	}
 
+	bool rotating_xzy = (flags & MDL_ROTATING) && (flags & MDL_FIXROTATING);
+	bool rotating_xyz = (flags & MDL_ROTATING) && !(flags & MDL_FIXROTATING);
+
 	// Applying model transformations:
 	// 1) Applying actor angle, pitch and roll to the model
 	if (flags & MDL_USEROTATIONCENTER)
@@ -182,12 +185,19 @@ VSMatrix FSpriteModelFrame::ObjectToWorldMatrix(FLevelLocals *Level, DVector3 tr
 
 		// 2) Applying Doomsday like rotation of the weapon pickup models
 		// The rotation angle is based on the elapsed time.
-		if(flags & MDL_ROTATING)
+		if(rotating_xzy)
 		{
 			objectToWorldMatrix.rotate(rotateOffset, xrotate, yrotate, zrotate);
 		}
 
 		objectToWorldMatrix.translate(-rotationCenterX, -rotationCenterZ/stretch, -rotationCenterY);
+
+		if(rotating_xyz)
+		{
+			objectToWorldMatrix.translate(rotationCenterX, rotationCenterY/stretch, rotationCenterZ);
+			objectToWorldMatrix.rotate(rotateOffset, xrotate, yrotate, zrotate);
+			objectToWorldMatrix.translate(-rotationCenterX, -rotationCenterY/stretch, -rotationCenterZ);
+		}
 	}
 	else
 	{
@@ -195,14 +205,19 @@ VSMatrix FSpriteModelFrame::ObjectToWorldMatrix(FLevelLocals *Level, DVector3 tr
 		objectToWorldMatrix.rotate(rotation.Pitch.Degrees(), 0, 0, 1);
 		objectToWorldMatrix.rotate(-rotation.Roll.Degrees(), 1, 0, 0);
 
-
 		// 2) Applying Doomsday like rotation of the weapon pickup models
 		// The rotation angle is based on the elapsed time.
-		if(flags & MDL_ROTATING)
+		if(rotating_xzy)
 		{
 			objectToWorldMatrix.translate(rotationCenterX, rotationCenterZ/stretch, rotationCenterY);
 			objectToWorldMatrix.rotate(rotateOffset, xrotate, yrotate, zrotate);
 			objectToWorldMatrix.translate(-rotationCenterX, -rotationCenterZ/stretch, -rotationCenterY);
+		}
+		else if(rotating_xyz)
+		{
+			objectToWorldMatrix.translate(rotationCenterX, rotationCenterY/stretch, rotationCenterZ);
+			objectToWorldMatrix.rotate(rotateOffset, xrotate, yrotate, zrotate);
+			objectToWorldMatrix.translate(-rotationCenterX, -rotationCenterY/stretch, -rotationCenterZ);
 		}
 	}
 
@@ -644,7 +659,7 @@ static inline void RenderModelFrame(FModelRenderer *renderer, int i, const FSpri
 
 void RenderFrameModels(FModelRenderer *renderer, FLevelLocals *Level, const FSpriteModelFrame *smf, const FState *curState, int curTics, double ticFrac, FTranslationID translation, AActor* actor)
 {
-	double tic = actor->Level->totaltime;
+	double tic = actor->GetModelTimer();
 	if (!WorldPaused(true) && !actor->isFrozen())
 	{
 		tic += ticFrac;
@@ -967,6 +982,10 @@ void ParseModelDefLump(int Lump)
 					smf.rotationCenterY = 0.;
 					smf.rotationCenterZ = 0.;
 					smf.rotationSpeed = 1.;
+				}
+				else if (sc.Compare("fix-rotating"))
+				{
+					smf.flags |= MDL_FIXROTATING;
 				}
 				else if (sc.Compare("rotation-speed"))
 				{
