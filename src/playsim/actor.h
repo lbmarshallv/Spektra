@@ -1207,6 +1207,7 @@ public:
 
 	AdvancedCollisionModel *collisionModel;
 	FName               collisionModelName;
+	FName               collisionModelShape;
 
 	uint32_t		ThruBits;
 	FTextureID		floorpic;			// contacted sec floorpic

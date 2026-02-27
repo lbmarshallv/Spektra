@@ -2140,6 +2140,7 @@ DEFINE_FIELD(AActor, MorphFlags)
 DEFINE_FIELD(AActor, PremorphProperties)
 DEFINE_FIELD(AActor, MorphExitFlash)
 DEFINE_FIELD(AActor, collisionModelName)
+DEFINE_FIELD(AActor, collisionModelShape)
 
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, thing);
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, pos);

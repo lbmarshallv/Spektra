@@ -593,12 +593,16 @@ btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
 
 void AActor::initCollisions()
 {
-	if (collisionModelName == "cylinder")
+	if (collisionModelShape == "cylinder")
 		collisionModel = new CylinderCollisionModel(radius, Height);
-	else if (collisionModelName == "capsule")
+	else if (collisionModelShape == "capsule")
 		collisionModel = new CapsuleCollisionModel(radius, Height);
-	else if (collisionModelName != NULL && collisionModelName != "")
+	else if (collisionModelName != NULL && collisionModelName != "" &&
+	         (collisionModelShape == NULL || collisionModelShape == "" || collisionModelShape == "mesh"))
 		collisionModel = new MeshCollisionModel(collisionModelName);
+	else if (collisionModelName != NULL && collisionModelName != "" &&
+	         collisionModelShape == "hull")
+		collisionModel = new ConvexHullCollisionModel(collisionModelName);
 	else
 		collisionModel = new DoomStandardCollisionModel(radius, Height);
 	collisionModel->owner = this;
