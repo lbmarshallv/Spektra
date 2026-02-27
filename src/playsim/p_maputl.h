@@ -452,7 +452,7 @@ class FThingPathTraverse
   public:
 	intercept_t *Next();
 	FThingPathTraverse(FLevelLocals *l, DVector3 Start, DVector3 End, int flags, double startfrac,
-	                   ActorFlags ActorMask)
+	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff))
 	{
 		Level = l;
 		init(Start, End, flags, startfrac, ActorMask);

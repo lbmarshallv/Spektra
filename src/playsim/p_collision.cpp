@@ -478,8 +478,9 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 		//transFrom.setOrigin(
 		//	tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, tmthing->Pos().Z)));
 		btTransform transTo   = tmthing->collisionModel->collider->getWorldTransform();
-		transTo.setOrigin(
-			tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, thing->Pos().Z - tmthing->MaxStepHeight)));
+		transTo.setOrigin(tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X + tmthing->Vel.X,
+		                                                                  tmthing->Pos().Y + tmthing->Vel.Y,
+		                                                                  thing->Pos().Z - tmthing->MaxStepHeight)));
 		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
 		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
 		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);

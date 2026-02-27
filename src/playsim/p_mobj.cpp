@@ -5185,24 +5185,15 @@ void AActor::Tick ()
 						double newZ = topZ;
 						
 						SetZ(newZ);
-
-						if (false)
+						if (player && player->mo == this)
 						{
-							SetZ(oldZ);
-						}
-						else
-						{
-							if (player && player->mo == this)
+							player->viewheight -= topZ - Z();
+							double deltaview = player->GetDeltaViewHeight();
+							if (deltaview > player->deltaviewheight)
 							{
-								player->viewheight -= topZ - Z();
-								double deltaview = player->GetDeltaViewHeight();
-								if (deltaview > player->deltaviewheight)
-								{
-									player->deltaviewheight = deltaview;
-								}
+								player->deltaviewheight = deltaview;
 							}
 						}
-						
 					}
 
 					// Check for MF6_BUMPSPECIAL

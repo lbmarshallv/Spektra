@@ -1851,7 +1851,17 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 		}
 	}
 
-	auto r = Level->TraceCollisionHit(Start, End, things);
+	DVector3 TracePoint;
+	if (flags & PT_DELTA)
+	{
+		TracePoint = DVector3(Start.X + End.X, Start.Y + End.Y, Start.Z + End.Z);	
+	}
+	else
+	{
+		TracePoint = End;
+	}
+
+	auto r = Level->TraceCollisionHit(Start, TracePoint, things);
 	if (r.hasHit())
 	{
 		for (int i = 0; i < r.m_collisionObjects.size(); i++)

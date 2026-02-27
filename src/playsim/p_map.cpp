@@ -4364,8 +4364,13 @@ struct aim_t
 		if (ceilingportalstate) EnterSectorPortal(sector_t::ceiling, 0, lastsector, toppitch, min<DAngle>(nullAngle, bottompitch));
 		if (floorportalstate) EnterSectorPortal(sector_t::floor, 0, lastsector, max<DAngle>(nullAngle, toppitch), bottompitch);
 
-		FPathTraverse it(lastsector->Level, startpos.X, startpos.Y, aimtrace.X, aimtrace.Y, PT_ADDLINES | PT_ADDTHINGS | PT_COMPATIBLE | PT_DELTA, startfrac);
+		FPathTraverse it(lastsector->Level, startpos.X, startpos.Y, aimtrace.X, aimtrace.Y, PT_ADDLINES | PT_COMPATIBLE | PT_DELTA, startfrac);
 		intercept_t *in;
+
+		DVector3 aimtrace3d(aimtrace.X, aimtrace.Y, 0);
+
+		
+		FThingPathTraverse it2(lastsector->Level, startpos, aimtrace3d, PT_COMPATIBLE | PT_DELTA, startfrac);
 
 		if (aimdebug)
 			Printf("Start AimTraverse, start = %f,%f,%f, vect = %f,%f\n", startpos.X, startpos.Y, startpos.Z, aimtrace.X, aimtrace.Y);
@@ -4448,13 +4453,28 @@ struct aim_t
 				continue;					// shot continues
 			}
 
+		}
+
+		while ((in = it2.Next()))
+		{
+			line_t *li;
+			AActor *th;
+			DAngle  pitch;
+			DAngle  thingtoppitch;
+			DAngle  thingbottompitch;
+			double  dist;
+			DAngle  thingpitch;
+
+			if (linetarget.linetarget != NULL && in->frac > linetarget.frac)
+				return; // we already found something better in another portal section.
+
 			// shoot a thing
 			th = in->d.thing;
 			if (th == shootthing)
-				continue;					// can't shoot self
+				continue; // can't shoot self
 
 			if (aimtarget != NULL && th != aimtarget)
-				continue;					// only care about target, and you're not it
+				continue; // only care about target, and you're not it
 
 			if (shootthing->player && P_ShouldPassThroughPlayer(shootthing, th))
 				continue;
@@ -4463,16 +4483,14 @@ struct aim_t
 			// found, regardless of other settings.
 			if (!(flags & ALF_CHECKCONVERSATION) || th->Conversation == NULL)
 			{
-				if (!(flags & ALF_CHECKNONSHOOTABLE))			// For info CCMD, ignore stuff about GHOST and SHOOTABLE flags
+				if (!(flags & ALF_CHECKNONSHOOTABLE)) // For info CCMD, ignore stuff about GHOST and SHOOTABLE flags
 				{
-					if (!(th->flags&MF_SHOOTABLE))
-						continue;					// corpse or something
+					if (!(th->flags & MF_SHOOTABLE))
+						continue; // corpse or something
 
 					// check for physical attacks on a ghost
-					if ((th->flags3 & MF3_GHOST) &&
-						shootthing->player &&	// [RH] Be sure shootthing is a player
-						shootthing->player->ReadyWeapon &&
-						(shootthing->player->ReadyWeapon->flags2 & MF2_THRUGHOST))
+					if ((th->flags3 & MF3_GHOST) && shootthing->player && // [RH] Be sure shootthing is a player
+					    shootthing->player->ReadyWeapon && (shootthing->player->ReadyWeapon->flags2 & MF2_THRUGHOST))
 					{
 						continue;
 					}
@@ -4492,7 +4510,7 @@ struct aim_t
 				if (lastceilingplane)
 				{
 					double ff_top = lastceilingplane->ZatPoint(th);
-					DAngle pitch = -VecToAngle(dist, ff_top - shootz);
+					DAngle pitch  = -VecToAngle(dist, ff_top - shootz);
 					// upper slope intersects with this 3d-floor
 					if (pitch > toppitch)
 					{
@@ -4502,7 +4520,7 @@ struct aim_t
 				if (lastfloorplane)
 				{
 					double ff_bottom = lastfloorplane->ZatPoint(th);
-					DAngle pitch = -VecToAngle(dist, ff_bottom - shootz);
+					DAngle pitch     = -VecToAngle(dist, ff_bottom - shootz);
 					// lower slope intersects with this 3d-floor
 					if (pitch < bottompitch)
 					{
@@ -4524,12 +4542,15 @@ struct aim_t
 					if (exitfrac > 0.)
 					{
 						double exitdist = attackrange * exitfrac;
-						thingtoppitch = -VecToAngle(exitdist, th->Top() - shootz);
-						if (thingtoppitch > bottompitch) continue;
+						thingtoppitch   = -VecToAngle(exitdist, th->Top() - shootz);
+						if (thingtoppitch > bottompitch)
+							continue;
 					}
-					else continue;					// shot over the thing
+					else
+						continue; // shot over the thing
 				}
-				else continue;					// shot over the thing
+				else
+					continue; // shot over the thing
 			}
 
 			thingbottompitch = -VecToAngle(dist, th->Z() - shootz);
@@ -4542,13 +4563,15 @@ struct aim_t
 					double exitfrac = ExitPoint(th);
 					if (exitfrac > 0.)
 					{
-						double exitdist = attackrange * exitfrac;
+						double exitdist  = attackrange * exitfrac;
 						thingbottompitch = -VecToAngle(exitdist, th->Z() - shootz);
-						if (thingbottompitch < toppitch) continue;
+						if (thingbottompitch < toppitch)
+							continue;
 					}
-					else continue;					// shot over the thing
+					else
+						continue; // shot over the thing
 				}
-				continue;					// shot under the thing
+				continue; // shot under the thing
 			}
 
 			if (crossedffloors)
@@ -4559,14 +4582,18 @@ struct aim_t
 					// the thing can't be seen so we can safely exclude its range from our aiming field
 					if (thingtoppitch < toppitch)
 					{
-						if (thingbottompitch > toppitch) toppitch = thingbottompitch;
+						if (thingbottompitch > toppitch)
+							toppitch = thingbottompitch;
 					}
-					else if (thingbottompitch>bottompitch)
+					else if (thingbottompitch > bottompitch)
 					{
-						if (thingtoppitch < bottompitch) bottompitch = thingtoppitch;
+						if (thingtoppitch < bottompitch)
+							bottompitch = thingtoppitch;
 					}
-					if (toppitch < bottompitch) continue;
-					else return;
+					if (toppitch < bottompitch)
+						continue;
+					else
+						return;
 				}
 			}
 
@@ -4589,7 +4616,7 @@ struct aim_t
 				if (cosine != 0)
 				{
 					double tracelen = DVector2(it.Trace().dx, it.Trace().dy).Length();
-					double d3 = tracelen * in->frac / cosine;
+					double d3       = tracelen * in->frac / cosine;
 					if (d3 > attackrange)
 					{
 						return;
@@ -4611,7 +4638,8 @@ struct aim_t
 					{
 						// friends don't aim at friends (except players), at least not first
 						if (aimdebug)
-							Printf("Hit friend %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(), th->Z());
+							Printf("Hit friend %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(),
+							       th->Z());
 						SetResult(thing_friend, in->frac, th, thingpitch);
 					}
 				}
@@ -4621,14 +4649,16 @@ struct aim_t
 					{
 						// don't autoaim at barrels and other shootable stuff unless no monsters have been found
 						if (aimdebug)
-							Printf("Hit other %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(), th->Z());
+							Printf("Hit other %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(),
+							       th->Z());
 						SetResult(thing_other, in->frac, th, thingpitch);
 					}
 				}
 				else
 				{
 					if (aimdebug)
-						Printf("Hit target %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(), th->Z());
+						Printf("Hit target %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(),
+						       th->Z());
 					SetResult(linetarget, in->frac, th, thingpitch);
 					return;
 				}
@@ -4636,11 +4666,13 @@ struct aim_t
 			else
 			{
 				if (aimdebug)
-					Printf("Hit target %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(), th->Z());
+					Printf("Hit target %s at %f,%f,%f\n", th->GetClass()->TypeName.GetChars(), th->X(), th->Y(),
+					       th->Z());
 				SetResult(linetarget, in->frac, th, thingpitch);
 				return;
 			}
 		}
+
 	}
 };
 
