@@ -559,7 +559,7 @@ btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
 		}
 	}
 #ifdef _DEBUG
-	Printf("%s: Pushed %d verts and %d tris\n", filename.GetChars(), verts.size(), trimesh->getNumTriangles());
+	Printf("%s: Pushed %d verts and %d tris to trimesh\n", filename.GetChars(), verts.size(), trimesh->getNumTriangles());
 #endif
 	return trimesh;
 }
@@ -586,24 +586,33 @@ btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
 		}
 	}
 #ifdef _DEBUG
-	Printf("%s: Pushed %d verts\n", filename.GetChars(), hullshape->getNumPoints());
+	Printf("%s: Pushed %d verts to convex hull\n", filename.GetChars(), hullshape->getNumPoints());
 #endif
 	return hullshape;
 }
 
 void AActor::initCollisions()
 {
-	if (collisionModelShape == "cylinder")
-		collisionModel = new CylinderCollisionModel(radius, Height);
-	else if (collisionModelShape == "capsule")
-		collisionModel = new CapsuleCollisionModel(radius, Height);
-	else if (collisionModelName != NULL && collisionModelName != "" &&
-	         (collisionModelShape == NULL || collisionModelShape == "" || collisionModelShape == "mesh"))
-		collisionModel = new MeshCollisionModel(collisionModelName);
-	else if (collisionModelName != NULL && collisionModelName != "" &&
-	         collisionModelShape == "hull")
-		collisionModel = new ConvexHullCollisionModel(collisionModelName);
+	if (collisionModelName != NULL && collisionModelName != "")
+	{
+		if (collisionModelShape == "hull")
+		{
+			collisionModel = new ConvexHullCollisionModel(collisionModelName);
+		}
+		else
+		{
+			collisionModel = new MeshCollisionModel(collisionModelName);
+		}
+	}
 	else
-		collisionModel = new DoomStandardCollisionModel(radius, Height);
+	{
+		if (collisionModelShape == "cylinder")
+			collisionModel = new CylinderCollisionModel(radius, Height);
+		else if (collisionModelShape == "capsule")
+			collisionModel = new CapsuleCollisionModel(radius, Height);
+		else
+			collisionModel = new DoomStandardCollisionModel(radius, Height);
+	}
+
 	collisionModel->owner = this;
 }
