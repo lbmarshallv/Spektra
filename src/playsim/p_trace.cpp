@@ -806,7 +806,7 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 	{
 		DVector3           End = Vec * MaxDist;
 		FThingPathTraverse it2(Level, Start, End, ptflags | PT_DELTA,
-		                       startfrac, ActorMask);
+		                       startfrac, ActorMask, IgnoreThis);
 		while ((in = it2.Next()))
 		{
 			double   dist = MaxDist * in->frac;

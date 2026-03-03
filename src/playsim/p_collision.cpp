@@ -36,6 +36,17 @@ void DoomStandardCollisionModel::updateTransform()
 	AdvancedCollisionModel::updateTransform();
 }
 
+void CapsuleCollisionModel::updateTransform()
+{
+	if (owner->radius != radius || owner->Height != height)
+	{
+		radius = owner->radius;
+		height = owner->Height;
+		collider->setCollisionShape(initShape());
+	}
+	AdvancedCollisionModel::updateTransform();
+}
+
 void FLevelLocals::InitCollisionWorld()
 {
 	if (collisionWorld)
@@ -284,7 +295,9 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 			{
 				btScalar t = closestConvex.m_closestHitFraction;
 				btVector3 hitOrigin = fromPos.lerp(toPos, t);
-				ret.Push(DVector3(hitOrigin.x(), hitOrigin.y(), closestConvex.m_hitPointWorld.z()));
+				ret.Push(DVector3(
+					hitOrigin.x(), hitOrigin.y(), closestConvex.m_hitPointWorld.z()
+				));
 			}
 			else
 				ret.Push(DVector3(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
@@ -312,8 +325,9 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 			for (auto &point : cb.manifoldPoints)
 			{
 				auto    &btv        = point.getPositionWorldOnB();
-				DVector3 worldPoint = tmthing->collisionModel->toWorldPoint(btv);
-				ret.Push(worldPoint);
+				DVector3 worldPoint = DVector3(btv.x(), btv.y(), btv.z());
+				if ((worldPoint - pos).Length() > a->getCollisionShape()->getMargin())
+					ret.Push(worldPoint);
 #ifdef _DEBUG
 				if (tmthing->player && moving)
 				{

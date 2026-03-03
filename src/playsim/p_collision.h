@@ -71,10 +71,9 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 	{
 		this->radius        = radius;
 		this->height        = height;
-		btCapsuleShape *bs  = new btCapsuleShape(radius, height / 2.);
-		bs->setMargin(0.1);
+
 		collider = new btCollisionObject();
-		collider->setCollisionShape(bs);
+		collider->setCollisionShape(initShape());
 		collider->setUserPointer(this);
 
 		btTransform transform;
@@ -93,7 +92,21 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 
 	virtual btVector3 toBulletPoint(DVector3 w)
 	{
-		return btVector3(w.X, w.Y, w.Z + height / 2.);
+		return btVector3(w.X, w.Y, w.Z + height / 2.f);
+	}
+
+	virtual DVector3 toWorldPoint(btVector3 b)
+	{
+		return DVector3(b.x(), b.y(), b.z() - height / 2.f);
+	}
+
+	void updateTransform() override;
+
+	btCapsuleShape *initShape()
+	{
+		auto bs = new btCapsuleShape(radius, height / 2.f);
+		bs->setMargin(0.1);
+		return bs;
 	}
 };
 
@@ -118,7 +131,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 
 	btBoxShape *initShape()
 	{
-		auto bs = new btBoxShape(btVector3(radius, radius, height / 2.));
+		auto bs = new btBoxShape(btVector3(radius, radius, height / 2.f));
 		bs->setMargin(0.05);
 		return bs;
 	}
@@ -134,7 +147,7 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 
 	virtual btVector3 toBulletPoint(DVector3 w)
 	{
-		return btVector3(w.X, w.Y, w.Z + height / 2.);
+		return btVector3(w.X, w.Y, w.Z + height / 2.f);
 	}
 };
 

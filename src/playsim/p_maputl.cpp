@@ -1775,7 +1775,7 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 		btit.SwitchBlock(mapx, mapy);
 		while ((thing = btit.Next(compatible)))
 		{
-			if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+			if (((thing->flags & ActorMask) || ActorMask == 0xffffffff) && !IsIgnored(thing))
 				things.Push(thing);
 		}
 
@@ -1814,23 +1814,18 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 			{
 
 
-				//if (flags & PT_ADDTHINGS)
-				//{
-				//	AddThingIntercepts(mapx + mapxstep, mapy, btit, false);
-				//	AddThingIntercepts(mapx, mapy + mapystep, btit, false);
-				//}
 
 				btit.SwitchBlock(mapx + mapxstep, mapy);
 				while ((thing = btit.Next(false)))
 				{
-					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff) && !IsIgnored(thing))
 						things.Push(thing);
 				}
 
 				btit.SwitchBlock(mapx, mapy + mapystep);
 				while ((thing = btit.Next(false)))
 				{
-					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff))
+					if (((thing->flags & ActorMask) || ActorMask == 0xffffffff) && !IsIgnored(thing))
 						things.Push(thing);
 				}
 

@@ -441,6 +441,7 @@ class FThingPathTraverse
 {
   protected:
 	TArray<intercept_t> intercepts;
+	TArray<AActor *>    ignoreThese;
 
 	FLevelLocals *Level;
 	divline_t     trace;
@@ -452,12 +453,23 @@ class FThingPathTraverse
   public:
 	intercept_t *Next();
 	FThingPathTraverse(FLevelLocals *l, DVector3 Start, DVector3 End, int flags, double startfrac,
-	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff))
+	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff), AActor *caller = NULL)
 	{
 		Level = l;
+		if (caller)
+			ignoreThese.Push(caller);
 		init(Start, End, flags, startfrac, ActorMask);
 	}
 	void init(DVector3 Start, DVector3 End, int flags, double startfrac, ActorFlags ActorMask);
+	void IgnoreThing(AActor *ignoreThis)
+	{
+		ignoreThese.Push(ignoreThis);
+	}
+
+	bool IsIgnored(AActor *ignoreThis)
+	{
+		return ignoreThese.Contains(ignoreThis);
+	}
 };
 
 //
