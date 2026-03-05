@@ -56,6 +56,19 @@ struct FCheckPosition
 	int				PushTime;
 	TArray<DVector3> collisionPoints;
 
+	double TopThingZ()
+	{
+		double topZ = pos.Z;
+		if (collisionPoints.size())
+		{
+			for (auto p : collisionPoints)
+			{
+				topZ = max(topZ, p.Z);
+			}
+		}
+		return topZ;
+	}
+
 	FCheckPosition(bool rip=false)
 	{
 		DoRipping = rip;

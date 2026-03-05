@@ -1390,8 +1390,9 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		return true;
 
 	tm.thing->BlockingMobj = thing;
-	topz = thing->Top();
+	
 	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE,true);
+	topz               = tm.TopThingZ();
 
 
 	// Both things overlap in x or y direction
@@ -1873,6 +1874,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 	FBoundingBox box(pos.X, pos.Y, thing->radius);
 
 	FPortalGroupArray pcheck;
+	double            topZ;
 
 	if (!(thing->flags2 & MF2_THRUACTORS))
 	{
@@ -1888,7 +1890,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				// could end up stuck inside a wall.
 				AActor* BlockingMobj = thing->BlockingMobj.ForceGet();
 
-				double topZ = level.GetTop(thing, BlockingMobj);
+				topZ = level.GetTop(thing, BlockingMobj);
 
 				// If this blocks through a restricted line portal, it will always completely block.
 				if (BlockingMobj == NULL || (thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) || (tcres.portalflags & FFCF_RESTRICTEDPORTAL))
@@ -2458,7 +2460,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			{
 				goto pushline;
 			}
-			if (tm.collisionPoints.size())
+			if (tm.collisionPoints.size() && (topZ - thing->Pos().Z) > 0.5)
 			{
 				auto closest = tm.collisionPoints[0];
 				tm.pos.X           = closest.X;
@@ -2589,14 +2591,23 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			if (!(thing->flags5&MF5_AVOIDINGDROPOFF))
 			{
 				double floorz = tm.floorz;
+				double dropoffz = tm.dropoffz;
 				// [RH] If the thing is standing on something, use its current z as the floorz.
 				// This is so that it does not walk off of things onto a drop off.
 				if (thing->flags2 & MF2_ONMOBJ)
 				{
 					floorz = max(thing->Z(), tm.floorz);
+
+					if (tm.stepthing)
+					{
+						DVector3 oldPos = thing->Pos();
+						thing->SetXYZ(DVector3(pos.X, pos.Y, oldPos.Z));
+						dropoffz = max(tm.floorz, level.GetTop(thing, tm.stepthing));
+						thing->SetXYZ(oldPos);
+					}
 				}
 
-				if (floorz - tm.dropoffz > thing->MaxDropOffHeight &&
+				if (floorz - dropoffz > thing->MaxDropOffHeight &&
 					!(thing->flags2 & MF2_BLASTED) && !missileCheck)
 				{ // Can't move over a dropoff unless it's been blasted
 					// [GZ] Or missile-spawned
