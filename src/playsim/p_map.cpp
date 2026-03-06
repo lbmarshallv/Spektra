@@ -4387,8 +4387,7 @@ struct aim_t
 
 		FPathTraverse it(lastsector->Level, startpos.X, startpos.Y, aimtrace.X, aimtrace.Y, PT_ADDLINES | PT_COMPATIBLE | PT_DELTA, startfrac);
 		intercept_t *in;
-
-		DVector3 aimtrace3d(aimtrace.X, aimtrace.Y, 0);
+		DVector3 aimtrace3d(aimtrace.X, aimtrace.Y, aimpitch.Sin()*attackrange);
 
 		
 		FThingPathTraverse it2(lastsector->Level, startpos, aimtrace3d, PT_COMPATIBLE | PT_DELTA, startfrac);

@@ -819,6 +819,9 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 		}
 	}
 
+	if (Results->HitType == TRACE_HitActor)
+		goto processResults;
+
 	while ((in = it.Next()))
 	{
 		// Deal with splashes in 3D floors (but only run once per sector, not each iteration - and stop if something was found.)
@@ -909,6 +912,8 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 			Results->HitTexture = CurSector->GetTexture(sector_t::ceiling);
 		}
 	}
+
+	processResults:
 
 	// check for intersection with floor/ceiling
 	Results->Sector = &Level->sectors[CurSector->sectornum];
