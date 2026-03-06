@@ -518,7 +518,7 @@ bool	P_TeleportMove(AActor* thing, const DVector3 &pos, bool telefrag, bool modi
 			}
 		}
 		
-		if (!tmf.thing->Level->CanCollide(tmf.thing, th, tmf.pos) || !P_CanCollideWith(tmf.thing, th))
+		if (!P_CanCollideWith(tmf.thing, th)  || !tmf.thing->Level->CanCollide(tmf.thing, th, tmf.pos))
 			continue;
 
 		// Don't let players and monsters block item teleports (all other actor types will still block.)
@@ -1391,8 +1391,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 
 	tm.thing->BlockingMobj = thing;
 	
-	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE,true);
-	topz               = tm.TopThingZ();
+	topz               = thing->Top();
 
 
 	// Both things overlap in x or y direction
@@ -1478,12 +1477,20 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		if (tm.collisionPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
-			return true;
-		else if (tm.collisionPoints.size())
+		if (P_CanCollideWith(tm.thing, thing))
 		{
-			unblocking = false;
+			tm.collisionPoints =
+				level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE, true);
+			topz = tm.TopThingZ();
+			if (tm.collisionPoints.size())
+			{
+				unblocking = false;
+			}
+			else
+				return true;
 		}
+		else
+			return true;
 	}
 
 	if (tm.thing->player == NULL || !(tm.thing->player->cheats & CF_PREDICTING))
@@ -2110,10 +2117,12 @@ DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
 		{ // [RH] Specials and noclippers don't block moves
 			continue;
 		}
-		
+		if (actor->Pos().Z > thing->Top())
+		{ // out of bounds
+			continue;
+		}
 		if (!P_CanCollideWith(actor, thing))
-		{
-			// no collisions allowed
+		{ // no collisions allowed
 			continue;
 		}
 
@@ -2124,6 +2133,7 @@ DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
 			double newZ;
 			if (hitThing)
 				*hitThing = thing;
+			P_CollidedWith(actor, thing);
 			if(actor->Vel.Z > 0)
 				newZ = p.Z - actor->Height;
 			else
@@ -6863,7 +6873,7 @@ int P_PushUp(AActor *thing, FChangePosition *cpos)
 			continue;
 		if ((thing->flags & MF_MISSILE) && (intersect->flags2 & MF2_REFLECTIVE) && (intersect->flags7 & MF7_THRUREFLECT))
 			continue;
-		if (!thing->Level->CanCollide(thing, intersect) || !P_CanCollideWith(thing, intersect))
+		if (!P_CanCollideWith(thing, intersect)  || !thing->Level->CanCollide(thing, intersect))
 			continue;
 
 		if (thing->player && P_ShouldPassThroughPlayer(thing, intersect))
@@ -6930,7 +6940,7 @@ int P_PushDown(AActor *thing, FChangePosition *cpos)
 			continue;
 		if ((thing->flags & MF_MISSILE) && (intersect->flags2 & MF2_REFLECTIVE) && (intersect->flags7 & MF7_THRUREFLECT))
 			continue;
-		if (!thing->Level->CanCollide(thing, intersect) || !P_CanCollideWith(thing, intersect))
+		if (!P_CanCollideWith(thing, intersect)  || !thing->Level->CanCollide(thing, intersect))
 			continue;
 
 		if (thing->player && P_ShouldPassThroughPlayer(thing, intersect))

@@ -5665,6 +5665,9 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 		if (f >= 0) actor->Speed = f;
 	}
 
+	// advanced collisions
+	actor->initCollisions();
+
 	// set subsector and/or block links
 	actor->LinkToWorld (nullptr, SpawningMapThing);
 	actor->ClearInterpolation();
@@ -5784,9 +5787,6 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 	}
 	// force scroller check in the first tic.
 	actor->flags8 |= MF8_INSCROLLSEC;
-
-	// advanced collisions
-	actor->initCollisions();
 }
 
 AActor *AActor::StaticSpawn(FLevelLocals *Level, PClassActor *type, const DVector3 &pos, replace_t allowreplacement, bool SpawningMapThing)

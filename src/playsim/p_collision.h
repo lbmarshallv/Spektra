@@ -151,14 +151,20 @@ class DoomStandardCollisionModel : public AdvancedCollisionModel
 	}
 };
 
+struct ObjModelInfo
+{
+	ObjModelInfo() : maxHeight(0.), maxRadius(0.) { }
+	double maxHeight, maxRadius;
+};
+
 class ConvexHullCollisionModel : public AdvancedCollisionModel
 {
   public:
-	static btConvexHullShape *fromOBJModel(FName filename);
+	static btConvexHullShape *fromOBJModel(FName filename, ObjModelInfo &info);
 
-	ConvexHullCollisionModel(FName filename)
+	ConvexHullCollisionModel(FName filename, ObjModelInfo &info)
 	{
-		btConvexHullShape *bs = fromOBJModel(filename);
+		btConvexHullShape *bs = fromOBJModel(filename, info);
 		bs->setMargin(0.05f);
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
@@ -175,12 +181,11 @@ class MeshCollisionModel : public AdvancedCollisionModel
   public:
 	btTriangleMesh *trimesh;
 
-	static btTriangleMesh *fromOBJModel(FName filename);
-	TArray<DVector3> getPoints();
+	static btTriangleMesh *fromOBJModel(FName filename, ObjModelInfo &info);
 
-	 MeshCollisionModel(FName filename)
+	 MeshCollisionModel(FName filename, ObjModelInfo &info)
 	{
-		trimesh                    = fromOBJModel(filename);
+		trimesh                    = fromOBJModel(filename, info);
 		btBvhTriangleMeshShape *bs = new btBvhTriangleMeshShape(trimesh, true);
 		bs->setMargin(0.1f);
 		collider = new btCollisionObject();
@@ -191,27 +196,6 @@ class MeshCollisionModel : public AdvancedCollisionModel
 		transform.setIdentity();
 		collider->setWorldTransform(transform);
 	}
-
-	struct WorldVertexCollector : public btTriangleCallback
-	{
-		btTransform worldTx;
-		TArray<DVector3> WorldPoints;
-
-		WorldVertexCollector(const btTransform &tx) : worldTx(tx)
-		{
-		}
-
-		void processTriangle(btVector3 *triangle, int, int) override
-		{
-			btVector3 v0 = worldTx * triangle[0];
-			btVector3 v1 = worldTx * triangle[1];
-			btVector3 v2 = worldTx * triangle[2];
-
-			WorldPoints.Push(DVector3(v0.x(), v0.y(), v0.z()));
-			WorldPoints.Push(DVector3(v1.x(), v1.y(), v1.z()));
-			WorldPoints.Push(DVector3(v2.x(), v2.y(), v2.z()));
-		}
-	};
 };
 
 

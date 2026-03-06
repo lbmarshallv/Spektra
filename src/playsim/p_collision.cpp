@@ -532,7 +532,7 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 	return -INFINITY;
 }
 
-btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
+btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename, ObjModelInfo &info)
 {
 	btTriangleMesh *trimesh = new btTriangleMesh();
 	int             lastLump = 0;
@@ -553,6 +553,9 @@ btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
 			sc.MustGetFloat();
 			double z = sc.Float;
 			verts.Push(btVector3(x,-z,y));
+			info.maxHeight = max(y, info.maxHeight);
+			info.maxRadius = max(info.maxRadius, abs(x));
+			info.maxRadius = max(info.maxRadius, abs(z));
 		}
 		else if (strlen(sc.String) == 1 && sc.String[0] == 'f')
 		{
@@ -578,7 +581,7 @@ btTriangleMesh *MeshCollisionModel::fromOBJModel(FName filename)
 	return trimesh;
 }
 
-btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
+btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename, ObjModelInfo &info)
 {
 	btConvexHullShape *hullshape = new btConvexHullShape();
 	int             lastLump = 0;
@@ -597,6 +600,9 @@ btConvexHullShape *ConvexHullCollisionModel::fromOBJModel(FName filename)
 			sc.MustGetFloat();
 			double z = sc.Float;
 			hullshape->addPoint(btVector3(x, -z, y));
+			info.maxHeight = max(y, info.maxHeight);
+			info.maxRadius = max(info.maxRadius, abs(x));
+			info.maxRadius = max(info.maxRadius, abs(z));
 		}
 	}
 #ifdef _DEBUG
@@ -609,13 +615,23 @@ void AActor::initCollisions()
 {
 	if (collisionModelName != NULL && collisionModelName != "")
 	{
+		ObjModelInfo info;
 		if (collisionModelShape == "hull")
 		{
-			collisionModel = new ConvexHullCollisionModel(collisionModelName);
+			collisionModel = new ConvexHullCollisionModel(collisionModelName, info);
 		}
 		else
 		{
-			collisionModel = new MeshCollisionModel(collisionModelName);
+			collisionModel = new MeshCollisionModel(collisionModelName, info);
+		}
+		if (collisionModelAutoRadius)
+		{
+			radius = ceil(info.maxRadius + 128.);
+			Height = ceil(info.maxHeight + 128.);
+			
+#ifdef _DEBUG
+			Printf("automatic bounds set to %f by %f\n", radius, Height);
+#endif
 		}
 	}
 	else
