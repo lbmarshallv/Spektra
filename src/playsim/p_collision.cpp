@@ -13,7 +13,9 @@ void AdvancedCollisionModel::setWorldPos(DVector3 pos)
 void AdvancedCollisionModel::setRotation(DRotator d)
 {
 	btTransform transform = collider->getWorldTransform();
-	transform.setRotation(btQuaternion(d.Pitch.Radians(), d.Roll.Radians(), d.Yaw.Radians()));
+	auto         r         = btQuaternion(0,0,0);
+	r.setEulerZYX(d.Yaw.Radians(), d.Pitch.Radians(), d.Roll.Radians());
+	transform.setRotation(r);
 	collider->setWorldTransform(transform);
 }
 
@@ -166,17 +168,6 @@ bool FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing
 	RemoveCollisionObject(thing);
 
 
-
-#ifdef _DEBUG
-	if (closestResults.hasHit())
-	{
-		DVector3 hitPoint(closestResults.m_hitPointWorld.x(), closestResults.m_hitPointWorld.y(),
-		                  closestResults.m_hitPointWorld.z());
-		P_SpawnParticle(this, hitPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255),
-		                255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
-	}
-#endif
-
 	return closestResults.hasHit();
 }
 
@@ -291,6 +282,12 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 		RemoveCollisionObject(thing);
 		if (closestConvex.hasHit())
 		{
+#ifdef _DEBUG
+			DVector3 hitPoint(closestConvex.m_hitPointWorld.x(), closestConvex.m_hitPointWorld.y(),
+			                  closestConvex.m_hitPointWorld.z());
+			P_SpawnParticle(this, hitPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 0, 255), 255.0, 350,
+				            4., 0, 0, SPF_FULLBRIGHT);
+#endif
 			if (asOrigin)
 			{
 				btScalar t = closestConvex.m_closestHitFraction;
@@ -328,15 +325,7 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 				DVector3 worldPoint = DVector3(btv.x(), btv.y(), btv.z());
 				if ((worldPoint - pos).Length() > a->getCollisionShape()->getMargin())
 					ret.Push(worldPoint);
-#ifdef _DEBUG
-				if (tmthing->player && moving)
-				{
-					P_SpawnParticle(tmthing->Level, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0),
-					                PalEntry(255, 255, 255), 255.0, 350, 4., 0, 0, SPF_FULLBRIGHT);
-				}
-#endif
 			}
-
 			RemoveCollisionObject(tmthing);
 			RemoveCollisionObject(thing);
 		}
