@@ -323,8 +323,16 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 			{
 				auto    &btv        = point.getPositionWorldOnB();
 				DVector3 worldPoint = DVector3(btv.x(), btv.y(), btv.z());
-				if ((worldPoint - pos).Length() > a->getCollisionShape()->getMargin())
+				if (worldPoint.Z > pos.Z && worldPoint.Z < tmthing->Top())
+				{
+#ifdef _DEBUG
+					P_SpawnParticle(this, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255),
+					                255.0,
+					                350, 4., 0, 0, SPF_FULLBRIGHT);
 					ret.Push(worldPoint);
+#endif
+				}
+					
 			}
 			RemoveCollisionObject(tmthing);
 			RemoveCollisionObject(thing);
@@ -333,6 +341,45 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 
 
 	return ret;
+}
+
+btCollisionWorld::ClosestConvexResultCallback FLevelLocals::ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
+                                                                DVector3 &newPos, bool asOrigin)
+{
+	btTransform fromTrans = tmthing->collisionModel->collider->getWorldTransform();
+	btTransform toTrans   = tmthing->collisionModel->collider->getWorldTransform();
+	toTrans.setOrigin(tmthing->collisionModel->toBulletPoint(newPos));
+	btVector3   fromPos     = fromTrans.getOrigin();
+	btVector3 toPos   = toTrans.getOrigin();
+
+	btCollisionWorld::ClosestConvexResultCallback closestConvex(fromPos, toPos);
+
+	btCollisionShape *shape = tmthing->collisionModel->getCollisionShape();
+
+	if (!shape->isConvex())
+	{
+		assert(shape->isConvex());
+		Printf("Only convex shapes can run ActorMovementTest!");
+		return closestConvex;
+	}
+
+	UpdateCollisionModel(tmthing);
+	for (AActor *thing : things)
+	{
+		UpdateCollisionModel(thing);
+		AddCollisionObject(thing);
+	}
+
+	btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
+
+	collisionWorld->convexSweepTest(cs, fromTrans, toTrans, closestConvex);
+
+	for (AActor *thing : things)
+	{
+		RemoveCollisionObject(thing);
+	}
+
+	return closestConvex;
 }
 
 bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing)
@@ -478,12 +525,10 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 	if (shape->isConvex())
 	{
 		btTransform transFrom = tmthing->collisionModel->collider->getWorldTransform();
-		//transFrom.setOrigin(
-		//	tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X, tmthing->Pos().Y, tmthing->Pos().Z)));
 		btTransform transTo   = tmthing->collisionModel->collider->getWorldTransform();
-		transTo.setOrigin(tmthing->collisionModel->toBulletPoint(DVector3(tmthing->Pos().X + tmthing->Vel.X,
-		                                                                  tmthing->Pos().Y + tmthing->Vel.Y,
-		                                                                  thing->Pos().Z - tmthing->MaxStepHeight)));
+		transTo.setOrigin(tmthing->collisionModel->toBulletPoint(
+			DVector3(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y,
+			            thing->Pos().Z - tmthing->MaxStepHeight)));
 		btConvexShape *cs = static_cast<btConvexShape *>(tmthing->collisionModel->getCollisionShape());
 		btCollisionWorld::ClosestConvexResultCallback closestConvex(transFrom.getOrigin(), transTo.getOrigin());
 		collisionWorld->convexSweepTest(cs, transFrom, transTo, closestConvex);
@@ -498,7 +543,7 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing)
 	else
 	{
 		btVector3 from(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, t);
-		btVector3 to(tmthing->Pos().X + tmthing->Vel.X, tmthing->Pos().Y + tmthing->Vel.Y, thing->Pos().Z);
+		btVector3 to(from.x(), from.y(), thing->Pos().Z);
 		btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
 		collisionWorld->rayTest(from, to, closestResults);
 		RemoveCollisionObject(thing);

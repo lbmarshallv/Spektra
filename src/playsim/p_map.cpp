@@ -1391,7 +1391,8 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 
 	tm.thing->BlockingMobj = thing;
 	
-	topz               = thing->Top();
+	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE,true);
+	topz               = tm.TopThingZ();
 
 
 	// Both things overlap in x or y direction
@@ -1477,20 +1478,12 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) && 
 		((tm.thing->flags & (MF_SOLID|MF_MISSILE)) || (tm.thing->flags2 & MF2_BLASTED) || (tm.thing->flags6 & MF6_BLOCKEDBYSOLIDACTORS) || (tm.thing->BounceFlags & BOUNCE_MBF)))
 	{
-		if (P_CanCollideWith(tm.thing, thing))
-		{
-			tm.collisionPoints =
-				level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE, true);
-			topz = tm.TopThingZ();
-			if (tm.collisionPoints.size())
-			{
-				unblocking = false;
-			}
-			else
-				return true;
-		}
-		else
+		if (tm.collisionPoints.size() == 0 || !P_CanCollideWith(tm.thing, thing))
 			return true;
+		else if (tm.collisionPoints.size())
+		{
+			unblocking = false;
+		}
 	}
 
 	if (tm.thing->player == NULL || !(tm.thing->player->cheats & CF_PREDICTING))
@@ -1897,7 +1890,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				// could end up stuck inside a wall.
 				AActor* BlockingMobj = thing->BlockingMobj.ForceGet();
 
-				topZ = level.GetTop(thing, BlockingMobj);
+				topZ = tm.TopThingZ();
 
 				// If this blocks through a restricted line portal, it will always completely block.
 				if (BlockingMobj == NULL || (thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) || (tcres.portalflags & FFCF_RESTRICTEDPORTAL))
@@ -2470,16 +2463,19 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			{
 				goto pushline;
 			}
-			if (tm.collisionPoints.size() && (topZ - thing->Pos().Z) > 0.5)
+			if (tm.collisionPoints.size() && topZ > thing->Pos().Z)
 			{
 				auto closest = tm.collisionPoints[0];
-				tm.pos.X           = closest.X;
-				tm.pos.Y           = closest.Y;
-				auto s = level.GetCollisionPoints(thing, BlockingMobj, closest, false, true);
-				if (s.size())
+				DVector3 cp      = tm.pos;
+				cp.Z             = topZ + thing->MaxStepHeight;
+
+				auto s = level.GetCollisionPoints(thing, BlockingMobj, cp, false, true);
+				if (s.Size())
+				{
+					tm.pos.X           = closest.X;
+					tm.pos.Y           = closest.Y;
 					goto pushline;
-				//if ((tm.pos.XY() - pos).Length() > thing->radius)
-				//	goto pushline;
+				}
 			}
 
 		}

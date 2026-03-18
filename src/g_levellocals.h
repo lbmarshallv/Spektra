@@ -917,7 +917,9 @@ public:
 	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false, bool asOrigin = false);
-	double GetTop(AActor *tmthing, AActor *thing);
+	btCollisionWorld::ClosestConvexResultCallback ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
+	                                                                DVector3 &newPos, bool asOrigin = false);
+	double                                        GetTop(AActor *tmthing, AActor *thing);
 	DVector3         SweepTest(AActor *tmthing, AActor *thing, DVector3 pos);
 	bool     TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing);
 	btCollisionWorld::AllHitsRayResultCallback TraceCollisionHit(DVector3 &from, DVector3 &to, TArray<AActor *> things);

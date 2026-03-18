@@ -1643,8 +1643,6 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 
 	int count;
 
-	TArray<AActor *> things;
-
 	trace.x = x1;
 	trace.y = y1;
 	if (flags & PT_DELTA)

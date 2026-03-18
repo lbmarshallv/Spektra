@@ -104,7 +104,7 @@ class CapsuleCollisionModel : public AdvancedCollisionModel
 
 	btCapsuleShape *initShape()
 	{
-		auto bs = new btCapsuleShape(radius, height / 2.f);
+		auto bs = new btCapsuleShape(radius, height-(2.f*radius));
 		bs->setMargin(0.1);
 		return bs;
 	}

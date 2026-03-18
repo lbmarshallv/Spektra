@@ -451,6 +451,7 @@ class FThingPathTraverse
 	unsigned int  intercept_count;
 	unsigned int  count;
   public:
+	TArray<AActor *> things;
 	intercept_t *Next();
 	FThingPathTraverse(FLevelLocals *l, DVector3 Start, DVector3 End, int flags, double startfrac,
 	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff), AActor *caller = NULL)
