@@ -660,8 +660,8 @@ void AActor::initCollisions()
 		}
 		if (collisionModelAutoRadius)
 		{
-			radius = ceil(info.maxRadius + 128.);
-			Height = ceil(info.maxHeight + 128.);
+			radius = ceil(info.maxRadius * 1.05);
+			Height = ceil(info.maxHeight * 1.05);
 			
 #ifdef _DEBUG
 			Printf("automatic bounds set to %f by %f\n", radius, Height);
