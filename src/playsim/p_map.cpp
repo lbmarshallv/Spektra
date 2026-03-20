@@ -1899,6 +1899,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					return false;
 				}
 				else if (!BlockingMobj->player && !(thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY)) &&
+				         !(BlockingMobj->collisionFlags & COLFLAG_NOSTEP) &&
 				         topZ > BlockingMobj->Z() && topZ - thing->Z() <= thing->MaxStepHeight)
 				{
 					if (thingblocker == NULL ||
@@ -2452,7 +2453,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				topZ = max(topZ, p.Z);
 			}
 
-			if (BlockingMobj->player || !(thing->player || (thing->flags3 & MF3_ISMONSTER)))
+			if (BlockingMobj->player || !(thing->player || (thing->flags3 & MF3_ISMONSTER)) || BlockingMobj->collisionFlags & COLFLAG_NOSTEP)
 			{
 				goto pushline;
 			}

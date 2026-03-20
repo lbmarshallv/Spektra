@@ -5179,7 +5179,7 @@ void AActor::Tick ()
 							PlayerLandedOnThing (this, onmo);
 						}
 					}
-					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz && abs(diff) <= MaxStepHeight)
+					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz && !(onmo->collisionFlags & COLFLAG_NOSTEP) && abs(diff) <= MaxStepHeight)
 					{
 						double oldZ = Z();
 						double newZ = topZ;

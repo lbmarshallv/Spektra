@@ -508,6 +508,11 @@ enum ActorRenderFlag2
 	RF2_NODYNAMICLIGHTING		= 0x4000,	// [MC] Disable dynamic lighting effects on sprites/models
 };
 
+enum ActorCollisionFlag
+{
+	COLFLAG_NOSTEP = 0x0001 // never allow actors to automatically "step" up onto this actor
+};
+
 // This translucency value produces the closest match to Heretic's TINTTAB.
 // ~40% of the value of the overlaid image shows through.
 const double HR_SHADOW = (0x6800 / 65536.);
@@ -616,6 +621,7 @@ typedef TFlags<ActorRenderFlag> ActorRenderFlags;
 typedef TFlags<ActorRenderFlag2> ActorRenderFlags2;
 typedef TFlags<ActorBounceFlag> ActorBounceFlags;
 typedef TFlags<ActorRenderFeatureFlag> ActorRenderFeatureFlags;
+typedef TFlags<ActorCollisionFlag> ActorCollisionFlags;
 DEFINE_TFLAGS_OPERATORS (ActorFlags)
 DEFINE_TFLAGS_OPERATORS (ActorFlags2)
 DEFINE_TFLAGS_OPERATORS (ActorFlags3)
@@ -629,6 +635,7 @@ DEFINE_TFLAGS_OPERATORS (ActorRenderFlags)
 DEFINE_TFLAGS_OPERATORS (ActorRenderFlags2)
 DEFINE_TFLAGS_OPERATORS (ActorBounceFlags)
 DEFINE_TFLAGS_OPERATORS (ActorRenderFeatureFlags)
+DEFINE_TFLAGS_OPERATORS (ActorCollisionFlags)
 
 // Used to affect the logic for thing activation through death, USESPECIAL and BUMPSPECIAL
 // "thing" refers to what has the flag and the special, "trigger" refers to what used or bumped it
@@ -1723,6 +1730,7 @@ public:
 	bool				hasmodel;
 
 	void initCollisions();
+	ActorCollisionFlags collisionFlags;
 
 };
 
