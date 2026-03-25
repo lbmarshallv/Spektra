@@ -329,8 +329,9 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 					P_SpawnParticle(this, worldPoint, DVector3(0, 0, 0), DVector3(0, 0, 0), PalEntry(255, 255, 255),
 					                255.0,
 					                350, 4., 0, 0, SPF_FULLBRIGHT);
-					ret.Push(worldPoint);
+					
 #endif
+					ret.Push(worldPoint);
 				}
 					
 			}
