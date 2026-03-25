@@ -63,6 +63,8 @@ struct FRenderViewpoint
 	double			cotfloor;		// used for isometric sprites Y-billboarding compensation in hw_sprites.cpp
 	angle_t		FrustAngle; 	// FrustumAngle() result
 
+	TArray<int>		culledSectors;
+
 	AActor			*camera;		// camera actor
 	sector_t		*sector;		// [RH] keep track of sector viewing from
 	DAngle			FieldOfView;	// current field of view

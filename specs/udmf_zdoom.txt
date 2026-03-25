@@ -353,7 +353,9 @@ Note: All <bool> fields default to false unless mentioned otherwise.
       healthceilinggroup = <int>;     // ID of destructible object to synchronize hitpoints (optional, default is 0)
       health3d = <int>;               // Amount of hitpoints for this sector (includes 3D floors)
       health3dgroup = <int>;          // ID of destructible object to synchronize hitpoints (optional, default is 0)
-	  
+
+      culledSectors = <string>;	      // comma separated list of sectors that should be excluded from rendering while in this sector
+
       xscrollfloor = <float>;         // X map units per frame to scroll the floor.
       yscrollfloor = <float>;         // Y map units per frame to scroll the floor.
       scrollfloormode = <int>;        // Floor scroll mode bit mask (1 = scroll textures, 2 = carry static objects, 4 = carry players, 8 = carry monsters.

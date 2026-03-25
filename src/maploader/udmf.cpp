@@ -2200,6 +2200,12 @@ public:
 					sec->health3dgroup = CheckInt(key);
 					break;
 
+				case NAME_culledSectors: {
+					sec->culledsectors = CheckString(key);
+					break;
+				}
+
+
 				case NAME_lm_sampledist_floor:
 				case NAME_lm_sampledist_ceiling:
 				case NAME_lm_dynamic:

@@ -280,7 +280,6 @@ static double DistanceToSector(FRenderViewpoint vp, sector_t* sector) {
 }
 
 static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
-	int count = sub->numlines;
 	seg_t* seg = sub->firstline;
 	sector_t* sector = sub->sector;
 	if (!sector || !seg)
@@ -310,6 +309,24 @@ static bool IsDistanceCulled(double dist, seg_t* line)
 	if (line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum)
 		return false;
 	return dist > cullDist;
+}
+
+static bool IsManuallyCulled(FRenderViewpoint vp, subsector_t* sub)
+{
+	int       count  = sub->numlines;
+	seg_t    *seg    = sub->firstline;
+	sector_t *sector = sub->sector;
+
+	if (!sector || !vp.culledSectors.Size())
+		return false;
+	
+	int  tagCount = level.tagManager.CountSectorTags(sector);
+	for (int i = 0; i < tagCount; i++)
+	{
+		if (vp.culledSectors.Contains(level.tagManager.GetSectorTag(sector, i)))
+			return true;
+	}
+	return false;
 }
 
 /**
@@ -924,7 +941,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 
 	fakesector=hw_FakeFlat(sector, in_area, false);
 
-	bool isCulled = !isNoLineCullMode() && IsDistanceCulled(Viewpoint, sub);
+	bool isCulled = !isNoLineCullMode() && (IsDistanceCulled(Viewpoint, sub) || IsManuallyCulled(Viewpoint,sub));
 	sub->isCulled = isCulled;
 
 	if(doOob && sector->isSecret() && sector->wasSecret() && !r_radarclipper) return;
@@ -1235,6 +1252,17 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 	// Give the DrawInfo the viewpoint in fixed point because that's what the nodes are.
 	viewx = FLOAT2FIXED(Viewpoint.Pos.X);
 	viewy = FLOAT2FIXED(Viewpoint.Pos.Y);
+
+	if (Viewpoint.sector)
+	{
+		Viewpoint.culledSectors = Viewpoint.sector->CulledSectors();
+	}
+	else
+	{
+		Viewpoint.culledSectors.clear();
+	}
+	
+
 	if (r_radarclipper && !(Level->flags3 & LEVEL3_NOFOGOFWAR) && Viewpoint.bDoOob)
 	{
 		viewx = FLOAT2FIXED(Viewpoint.OffPos.X);

@@ -175,6 +175,8 @@ struct HWDrawInfo
 	TArray<ACorona*> Coronas;
 	uint64_t LastFrameTime = 0;
 
+	TArray<int> culledSectors;
+
 	TArray<MissingTextureInfo> MissingUpperTextures;
 	TArray<MissingTextureInfo> MissingLowerTextures;
 

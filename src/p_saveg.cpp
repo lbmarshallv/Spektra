@@ -324,7 +324,8 @@ FSerializer &Serialize(FSerializer &arc, const char *key, sector_t &p, sector_t 
 			("healthceiling", p.healthceiling, def->healthceiling)
 			("health3d", p.health3d, def->health3d)
 			// GZDoom exclusive:
-			.Array("reflect", p.reflect, def->reflect, 2, true);
+			.Array("reflect", p.reflect, def->reflect, 2, true)
+			("culledsectors",p.culledsectors, def->culledsectors);
 
 		SerializeTerrain(arc, "floorterrain", p.terrainnum[0], &def->terrainnum[0]);
 		SerializeTerrain(arc, "ceilingterrain", p.terrainnum[1], &def->terrainnum[1]);

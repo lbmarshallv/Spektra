@@ -719,6 +719,8 @@ struct sector_t
 
 	bool HasLightmaps = false;		// Sector has lightmaps, each subsector vertex needs its own unique lightmap UV data
 
+	FName culledsectors; // sectors (by tag) which will not be rendered while the viewpoint is within this sector
+
 	// Below are all properties which are not used by the renderer.
 
 	TObjPtr<AActor*> SoundTarget;
@@ -824,6 +826,19 @@ public:
 
 	int CheckSpriteGlow(int lightlevel, const DVector3 &pos);
 	bool GetWallGlow(float *topglowcolor, float *bottomglowcolor);
+
+	TArray<int> CulledSectors()
+	{
+		TArray<int> ret;
+		FString     cs(culledsectors.GetChars());
+
+		for (FString s : cs.Split(","))
+		{
+
+			ret.Push(s.ToLong());
+		}
+		return ret;
+	}
 
 	void SetXOffset(int pos, double o)
 	{

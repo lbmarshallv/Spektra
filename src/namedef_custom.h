@@ -945,6 +945,7 @@ xx(skyfloor2)
 xx(skyceiling2)
 xx(frictionfactor)
 xx(movefactor)
+xx(culledSectors)
 
 xx(Corona)
 xx(BuiltinStateOffset)
