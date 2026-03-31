@@ -45,6 +45,7 @@ struct FCheckPosition
 	native bool			FromPMove;
 	native line			ceilingline;
 	native Actor		stepthing;
+	native Actor		blockingMobj;
 	native bool			DoRipping;
 	native bool			portalstep;
 	native int			portalgroup;

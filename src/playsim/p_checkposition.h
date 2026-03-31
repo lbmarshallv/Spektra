@@ -45,6 +45,7 @@ struct FCheckPosition
 	bool			FromPMove;
 	line_t			*ceilingline;
 	AActor			*stepthing;
+	AActor          *blockingMobj;
 	// [RH] These are used by PIT_CheckThing and P_XYMovement to apply
 	// ripping damage once per tic instead of once per move.
 	TMap<AActor*, bool> LastRipped;

@@ -2164,6 +2164,7 @@ DEFINE_FIELD_X(FCheckPosition, FCheckPosition, DoRipping);
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, portalstep);
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, portalgroup);
 DEFINE_FIELD_X(FCheckPosition, FCheckPosition, PushTime);
+DEFINE_FIELD_X(FCheckPosition, FCheckPosition, blockingMobj);
 
 DEFINE_FIELD_X(FRailParams, FRailParams, source);
 DEFINE_FIELD_X(FRailParams, FRailParams, damage);

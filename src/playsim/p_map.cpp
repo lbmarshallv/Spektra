@@ -1896,6 +1896,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				if (BlockingMobj == NULL || (thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) || (tcres.portalflags & FFCF_RESTRICTEDPORTAL))
 				{ // Thing slammed into something; don't let it move now.
 					thing->Height = realHeight;
+					tm.blockingMobj = BlockingMobj;
 					return false;
 				}
 				else if (!BlockingMobj->player && !(thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY)) &&
@@ -1925,6 +1926,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				else
 				{ // Definitely blocking
 					thing->Height = realHeight;
+					tm.blockingMobj = BlockingMobj;
 					return false;
 				}
 			}
