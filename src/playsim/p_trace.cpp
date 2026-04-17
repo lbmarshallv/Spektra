@@ -66,6 +66,7 @@ struct FTraceInfo
 
 	void Setup3DFloors();
 	bool LineCheck(intercept_t *in, double dist, DVector3 hit, bool special3dpass);
+	bool ThingPreCheck(intercept_t *in, double dist, DVector3 hit);
 	bool ThingCheck(intercept_t *in, double dist, DVector3 hit);
 	bool TraceTraverse (int ptflags);
 	bool CheckPlane(const secplane_t &plane);
@@ -685,6 +686,49 @@ cont:
 //
 //==========================================================================
 
+bool FTraceInfo::ThingPreCheck(intercept_t *in, double dist, DVector3 hit)
+{
+	if (hit.Z > in->d.thing->Top())
+	{
+		// trace enters above actor
+		if (Vec.Z >= 0)
+			return true; // Going up: can't hit
+
+		// Does it hit the top of the actor?
+		dist = (in->d.thing->Top() - Start.Z) / Vec.Z;
+
+		if (dist > MaxDist)
+			return true;
+		in->frac = dist / MaxDist;
+
+		hit = Start + Vec * dist;
+
+		// calculated coordinate is outside the actor's bounding box
+		if (fabs(hit.X - in->d.thing->X()) > in->d.thing->radius ||
+		    fabs(hit.Y - in->d.thing->Y()) > in->d.thing->radius)
+			return true;
+	}
+	else if (hit.Z < in->d.thing->Z())
+	{ // trace enters below actor
+		if (Vec.Z <= 0)
+			return true; // Going down: can't hit
+
+		// Does it hit the bottom of the actor?
+		dist = (in->d.thing->Z() - Start.Z) / Vec.Z;
+		if (dist > MaxDist)
+			return true;
+		in->frac = dist / MaxDist;
+
+		hit = Start + Vec * dist;
+
+		// calculated coordinate is outside the actor's bounding box
+		if (fabs(hit.X - in->d.thing->X()) > in->d.thing->radius ||
+		    fabs(hit.Y - in->d.thing->Y()) > in->d.thing->radius)
+			return true;
+	}
+	return false;
+}
+
 bool FTraceInfo::ThingCheck(intercept_t *in, double dist, DVector3 hit)
 {
 	if (hit.Z > in->d.thing->Top())
@@ -800,6 +844,8 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 
 	FPathTraverse it(Level, Start.X, Start.Y, Vec.X * MaxDist, Vec.Y * MaxDist, ptflags | PT_DELTA, startfrac);
 	intercept_t *in;
+	intercept_t  thingIn;
+	bool          foundThing = false;
 	int lastsplashsector = -1;
 
 	if (ptflags & PT_ADDTHINGS)
@@ -813,17 +859,20 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 			DVector3 hit  = Start + Vec * dist;
 			if (((in->d.thing->flags & ActorMask) || ActorMask == 0xffffffff) && in->d.thing != IgnoreThis)
 			{
-				if (!ThingCheck(in, dist, hit))
+				if (!ThingPreCheck(in, dist, hit))
+				{
+					thingIn = *in;
+					foundThing = true;
 					break;
+				}	
 			}
 		}
 	}
 
-	if (Results->HitType == TRACE_HitActor)
-		goto processResults;
-
 	while ((in = it.Next()))
 	{
+		if (foundThing && in->frac > thingIn.frac)
+			break;
 		// Deal with splashes in 3D floors (but only run once per sector, not each iteration - and stop if something was found.)
 		if (Results->Crossed3DWater == NULL && lastsplashsector != CurSector->sectornum)
 		{
@@ -897,6 +946,13 @@ bool FTraceInfo::TraceTraverse (int ptflags)
 		//	if (!ThingCheck(in, dist, hit) && hitThings.Contains(in->d.thing))
 		//		break;
 		//}
+	}
+
+	if (foundThing && (!in || thingIn.frac < in->frac))
+	{
+		double   dist = MaxDist * thingIn.frac;
+		DVector3 hit  = Start + Vec * dist;
+		ThingCheck(&thingIn, dist, hit);
 	}
 	
 	if (Results->HitType == TRACE_HitNone)

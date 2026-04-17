@@ -1758,10 +1758,10 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 	// from skipping the break statement.
 
 	bool compatible = (flags & PT_COMPATIBLE) && (Level->i_compatflags & COMPATF_HITSCAN);
-
+	const int maxCount  = 2000;
 	// we want to use one list of checked actors for the entire operation
 	FBlockThingsIterator btit(Level);
-	for (count = 0; count < 1000; count++)
+	for (count = 0; count < maxCount; count++)
 	{
 
 		//if (flags & PT_ADDTHINGS)
@@ -1785,7 +1785,7 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 		switch (((xs_FloorToInt(yintercept) == mapy) << 1) | (xs_FloorToInt(xintercept) == mapx))
 		{
 		case 0:           // neither xintercept nor yintercept match!
-			count = 1000; // Stop traversing, because somebody screwed up.
+			count = maxCount; // Stop traversing, because somebody screwed up.
 			break;
 
 		case 1: // xintercept matches

@@ -154,10 +154,9 @@ void FLevelLocals::AddAllCollisionObjects()
 	Printf("Added %d collisionObjects to CollisionWorld\n", collisionModels.size());
 }
 
-bool FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing)
+btCollisionWorld::ClosestRayResultCallback FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing)
 {
-	if (from == to)
-		return false;
+
 	btVector3                                  bFrom(from.X, from.Y, from.Z); 
 	btVector3                                  bTo(to.X, to.Y, to.Z);
 	UpdateCollisionModel(thing);
@@ -167,8 +166,7 @@ bool FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing
 	collisionWorld->rayTest(bFrom, bTo, closestResults);
 	RemoveCollisionObject(thing);
 
-
-	return closestResults.hasHit();
+	return closestResults;
 }
 
 btCollisionWorld::AllHitsRayResultCallback FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to,
@@ -185,7 +183,6 @@ btCollisionWorld::AllHitsRayResultCallback FLevelLocals::TraceCollisionHit(DVect
 		UpdateCollisionModel(thing);
 		AddCollisionObject(thing);
 	}
-
 	
 	collisionWorld->rayTest(bFrom, bTo, allResults);
 	
