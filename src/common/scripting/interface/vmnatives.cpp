@@ -1057,8 +1057,9 @@ DEFINE_ACTION_FUNCTION(FKeyBindings, NameKeys)
 	PARAM_PROLOGUE;
 	PARAM_INT(k1);
 	PARAM_INT(k2);
+	PARAM_BOOL(colors);
 	char buffer[120];
-	C_NameKeys(buffer, k1, k2);
+	C_NameKeys(buffer, k1, k2, colors);
 	ACTION_RETURN_STRING(buffer);
 }
 
@@ -1149,7 +1150,7 @@ DEFINE_ACTION_FUNCTION(_Console, PrintfEx)
 
 	FString s = FStringFormat(VM_ARGS_NAMES,1);
 
-	Printf(printlevel,"%s\n", s.GetChars());
+	Printf(static_cast<PrintFlag>(printlevel),"%s\n", s.GetChars());
 	return 0;
 }
 
@@ -1160,7 +1161,7 @@ DEFINE_ACTION_FUNCTION(_Console, DebugPrintf)
 	PARAM_VA_POINTER(va_reginfo);
 
 	FString s = FStringFormat(VM_ARGS_NAMES, 1);
-	DPrintf(debugLevel, "%s\n", s.GetChars());
+	DPrintf(static_cast<DPrintLevel>(debugLevel), "%s\n", s.GetChars());
 	return 0;
 }
 

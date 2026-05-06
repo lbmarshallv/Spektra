@@ -314,6 +314,9 @@ class Actor : Thinker native
 	native int PoisonDurationReceived;
 	native int PoisonPeriodReceived;
 	native Actor Poisoner;
+	native int MinRespawnTics;
+	native int RespawnDice;
+
 	native Inventory Inv;
 	native uint8 smokecounter;
 	native uint8 FriendPlayer;
@@ -480,6 +483,8 @@ class Actor : Thinker native
 	property ShadowPenaltyFactor: ShadowPenaltyFactor;
 	property AutomapOffsets : AutomapOffsets;
 	property LandingSpeed: LandingSpeed;
+	property MinRespawnTics: MinRespawnTics;
+	property RespawnDice: RespawnDice;
 
 	// need some definition work first
 	//FRenderStyle RenderStyle;
@@ -571,6 +576,8 @@ class Actor : Thinker native
 		RenderRequired 0;
 		FriendlySeeBlocks 10; // 10 (blocks) * 128 (one map unit block)
 		LandingSpeed -8; // landing speed from a jump with normal gravity (squats the player's view)
+		MinRespawnTics 0; //0 is default value defined in SKILLP_Respawn, negative is seconds
+		RespawnDice 4;
 	}
 
 	// Functions

@@ -23,11 +23,12 @@
 
 #pragma once
 
-#include <limits.h>
-#include <stdio.h>
-#include "zstring.h"
+#include <cstdio>
+
+#include "printf.h"
 #include "tarray.h"
 #include "v_text.h"
+#include "zstring.h"
 
 enum EAddType
 {
@@ -54,7 +55,7 @@ class FConsoleBuffer
 
 public:
 	FConsoleBuffer();
-	void AddText(int printlevel, const char *string);
+	void AddText(PrintFlag printlevel, const char *string);
 	void FormatText(FFont *formatfont, int displaywidth);
 	void ResizeBuffer(unsigned newsize);
 	void Clear()

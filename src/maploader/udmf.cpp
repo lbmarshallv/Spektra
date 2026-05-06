@@ -1258,6 +1258,7 @@ public:
 		sdt->midtexture = "-";
 		sd->SetTextureXScale(1.);
 		sd->SetTextureYScale(1.);
+		sd->ClearAlpha();
 		sd->UDMFIndex = index;
 
 		sc.MustGetToken('{');
@@ -1375,6 +1376,10 @@ public:
 				sd->SetLight(CheckInt(key), side_t::bottom);
 				continue;
 
+			case NAME_Alpha:
+				sd->SetAlpha(CheckFloat(key));
+				continue;
+
 			case NAME_lightabsolute_bottom:
 				Flag(sd->Flags, WALLF_ABSLIGHTING_BOTTOM, key);
 				continue;
@@ -1401,6 +1406,10 @@ public:
 
 			case NAME_Nodecals:
 				Flag(sd->Flags, WALLF_NOAUTODECALS, key);
+				continue;
+
+			case NAME_Blockrendering:
+				Flag(sd->Flags, WALLF_BLOCKRENDERING, key);
 				continue;
 
 			case NAME_colorization_top:

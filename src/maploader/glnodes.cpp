@@ -21,31 +21,30 @@
 **
 */
 
-#include <math.h>
+#include <cmath>
+#include <miniz.h>
 
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 
-#include <miniz.h>
-
-#include "m_argv.h"
+#include "basics.h"
 #include "c_dispatch.h"
-#include "m_swap.h"
-#include "filesystem.h"
-#include "p_local.h"
-#include "nodebuild.h"
-#include "doomstat.h"
-#include "engineerrors.h"
-#include "p_setup.h"
-#include "version.h"
-#include "md5.h"
-#include "m_misc.h"
 #include "cmdlib.h"
-#include "g_levellocals.h"
-#include "i_time.h"
-#include "maploader.h"
+#include "engineerrors.h"
+#include "filesystem.h"
 #include "fs_findfile.h"
+#include "g_levellocals.h"
+#include "i_specialpaths.h"
+#include "i_time.h"
+#include "m_swap.h"
+#include "maploader.h"
+#include "nodebuild.h"
+#include "p_local.h"
+#include "p_setup.h"
+#include "printf.h"
+#include "version.h"
+#include "zstring.h"
 
 EXTERN_CVAR(Bool, gl_cachenodes)
 EXTERN_CVAR(Float, gl_cachetime)
@@ -379,7 +378,6 @@ bool MapLoader::LoadGLSegs(FileReader &lump)
 				ldef = &Level->lines[lineidx];
 				segs[i].linedef = ldef;
 	
-					
 				auto side=LittleShort(ml->side);
 				if (side > 1)
 					return false;
@@ -993,18 +991,20 @@ bool MapLoader::CheckNodes(MapData * map, bool rebuilt, int buildtime)
 
 typedef TArray<uint8_t> MemFile;
 
-
 static FString CreateCacheName(MapData *map, bool create)
 {
-	FString path = M_GetCachePath(create);
-	FString lumpname = fileSystem.GetFileFullPath(map->lumpnum).c_str();
-	auto separator = lumpname.IndexOf(':');
-	path << '/' << lumpname.Left(separator);
-	if (create) CreatePath(path.GetChars());
-
-	lumpname.ReplaceChars('/', '%');
-	lumpname.ReplaceChars(':', '$');
-	path << '/' << lumpname.Right((ptrdiff_t)lumpname.Len() - separator - 1) << ".gzc";
+	FString path = M_GetCachePath(create, "nodes");
+	const char bytes = 16;
+	uint8_t md5[bytes];
+	map->GetChecksum(md5);
+	static const char hex[] = "0123456789ABCDEF";
+	char buffer[2*bytes+1] = {'\0'};
+	for (int i = 0; i < bytes; i++)
+	{
+		buffer[i*2  ] = hex[md5[i]>>4  ];
+		buffer[i*2+1] = hex[md5[i]&0x0F];
+	}
+	path << '/' << buffer << ".znodes";
 	return path;
 }
 
@@ -1196,7 +1196,7 @@ bool MapLoader::CheckCachedNodes(MapData *map)
 UNSAFE_CCMD(clearnodecache)
 {
 	FileSys::FileList list;
-	FString path = M_GetCachePath(false);
+	FString path = M_GetCachePath(false, "nodes");
 	path += "/";
 
 	if (!FileSys::ScanDirectory(list, path.GetChars(), "*", false))

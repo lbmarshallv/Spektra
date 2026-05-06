@@ -182,7 +182,7 @@ NetStartWindow::NetStartWindow(bool host) : Widget(nullptr, WidgetType::Window)
 	MessageLabel->SetTextAlignment(TextLabelAlignment::Center);
 	ProgressLabel->SetTextAlignment(TextLabelAlignment::Center);
 
-	AbortButton->OnClick = [=]() { OnClose(); };
+	AbortButton->OnClick = [this]() { OnClose(); };
 	AbortButton->SetText(GStrings.GetString("ACTION_ABORT"));
 
 	if (host)
@@ -190,15 +190,15 @@ NetStartWindow::NetStartWindow(bool host) : Widget(nullptr, WidgetType::Window)
 		hosting = true;
 
 		ForceStartButton = new PushButton(this);
-		ForceStartButton->OnClick = [=]() { ForceStart(); };
+		ForceStartButton->OnClick = [this]() { ForceStart(); };
 		ForceStartButton->SetText(GStrings.GetString("ACTION_STARTGAME"));
 
 		KickButton = new PushButton(this);
-		KickButton->OnClick = [=]() { OnKick(); };
+		KickButton->OnClick = [this]() { OnKick(); };
 		KickButton->SetText(GStrings.GetString("ACTION_KICK"));
 
 		BanButton = new PushButton(this);
-		BanButton->OnClick = [=]() { OnBan(); };
+		BanButton->OnClick = [this]() { OnBan(); };
 		BanButton->SetText(GStrings.GetString("ACTION_BAN"));
 	}
 
@@ -206,7 +206,7 @@ NetStartWindow::NetStartWindow(bool host) : Widget(nullptr, WidgetType::Window)
 	LobbyWindow->SetColumnWidths({ 30.0, 30.0, 200.0, 50.0 });
 
 	CallbackTimer = new Timer(this);
-	CallbackTimer->FuncExpired = [=]() { OnCallbackTimerExpired(); };
+	CallbackTimer->FuncExpired = [this]() { OnCallbackTimerExpired(); };
 	CallbackTimer->Start(500);
 }
 
@@ -287,10 +287,23 @@ void NetStartWindow::OnGeometryChanged()
 	y = GetHeight() - 15.0 - AbortButton->GetPreferredHeight();
 	if (hosting)
 	{
-		AbortButton->SetFrameGeometry((w + 215.0) * 0.5, y, 100.0, AbortButton->GetPreferredHeight());
-		BanButton->SetFrameGeometry((w + 5.0) * 0.5, y, 100.0, BanButton->GetPreferredHeight());
-		KickButton->SetFrameGeometry((w - 205.0) * 0.5, y, 100.0, KickButton->GetPreferredHeight());
-		ForceStartButton->SetFrameGeometry((w - 415.0) * 0.5, y, 100.0, ForceStartButton->GetPreferredHeight());
+		Widget *bs[] = {AbortButton, BanButton, KickButton, ForceStartButton};
+		const size_t n = sizeof(bs)/sizeof(bs[0]);
+		double ws[n];
+		double hs[n];
+		double pos = 0, padding = 10.0;
+		for (size_t i = 0; i < n; i++)
+		{
+			ws[i] = bs[i]->GetPreferredWidth();
+			hs[i] = bs[i]->GetPreferredHeight();
+			pos += ws[i] + padding;
+		}
+		pos = (w - pos + padding) / 2;
+		for (size_t i = 0; i < n; i++)
+		{
+			bs[i]->SetFrameGeometry(pos, y, ws[i], hs[i]);
+			pos += ws[i] + padding;
+		}
 	}
 	else
 	{

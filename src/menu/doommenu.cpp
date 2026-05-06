@@ -39,6 +39,7 @@
 #include "i_soundinternal.h"
 #include "i_time.h"
 #include "menu.h"
+#include "name.h"
 #include "p_tick.h"
 #include "r_utility.h"
 #include "s_music.h"
@@ -47,7 +48,7 @@
 #include "teaminfo.h"
 #include "texturemanager.h"
 #include "v_draw.h"
-#include "v_video.h"
+#include "v_font.h"
 #include "vm.h"
 
 EXTERN_CVAR(Int, cl_gfxlocalization)
@@ -75,6 +76,7 @@ EXTERN_CVAR(Bool, m_tooltip_capwidth)
 EXTERN_CVAR(Bool, m_tooltip_small)
 EXTERN_CVAR(Int, r_extralight)
 EXTERN_CVAR(Float, r_visibility)
+EXTERN_CVAR(Int, snd_mididevice)
 
 CVAR(Bool, m_simpleoptions, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
 CVAR(Bool, m_simpleoptions_view, true, 0);
@@ -155,7 +157,7 @@ bool M_SetSpecialMenu(FName& menu, int param)
 	case NAME_MainMenu:
 		if (gameinfo.gametype & GAME_DoomStrifeChex)	// Raven's games always used text based menus
 		{
-			if (gameinfo.forcetextinmenus)	// If text is forced, this overrides any check.
+			if (gameinfo.forcetextinmenus) 	// If text is forced, this overrides any check.
 			{
 				menu = NAME_MainMenuTextOnly;
 			}
@@ -163,22 +165,16 @@ bool M_SetSpecialMenu(FName& menu, int param)
 			{
 				// For these games we must check up-front if they get localized because in that case another template must be used.
 				DMenuDescriptor **desc = MenuDescriptors.CheckKey(NAME_MainMenu);
-				if (desc != nullptr)
+				if (desc == nullptr) break;
+				if (!(*desc)->IsKindOf(RUNTIME_CLASS(DListMenuDescriptor))) break;
+				DListMenuDescriptor *ld = static_cast<DListMenuDescriptor*>(*desc);
+				if (!ld->mFromEngine) break;
+				// This assumes that replacing one graphic will replace all of them.
+				// So this only checks the "New game" entry for localization capability.
+				FTextureID texid = TexMan.CheckForTexture("M_NGAME", ETextureType::MiscPatch);
+				if (!OkForLocalization(texid, "$MNU_NEWGAME"))
 				{
-					if ((*desc)->IsKindOf(RUNTIME_CLASS(DListMenuDescriptor)))
-					{
-						DListMenuDescriptor *ld = static_cast<DListMenuDescriptor*>(*desc);
-						if (ld->mFromEngine)
-						{
-							// This assumes that replacing one graphic will replace all of them.
-							// So this only checks the "New game" entry for localization capability.
-							FTextureID texid = TexMan.CheckForTexture("M_NGAME", ETextureType::MiscPatch);
-							if (!OkForLocalization(texid, "$MNU_NEWGAME"))
-							{
-								menu = NAME_MainMenuTextOnly;
-							}
-						}
-					}
+					menu = NAME_MainMenuTextOnly;
 				}
 			}
 		}
@@ -286,6 +282,21 @@ bool M_SetSpecialMenu(FName& menu, int param)
 	case NAME_ReadthisMenu:
 		// [MK] allow us to override the ReadThisMenu class
 		menu = gameinfo.HelpMenuClass;
+		break;
+
+	case NAME_MidiPlayerOptions:
+		switch (snd_mididevice)
+		{
+			// magic numbers from: ZMusic/configuration.cpp:MidiDeviceList.Build()
+			case -8: menu = NAME_OPNOptions; break;
+			case -7: menu = NAME_ADLOptions; break;
+			case -6: menu = NAME_WildMidiOptions;  break;
+			case -5: menu = NAME_FluidsynthOptions; break;
+			case -4: menu = NAME_GUSOptions; break;
+			case -3: menu = NAME_OPLOptions; break;
+			case -2: menu = NAME_TimidityOptions; break;
+			default: break;
+		}
 		break;
 	}
 

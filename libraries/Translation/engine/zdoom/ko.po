@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"PO-Revision-Date: 2025-12-24 17:00+0000\n"
-"Last-Translator: Boondorl <boondorl0@gmail.com>\n"
+"PO-Revision-Date: 2026-04-13 18:01+0000\n"
+"Last-Translator: Marcus Minhorst <marcus.minhorst@gmail.com>\n"
 "Language-Team: Korean <https://hosted.weblate.org/projects/uzdoom/zdoom-"
 "engine-strings/ko/>\n"
 "Language: ko\n"
@@ -11,8 +11,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Generator: Weblate 5.15.1\n"
-"HeaderCode: ko\n"
+"X-Generator: Weblate 5.17-dev\n"
 
 msgid "PRESSKEY"
 msgstr "키를 누르시오."
@@ -21,10 +20,13 @@ msgid "SECRETMESSAGE"
 msgstr "비밀 발견!"
 
 msgid "D_DEVSTR"
-msgstr "쓸모없는 모드 켬."
+msgstr "쓸모없는 모드: 켜짐"
 
+#, fuzzy
 msgid "QUITMSG"
-msgstr "진짜 이 개쩌는 게임을 꺼버릴려고?"
+msgstr ""
+"진짜 이 개쩌는 게임을\n"
+"꺼버릴려고?"
 
 # In some languages, it may make more sense to translate “Press a key” as
 # “Press any key.”
@@ -48,16 +50,19 @@ msgstr ""
 
 msgid "NEWGAME"
 msgstr ""
-"멀티플레이 중엔 새로운 게임을 시작할 수 없습니다.\n"
+"멀티플레이 중엔 새로운\n"
+"게임을 시작할 수 없습니다.\n"
 "\n"
 "키를 누르시오."
 
 msgid "NIGHTMARE"
 msgstr ""
-"진심입니까? 이 난이도는 매우 어렵습니다.\n"
+"진심입니까?\n"
+"이 난이도는 매우 어렵습니다.\n"
 "\n"
 "Y키 또는 N키를 누르시오."
 
+#, fuzzy
 msgid "SWSTRING"
 msgstr ""
 "이 게임은 셰어웨어 버전입니다.\n"
@@ -89,94 +94,146 @@ msgid "DOSY"
 msgstr "(Y을 누르시면 종료합니다)"
 
 msgid "QUITMSG1"
-msgstr "부디 나가지 말아줘, 아직 죽여야 할 악마들이 남아있단 말이야!"
+msgstr ""
+"부디 나가지 말아줘, 아직 죽여야\n"
+"할 악마들이 남아있단 말이야!"
 
 msgid "QUITMSG2"
-msgstr "그냥 나가자고- 유혈사태가 곧 시작될 것 같으니!"
+msgstr ""
+"그냥 나가자고—\n"
+"유혈사태가 곧 시작될 것 같으니!"
 
 msgid "QUITMSG3"
-msgstr "만약 내가 너였다면 나가지 않았을 거야. DOS는 정말 최악이거든."
+msgstr ""
+"만약 내가 너였다면 나가지 않았을 거야.\n"
+"DOS는 정말 최악이거든."
 
 msgid "QUITMSG4"
-msgstr "나보다 DOS가 훨씬 좋다 이 말씀이지, 그런 거지?"
+msgstr ""
+"나보다 DOS가 훨씬 좋다\n"
+"이 말씀이지, 그런 거지?"
 
 msgid "QUITMSG5"
-msgstr "나가지 마- 저 구석에 악마가 숨어있다고!"
+msgstr ""
+"나가지 마—저 구석에\n"
+"악마가 숨어있다고!"
 
 msgid "QUITMSG6"
-msgstr "있지, 만약 네가 다시 돌아온다면 너를 아예 구워버릴 거다."
+msgstr ""
+"있지, 만약 네가 다시 돌아온다면\n"
+"너를 아예 구워버릴 거다."
 
 msgid "QUITMSG7"
 msgstr "그럼 나가버려. 난 신경 안 써."
 
 # More info here.
 msgid "QUITMSG8"
-msgstr "나가시겠다? 그럼, 당신은 8번째 조각을 잃었다!"
+msgstr ""
+"나가시겠다?\n"
+"그럼, 당신은 8번째 조각을 잃었다!"
 
 # A “dimensional shambler” is a creature appearing in the works of H. P.
 # Lovecraft.
 msgid "QUITMSG9"
-msgstr "나가지 말아줘, 지금 차원을 넘나드는 쉠블러가 DOS 프롬프트에서 기다리고 있거든!"
+msgstr ""
+"나가지 말아줘, 지금 차원을\n"
+"넘나드는 쉠블러가 DOS\n"
+"프롬프트에서 기다리고 있거든!"
 
 msgid "QUITMSG10"
-msgstr "당장 나가버리고 너의 후진 프로그램들이나 만지작거리시지."
+msgstr ""
+"당장 나가버리고 너의 후진\n"
+"프로그램들이나 만지작거리시지."
 
 msgid "QUITMSG11"
-msgstr "만약 내가 너의 상사였다면, 지금 당장 데스매치를 열었을 거다!"
+msgstr ""
+"만약 내가 너의 상사였다면,\n"
+"지금 당장 데스매치를 열었을 거다!"
 
 msgid "QUITMSG12"
-msgstr "이봐, 친구. 지금 여기서 나가버리면 죽여서 얻은 점수가 다 초기화될걸?"
+msgstr ""
+"이봐, 친구. 지금 여기서 나가버리면\n"
+"네가 올린 킬 스코어는 전부 몰수야!"
 
+#, fuzzy
 msgid "QUITMSG13"
-msgstr "그냥 나가봐. 돌아올 때까지 방망이를 들고 기다릴테니까."
+msgstr ""
+"그냥 나가봐. 돌아올 때까지\n"
+"방망이를 들고 기다릴테니까."
 
 msgid "QUITMSG14"
-msgstr "나간다는 이유로 싸대기를 날리지 않는 게 다행인 줄 알아."
+msgstr ""
+"나간다는 이유로 싸대기를\n"
+"날리지 않는 게 다행인 줄 알아."
 
 msgid "QUITMSG15"
-msgstr "어딜 가는 거야?! 저항군은 어쩌고?"
+msgstr ""
+"어딜 가는 거야?!\n"
+"저항군은 어쩌고?"
 
 msgid "QUITMSG16"
-msgstr "학살중절이라... 놀리는구먼!"
+msgstr ""
+"학살중절이라…\n"
+"놀리는구먼!"
 
 msgid "QUITMSG17"
-msgstr "하지만 넌 희망이야- 나의 유일한 기회라고!!"
+msgstr ""
+"하지만 넌 희망이야\n"
+"—나의 유일한 기회라고!!"
 
 msgid "QUITMSG18"
 msgstr "그 누구도 블랙버드를 내 버릴 수 없지."
 
 msgid "QUITMSG19"
-msgstr "난 네가 다를 줄 알았는데..."
+msgstr "난 네가 다를 줄 알았는데…"
 
 msgid "QUITMSG20"
 msgstr "그래그래 알았다! 그럼 그냥 뛰고 죽이기나 해!"
 
 msgid "QUITMSG21"
-msgstr "나갈 수는 있겠지만... 숨을 수는 없을 거다..."
+msgstr ""
+"나갈 수는 있겠지만…\n"
+"숨을 수는 없을 거다…"
 
 msgid "QUITMSG22"
-msgstr "헤에에, 무슨 일이야? 엄마가 저녁 먹으레?"
+msgstr ""
+"헤에에, 무슨 일이야?\n"
+"엄마가 저녁 먹으레?"
 
 msgid "QUITMSG23"
-msgstr "부디 종료하지 말아 주세요, 플레모이드들이 아직도 널려있단 말입니다!"
+msgstr ""
+"부디 종료하지 말아 주세요,\n"
+"플레모이드들이 아직도 널려있단 말입니다!"
 
 msgid "QUITMSG24"
-msgstr "부디 포기하지 마시길- 플레모이드들이 그 순간 우세할 것입니다!"
+msgstr ""
+"부디 포기하지 마시길—플레모이드들이\n"
+"그 순간 우세할 것입니다!"
 
 msgid "QUITMSG25"
-msgstr "지금 떠나지 말아 주세요. 우린 당신의 도움이 필요합니다!"
+msgstr ""
+"지금 떠나지 말아 주세요.\n"
+"우린 당신의 도움이 필요합니다!"
 
 msgid "QUITMSG26"
-msgstr "첵스(R) 한 박스를 뜯기 위해서 잠시 중단하는 거였으면 좋겠군요."
+msgstr ""
+"첵스® 한 박스를 뜯기 위해서 잠시\n"
+"중단하는 거였으면 좋겠군요."
 
 msgid "QUITMSG27"
-msgstr "지금 그만두지 마세요! 우린 당신의 도움이 필요합니다!"
+msgstr ""
+"지금 그만두지 마세요!\n"
+"우린 당신의 도움이 필요합니다!"
 
 msgid "QUITMSG28"
-msgstr "은하연합시리얼국을 위해서라도 부디 떠나지 말아 주시길 바랍니다!"
+msgstr ""
+"은하연합시리얼국을 위해서라도\n"
+"부디 떠나지 말아 주시길 바랍니다!"
 
 msgid "QUITMSG29"
-msgstr "진정한 첵스(R)전사는 그렇게 빨리 포기하지 않을 것입니다!"
+msgstr ""
+"진정한 첵스®전사는 그렇게\n"
+"빨리 포기하지 않을 것입니다!"
 
 msgid "TXT_DEFAULTPICKUPMSG"
 msgstr "무언가를 집어냈다"
@@ -217,8 +274,9 @@ msgstr "자기 혼자서 벌벌 떨고 있다"
 msgid "HUSTR_TALKTOSELF4"
 msgstr "횡설수설하기 시작했다"
 
+#, fuzzy
 msgid "HUSTR_TALKTOSELF5"
-msgstr "미치기 시작했다..."
+msgstr "미치기 시작했다…"
 
 msgid "HUSTR_MESSAGESENT"
 msgstr "[메시지가 전달됨]"
@@ -230,16 +288,16 @@ msgid "STSTR_NOMUS"
 msgstr "불가능한 선택입니다"
 
 msgid "STSTR_DQDON"
-msgstr "무미건조한 모드 켬"
+msgstr "무미건조한 모드: 켜짐"
 
 msgid "STSTR_DQDOFF"
-msgstr "무미건조한 모드 끔"
+msgstr "무미건조한 모드: 끔"
 
 msgid "STSTR_DQD2ON"
-msgstr "엄청나게 무미건조한 모드 켬"
+msgstr "엄청나게 무미건조한 모드: 켜짐"
 
 msgid "STSTR_DQD2OFF"
-msgstr "엄청나게 무미건조한 모드 끔"
+msgstr "엄청나게 무미건조한 모드: 끔"
 
 msgid "STSTR_KFAADDED"
 msgstr "아주 행복한 탄약 추가됨"
@@ -248,16 +306,18 @@ msgid "STSTR_FAADDED"
 msgstr "탄약(열쇠 없이) 추가됨"
 
 msgid "STSTR_NCON"
-msgstr "노 클립 모드 켬"
+msgstr "노 클립 모드: 켜짐"
 
 msgid "STSTR_NCOFF"
-msgstr "노 클립 모드 끔"
+msgstr "노 클립 모드: 끔"
 
+#, fuzzy
 msgid "STSTR_NC2ON"
-msgstr "노 클립 모드 2 켬"
+msgstr "노 클립 모드 2: 켜짐"
 
+#, fuzzy
 msgid "STSTR_NC2OFF"
-msgstr "노 클립 모드 2 끔"
+msgstr "노 클립 모드 2: 끔"
 
 # “inVuln”: Invulnerability sphere
 # “Str”: Berserk
@@ -274,28 +334,28 @@ msgstr "파워-업 전환됨"
 # Printed when entering the idchoppers cheat, which gives the player a
 # chainsaw
 msgid "STSTR_CHOPPERS"
-msgstr "... 후진 건 아니지만 - GM"
+msgstr "… 후진 건 아니지만 - GM"
 
 msgid "STSTR_CLEV"
-msgstr "레벨 변경 중..."
+msgstr "레벨 변경 중…"
 
 msgid "TXT_BUDDHAON"
-msgstr "부처 모드 켬"
+msgstr "부처 모드: 켜짐"
 
 msgid "TXT_BUDDHAOFF"
-msgstr "부처 모드 끔"
+msgstr "부처 모드: 끔"
 
 msgid "TXT_BUDDHA2ON"
-msgstr "나무 아미타불 모드 켬"
+msgstr "나무 아미타불 모드: 켜짐"
 
 msgid "TXT_BUDDHA2OFF"
-msgstr "나무 아미타불 모드 끔"
+msgstr "나무 아미타불 모드: 끔"
 
 msgid "TXT_CHEATPOWERON"
-msgstr "파워 켬"
+msgstr "파워: 켜짐"
 
 msgid "TXT_CHEATPOWEROFF"
-msgstr "파워 끔"
+msgstr "파워: 끔"
 
 msgid "TXT_CHEATHEALTH"
 msgstr "체력 완전 회복"
@@ -304,40 +364,40 @@ msgid "TXT_CHEATKEYS"
 msgstr "모든 열쇠"
 
 msgid "TXT_CHEATSOUNDON"
-msgstr "효과음 디버그 켬"
+msgstr "효과음 디버그: 켜짐"
 
 msgid "TXT_CHEATSOUNDOFF"
-msgstr "효과음 디버그 끔"
+msgstr "효과음 디버그: 끔"
 
 msgid "TXT_CHEATIDDQD"
 msgstr "치트 쓸려고? 그럼 죽어야지!"
 
 msgid "TXT_CHEATIDKFA"
-msgstr "사기꾼놈! 너는 무기를 가질 자격이 없어!"
+msgstr "사기꾼놈! 너는 무기를 가질 자격이 없어"
 
 msgid "TXT_CHEATTICKERON"
-msgstr "프레임 속도 표시 켬"
+msgstr "프레임 속도 표시: 켜짐"
 
 msgid "TXT_CHEATTICKEROFF"
-msgstr "프레임 속도 표시 끔"
+msgstr "프레임 속도 표시: 끔"
 
 msgid "TXT_CHEATARTIFACTS3"
 msgstr "얻었다"
 
 msgid "TXT_MIDASTOUCH"
-msgstr "넌 미다스의 손을 얻었어 베이베!"
+msgstr "넌 미다스의 손을 얻었어 베이베"
 
 msgid "TXT_GOTSTUFF"
 msgstr "무언가를 얻었다!"
 
 msgid "TXT_FREEZEON"
-msgstr "시간정지 켬"
+msgstr "시간정지: 켜짐"
 
 msgid "TXT_FREEZEOFF"
-msgstr "시간정지 끔"
+msgstr "시간정지: 끔"
 
 msgid "TXT_STRANGE"
-msgstr "뭔가 이상한 기분이..."
+msgstr "뭔가 이상한 기분이…"
 
 msgid "TXT_STRANGER"
 msgstr "기분이 더더욱 이상해졌다."
@@ -346,10 +406,10 @@ msgid "TXT_NOTSTRANGE"
 msgstr "자기 자신처럼 생각하게 됐다."
 
 msgid "TXT_LEADBOOTSON"
-msgstr "납 부츠 켬"
+msgstr "납 부츠: 켜짐"
 
 msgid "TXT_LEADBOOTSOFF"
-msgstr "납 부츠 끔"
+msgstr "납 부츠: 끔"
 
 msgid "TXT_LIGHTER"
 msgstr "가벼운 느낌이 든다"
@@ -358,34 +418,34 @@ msgid "TXT_GRAVITY"
 msgstr "중력이 당신을 붙잡았다"
 
 msgid "TXT_NOTARGET_ON"
-msgstr "적 표적 감지 켬"
+msgstr "적 표적 감지: 켜짐"
 
 msgid "TXT_NOTARGET_OFF"
-msgstr "적 표적 감지 끔"
+msgstr "적 표적 감지: 끔"
 
 msgid "TXT_ANUBIS_ON"
-msgstr "공포에 떨어라!"
+msgstr "“공포에 떨어라!”"
 
 msgid "TXT_ANUBIS_OFF"
-msgstr "오거 갑옷은 이제 없다."
+msgstr "오거 갑옷은 이제 없다"
 
 msgid "TXT_CHASECAM_ON"
-msgstr "3인칭 카메라 켬"
+msgstr "3인칭 카메라: 켜짐"
 
 msgid "TXT_CHASECAM_OFF"
-msgstr "3인칭 카메라 끔"
+msgstr "3인칭 카메라: 끔"
 
 msgid "TXT_BADDIE_KILLED"
-msgstr "1 명의 나쁜놈이 사살됨."
+msgstr "1 명의 나쁜놈이 사살됨"
 
 msgid "TXT_BADDIES_KILLED"
-msgstr "%d 명의 나쁜놈들이 사살됨."
+msgstr "%d 명의 나쁜놈들이 사살됨"
 
 msgid "TXT_MONSTER_KILLED"
-msgstr "1 마리의 몬스터가 사살됨."
+msgstr "1 마리의 몬스터가 사살됨"
 
 msgid "TXT_MONSTERS_KILLED"
-msgstr "%d 마리의 몬스터들이 사살됨."
+msgstr "%d 마리의 몬스터들이 사살됨"
 
 msgid "TXT_NO_RESURRECT"
 msgstr "부활할 수 없습니다. 플레이어는 더 이상 육체와 연결돼있지 않습니다."
@@ -397,25 +457,25 @@ msgid "TXT_WHAT_KILL"
 msgstr "게임 밖에서 무엇을 죽이고 싶습니까?"
 
 msgid "TXT_NOT_FROZEN"
-msgstr "플레이어 정지 속성이 꺼졌습니다."
+msgstr "플레이어 정지 속성: 끔"
 
 msgid "AMSTR_FOLLOWOFF"
-msgstr "추적 모드 끔"
+msgstr "추적 모드: 끔"
 
 msgid "AMSTR_FOLLOWON"
-msgstr "추적 모드 켬"
+msgstr "추적 모드: 켜짐"
 
 msgid "AMSTR_GRIDON"
-msgstr "격자 켬"
+msgstr "격자: 켜짐"
 
 msgid "AMSTR_GRIDOFF"
-msgstr "격자 끔"
+msgstr "격자: 끔"
 
 msgid "AMSTR_TEXON"
-msgstr "텍스쳐 모드 켬"
+msgstr "텍스쳐 모드: 켜짐"
 
 msgid "AMSTR_TEXOFF"
-msgstr "텍스쳐 모드 끔"
+msgstr "텍스쳐 모드: 끔"
 
 msgid "AMSTR_MARKEDSPOT"
 msgstr "지점 추가"
@@ -448,7 +508,7 @@ msgid "SPREE20"
 msgstr "%k 을(를) 막을 수없습니다!"
 
 msgid "SPREE25"
-msgstr "%k 은(는) 신적입니다! "
+msgstr "%k 은(는) 신적입니다!"
 
 msgid "MULTI2"
 msgstr "더블 킬!"
@@ -643,7 +703,7 @@ msgid "GOTBERSERK"
 msgstr "광전사!"
 
 msgid "GOTINVIS"
-msgstr "일시적 투명 효과!"
+msgstr "일시적 투명 효과"
 
 msgid "GOTSUIT"
 msgstr "방사능 보호복"
@@ -2015,13 +2075,13 @@ msgid "TXT_AMMOSATCHEL"
 msgstr "탄약 배낭을 획득했다."
 
 msgid "MSG_TALISMANRED"
-msgstr "결코, 만지면 안 된다는 생각이 든다..."
+msgstr "결코, 만지면 안 된다는 생각이 든다…"
 
 msgid "MSG_TALISMANGREEN"
-msgstr "뭔지는 몰라도 이 세상에 속한 것이 아닌 것 같다..."
+msgstr "뭔지는 몰라도 이 세상에 속한 것이 아닌 것 같다…"
 
 msgid "MSG_TALISMANBLUE"
-msgstr "분명히 뭔가를 할 것이다..."
+msgstr "분명히 뭔가를 할 것이다…"
 
 msgid "MSG_TALISMANPOWER"
 msgstr "엄청난 힘이 솟는다!"
@@ -2066,7 +2126,7 @@ msgid "TXT_NEED_BLUECRYSTAL"
 msgstr "청색 크리스탈이 필요하다"
 
 msgid "TXT_RETAIL_ONLY"
-msgstr "이 구역은 정품 버전에서만 입장이 가능합니다"
+msgstr "이 구역은 스트라이프 정품 버전에서만 입장이 가능합니다"
 
 msgid "TXT_DOES_NOT_WORK"
 msgstr "작동이 안 되는 것 같다"
@@ -2480,7 +2540,7 @@ msgid "TXT_DESTROYED_CONVERTER"
 msgstr "개조 장치를 파괴했다!"
 
 msgid "TXT_COMPLETED_TRAINING"
-msgstr "훈련 코스를 마쳤다. 능력치 업!"
+msgstr "축하한다! 훈련 코스를 마쳤다"
 
 msgid "TXT_QUEST_14"
 msgstr "수정체를 파괴했다"
@@ -2504,22 +2564,22 @@ msgid "TXT_KILLED_LOREMASTER"
 msgstr "로어마스터의 목숨에 종지부를 찍었다!"
 
 msgid "TXT_YOUFOOL"
-msgstr "어리석은 것! 알람이 작동되었다고!"
+msgstr "어리석은 것! 알람이 작동되었다고."
 
 msgid "TXT_YOUREDEAD"
-msgstr "알람이 작동되었다. 넌 죽었어!"
+msgstr "넌 죽었어! 알람이 작동되었다."
 
 msgid "TXT_HAVEENOUGH"
-msgstr "충분히 가진 것 같은데?"
+msgstr "충분히 가진 것 같은데!"
 
 msgid "TXT_GOAWAY"
 msgstr "저리 가!"
 
 msgid "TXT_COMM0"
-msgstr "메시지가 옴..."
+msgstr "메시지가 옴…"
 
 msgid "TXT_COMM1"
-msgstr "블랙버드로부터 메시지가 옴..."
+msgstr "블랙버드로부터 메시지가 옴…"
 
 msgid "TXT_FINDHELP"
 msgstr "도움말"
@@ -2529,10 +2589,10 @@ msgid "TXT_TRADE"
 msgstr "(가격: %u)"
 
 msgid "GOTCHEXARMOR"
-msgstr "첵스(R) 갑옷 획득."
+msgstr "첵스® 갑옷 획득."
 
 msgid "GOTSUPERCHEXARMOR"
-msgstr "슈퍼 첵스(R) 갑옷 획득!"
+msgstr "슈퍼 첵스® 갑옷 획득!"
 
 msgid "GOTWATER"
 msgstr "물 한 컵 섭취."
@@ -2562,10 +2622,10 @@ msgid "GOTVEGETABLES"
 msgstr "채소 한 그릇 섭취."
 
 msgid "GOTSLIMESUIT"
-msgstr "오물 보호복 사용."
+msgstr "오물 보호복 사용"
 
 msgid "GOTCHEXMAP"
-msgstr "컴퓨터 지도 사용."
+msgstr "컴퓨터 지도 사용"
 
 msgid "GOTZORCHRECHARGE"
 msgstr "소형 저치 전지 획득."
@@ -2580,7 +2640,7 @@ msgid "GOTPROPULSORPACK"
 msgstr "저치 추진 팩 획득."
 
 msgid "GOTPHASINGZORCHERRECHARGE"
-msgstr "저치 전자 충전기 획득."
+msgstr "저치 전자 충전기 획득"
 
 msgid "GOTPHASINGZORCHERPACK"
 msgstr "특대 저치 충전기 획득."
@@ -2717,7 +2777,7 @@ msgstr ""
 "\n"
 "\n"
 "\n"
-"ESCAPE키를 누르시오..."
+"Escape키를 누르시오…"
 
 msgid "CE2TEXT"
 msgstr "해내셨습니다!"
@@ -2741,7 +2801,7 @@ msgstr ""
 "\n"
 "'%s'\n"
 "\n"
-"Y키 나 N키를 누르시오."
+"Y키 또는 N키를 누르시오."
 
 msgctxt "chex"
 msgid "QLOADNET"
@@ -2757,23 +2817,25 @@ msgstr ""
 "\n"
 "'%s'\n"
 "\n"
-"Y키 나 N키를 누르시오."
+"Y키 또는 N키를 누르시오."
 
 msgid "CNEWGAME"
 msgstr ""
-"네트워크 퀘스트 중엔 새로운 퀘스트를 시작 할 수 없습니다.\n"
+"네트워크 퀘스트 중엔 새로운\n"
+"퀘스트를 시작 할 수 없습니다.\n"
 "\n"
 "키를 누르시오."
 
 msgid "CNIGHTMARE"
 msgstr ""
-"이 퀘스트는 아주 위험하고 어렵습니다. 그래도 도전하시겠습니까?\n"
+"이 퀘스트는 아주 위험하고 어렵습니다.\n"
+"그래도 도전하시겠습니까?\n"
 "\n"
-"Y키 나 N키를 누르시오."
+"Y키 또는 N키를 누르시오."
 
 msgid "CSWSTRING"
 msgstr ""
-"이 게임은 첵스(R) 퀘스트입니다.\n"
+"이 게임은 첵스® 퀘스트입니다.\n"
 "\n"
 "레벨 관련 소식은 여기서 확인해주시길 바랍니다: www.chexquest.com\n"
 "\n"
@@ -2791,15 +2853,15 @@ msgid "ENDGAME"
 msgstr ""
 "이 퀘스트를 잠시 중단하시겠습니까?\n"
 "\n"
-"Y키 나 N키를 누르시오."
+"Y키 또는 N키를 누르시오."
 
 msgctxt "chex"
 msgid "STSTR_DQDON"
-msgstr "무적 모드 켬"
+msgstr "무적 모드: 켜짐"
 
 msgctxt "chex"
 msgid "STSTR_DQDOFF"
-msgstr "무적 모드 끔"
+msgstr "무적 모드: 끔"
 
 msgctxt "chex"
 msgid "STSTR_FAADDED"
@@ -2807,11 +2869,11 @@ msgstr "모든 저치 에너지 추가"
 
 msgctxt "chex"
 msgid "STSTR_KFAADDED"
-msgstr "모든 아이템 습득!"
+msgstr "모든 아이템 습득"
 
 msgctxt "chex"
 msgid "STSTR_CHOPPERS"
-msgstr "... 첵스(R) 를 많이 먹자!"
+msgstr "…첵스® 를 많이 먹자!"
 
 msgctxt "chex"
 msgid "AMMO_CLIP"
@@ -2970,7 +3032,7 @@ msgid "MNU_RANDOM"
 msgstr "랜덤"
 
 msgid "MNU_EPISODE"
-msgstr "에피소드 선택:"
+msgstr "에피소드 선택?"
 
 msgctxt "strife"
 msgid "MNU_EPISODE"
@@ -3223,16 +3285,16 @@ msgid "CMPTMNU_NODOORLIGHT"
 msgstr "붐 문간 조명보정 효과 끄기"
 
 msgid "CMPTMNU_LIGHT"
-msgstr "고전적인 조명추적 사용"
+msgstr "둠 방식의 조명추적 사용"
 
 msgid "CMPTMNU_SHORTTEX"
-msgstr "고전적인 텍스처분류 사용"
+msgstr "둠 방식의 텍스처분류 사용"
 
 msgid "CMPTMNU_STAIRS"
 msgstr "구형 계단상승 효과 사용"
 
 msgid "CMPTMNU_FLOORMOVE"
-msgstr "표면이나 천장이 서로 통과가 가능함"
+msgstr "둠 방식의 바닥 이동 동작 사용"
 
 msgid "CMPTMNU_POINTONLINE"
 msgstr "구형 선상 지점 정의법 사용"
@@ -3262,16 +3324,16 @@ msgid "CMPTMNU_TRACE"
 msgstr "자기 참조 섹터가 총탄을 막지 않음"
 
 msgid "CMPTMNU_HITSCAN"
-msgstr "구형 총탄 판정법 사용"
+msgstr "둠 방식 총탄 판정 사용"
 
 msgid "CMPTMNU_MISSILECLIP"
-msgstr "구형 발사체 판정법 사용"
+msgstr "둠 방식 발사체 판정 사용"
 
 msgid "CMPTMNU_RENDERINGBEHAVIOR"
 msgstr "렌더링 관련 설정"
 
 msgid "CMPTMNU_POLYOBJ"
-msgstr "구형 폴리오브젝트 시스템 사용"
+msgstr "헥센 방식 폴리오브젝트 시스템 사용"
 
 msgid "CMPTMNU_MASKEDMIDTEX"
 msgstr "이면선분의 중앙 텍스쳐의 Y축값 무시"
@@ -3293,9 +3355,6 @@ msgstr "즉발식 이동표면 소음효과 제거"
 
 msgid "CMPTMNU_SECTORSOUNDS"
 msgstr "섹터 중심부를 효과음의 원천으로 판정"
-
-msgid "CMPTMNU_SOUNDCUTOFF"
-msgstr "효과음 원천 소멸 시 효과음도 중단"
 
 msgid "CMPTMNU_SOUNDTARGET"
 msgstr "구형 섹터 경고음 보존법 사용"
@@ -3768,9 +3827,6 @@ msgstr "반투명 효과 사용"
 msgid "DSPLYMNU_OLDTRANS"
 msgstr "구형 투명도"
 
-msgid "DSPLYMNU_TRANSSOUL"
-msgstr "로스트 소울 반투명도"
-
 msgid "DSPLYMNU_FAKECONTRAST"
 msgstr "가명암 효과 사용"
 
@@ -3868,7 +3924,7 @@ msgid "HUDMNU_FORCECROSSHAIR"
 msgstr "기본 조준점 강제 설정"
 
 msgid "HUDMNU_GROWCROSSHAIR"
-msgstr "아이템 획득 시 조준점 키우기 "
+msgstr "아이템 획득 시 조준점 키우기"
 
 msgid "HUDMNU_NAMETAGS"
 msgstr "이름표 표시"
@@ -3924,9 +3980,6 @@ msgstr "네트워크 설정"
 msgid "NETMNU_LOCALOPTIONS"
 msgstr "로컬 설정"
 
-msgid "NETMNU_MOVEPREDICTION"
-msgstr "움직임 예측도"
-
 msgid "NETMNU_LINESPECIALPREDICTION"
 msgstr "라인 움직임 감지"
 
@@ -3941,15 +3994,6 @@ msgstr "호스트 설정"
 
 msgid "NETMNU_EXTRATICS"
 msgstr "추가 틱"
-
-msgid "NETMNU_TICBALANCE"
-msgstr "지연 시간 조정"
-
-msgid "OPTVAL_ORIGINAL"
-msgstr "원형"
-
-msgid "OPTVAL_OPTIMIZED"
-msgstr "최적화 형"
 
 msgid "OPTVAL_CLASSIC"
 msgstr "구형 (빠르게)"
@@ -4017,15 +4061,6 @@ msgstr "플레이어"
 
 msgid "OPTVAL_MAP"
 msgstr "맵"
-
-msgid "OPTVAL_SCALETO640X400"
-msgstr "640x400까지 확대"
-
-msgid "OPTVAL_PIXELDOUBLE"
-msgstr "2배 픽셀"
-
-msgid "OPTVAL_PIXELQUADRUPLE"
-msgstr "4배 픽셀"
 
 msgid "OPTVAL_CURRENTWEAPON"
 msgstr "현 무기"
@@ -4120,15 +4155,6 @@ msgstr "자체 미니맵 색상 사용"
 msgid "OPTVAL_NODOORS"
 msgstr "문을 제외한 모두"
 
-msgid "OPTVAL_DOUBLE"
-msgstr "2배"
-
-msgid "OPTVAL_TRIPLE"
-msgstr "3배"
-
-msgid "OPTVAL_QUADRUPLE"
-msgstr "4배"
-
 msgid "OPTVAL_ITEMPICKUP"
 msgstr "아이템 획득시"
 
@@ -4169,16 +4195,13 @@ msgid "OPTVAL_MBFSTRICT"
 msgstr "마린의 절친한 친구 (엄격하게)"
 
 msgid "OPTVAL_MBF21"
-msgstr "마린의 절친한 친구"
+msgstr "모더의 절친한 친구"
 
 msgid "OPTVAL_MBF21STRICT"
-msgstr "마린의 절친한 친구21 (엄격하게)"
+msgstr "모더의 절친한 친구 (엄격하게)"
 
 msgid "OPTVAL_ZDOOM2063"
 msgstr "Z둠 2.0.63"
-
-msgid "OPTVAL_ALLUNACKNOWLEDGED"
-msgstr "모두 미확인함"
 
 msgid "OPTVAL_ERRORS"
 msgstr "에러"
@@ -4201,26 +4224,14 @@ msgstr "둠 소프트웨어 렌더러"
 msgid "OPTVAL_SWDOOMTC"
 msgstr "트루 컬러 소프트웨어 렌더러"
 
-msgid "OPTVAL_DEDICATED"
-msgstr "고 성능"
-
-msgid "OPTVAL_INTEGRATED"
-msgstr "저전력"
-
 msgid "OPTVAL_VANILLA"
 msgstr "바닐라"
 
 msgid "OPTVAL_VTFZDOOM"
-msgstr "ZDoom (강제 설정)"
+msgstr "Z둠 (강제 설정)"
 
 msgid "OPTVAL_VTFVANILLA"
 msgstr "바닐라 (강제 설정)"
-
-msgid "OPTVAL_VTAZDOOM"
-msgstr "자동 (ZDoom 기본 설정)"
-
-msgid "OPTVAL_VTAVANILLA"
-msgstr "자동 (바닐라 기본 설정)"
 
 msgid "OPTVAL_SMALL"
 msgstr "작게"
@@ -4313,19 +4324,13 @@ msgid "OPTSTR_HERETIC"
 msgstr "헤러틱 커서"
 
 msgid "OPTSTR_CHEX"
-msgstr "첵스 커서"
-
-msgid "OPTSTR_NOSOUND"
-msgstr "음향 없음"
+msgstr "첵스® 커서"
 
 msgid "OPTSTR_NOINTERPOLATION"
 msgstr "보간 없음"
 
 msgid "OPTSTR_SPLINE"
 msgstr "스플라인"
-
-msgid "OPTSTR_OPENAL"
-msgstr "오픈에이엘"
 
 msgid "DSPLYMNU_GLOPT"
 msgstr "오픈지엘 렌더러"
@@ -4339,12 +4344,6 @@ msgstr "오픈지엘 설정"
 msgid "GLMNU_DYNLIGHT"
 msgstr "광원 설정"
 
-msgid "GLMNU_PREFS"
-msgstr "성능"
-
-msgid "GLTEXMNU_TRIMSPREDGE"
-msgstr "스프라이트 모서리 다듬기"
-
 msgid "GLTEXMNU_SORTDRAWLIST"
 msgstr "텍스처별로 생성 목록 정렬"
 
@@ -4353,9 +4352,6 @@ msgstr "다이나믹 라이트"
 
 msgid "GLLIGHTMNU_LIGHTSENABLED"
 msgstr "다이나믹 라이트(오픈지엘)"
-
-msgid "GLLIGHTMNU_LIGHTDEFS"
-msgstr "조명 선명도 사용"
 
 msgid "GLLIGHTMNU_LIGHTSPRITES"
 msgstr "조명에 영향받는 스프라이트"
@@ -4372,17 +4368,11 @@ msgstr "섀도우맵 퀄리티"
 msgid "GLLIGHTMNU_LIGHTSHADOWMAPFILTER"
 msgstr "섀도우맵 필터"
 
-msgid "GLPREFMNU_FOGMODE"
-msgstr "안개 모드"
-
 msgid "GLPREFMNU_FOGFORCEFULLBRIGHT"
 msgstr "안개를 최대한 강제로 밝힘"
 
 msgid "GLPREFMNU_WPNLIGHTSTR"
 msgstr "무기 빛 강도"
-
-msgid "GLPREFMNU_ENVIRONMENTMAPMIRROR"
-msgstr "거울 주변의지도 활성"
 
 msgid "GLPREFMNU_ENV"
 msgstr "야시경 효과 향상"
@@ -4407,9 +4397,6 @@ msgstr "카메라를 향한 스프라이트"
 
 msgid "GLPREFMNU_PARTICLESTYLE"
 msgstr "입자 스타일"
-
-msgid "GLPREFMNU_RENDERQUALITY"
-msgstr "렌더링 품질"
 
 msgid "GLPREFMNU_VRMODE"
 msgstr "VR 입체 스테레오 사용"
@@ -4460,9 +4447,6 @@ msgstr ""
 msgid "OPTVAL_SOFTWARE"
 msgstr "소프트웨어"
 
-msgid "OPTVAL_OPTIMAL"
-msgstr "최적함"
-
 msgid "OPTVAL_YAXIS"
 msgstr "Y 축"
 
@@ -4474,9 +4458,6 @@ msgstr "정사각형"
 
 msgid "OPTVAL_ROUND"
 msgstr "원형"
-
-msgid "OPTVAL_RADIAL"
-msgstr "방사형"
 
 msgid "OPTVAL_PIXELFUZZ"
 msgstr "픽셀 퍼즈"
@@ -4541,9 +4522,6 @@ msgstr "트루 컬러 설정"
 msgid "TCMNU_TITLE"
 msgstr "트루 컬러 설정"
 
-msgid "TCMNU_TRUECOLOR"
-msgstr "트루 컬러 출력"
-
 msgid "TCMNU_MINFILTER"
 msgstr "축소시 선형 필터링함"
 
@@ -4555,21 +4533,6 @@ msgstr "밉맵 텍스쳐 사용"
 
 msgid "TCMNU_DYNLIGHTS"
 msgstr "다이나믹 라이트 (소프트웨어 버전)"
-
-msgid "OS_TITLE"
-msgstr "옵션 검색"
-
-msgid "OS_ANY"
-msgstr "용어 검색"
-
-msgid "OS_ALL"
-msgstr "모든 조건 검색"
-
-msgid "OS_NO_RESULTS"
-msgstr "검색 결과 없음."
-
-msgid "OS_LABEL"
-msgstr "검색:"
 
 msgid "AUTOMAPMNU_SHOWKEYS_ALWAYS"
 msgstr "항상 키들을 표시"
@@ -4585,16 +4548,16 @@ msgid "TXT_LONER"
 msgstr "%s 은(는) 혼자 남음."
 
 msgid "TXT_LEFTWITHFRAGS"
-msgstr "%s 이(가) 게임에서 %d 의 점수를 기록하고 퇴장 함."
+msgstr "%s 이(가) 게임에서 %d 의 점수를 기록하고 퇴장 함"
 
 msgid "TXT_LEFTTHEGAME"
-msgstr "%s 이(가) 게임을 떠남."
+msgstr "%s 이(가) 게임을 떠남"
 
 msgid "TXT_COULDNOTREAD"
-msgstr "저장된 게임을 불러올 수 없습니다.'%s'"
+msgstr "저장된 게임을 불러올 수 없습니다.'%s'."
 
 msgid "TXT_NOINFOJSON"
-msgstr "%s' 는 유효하지 않습니다: 파일이 없습니다.'info.json'"
+msgstr "%s' 는 유효하지 않습니다: 파일이 없습니다.'info.json'."
 
 msgid "TXT_FAILEDTOREADSG"
 msgstr "%s'의 저장된 게임 정보에 액세스 할 수 없습니다."
@@ -4606,8 +4569,9 @@ msgid "TXT_OTHERENGINESG"
 msgstr "저장된 게임 '%s'은(는) 다른 Z둠 기반 엔진입니다:"
 
 msgid "TXT_TOOOLDSG"
-msgstr "저장된 게임'%s'은(는) 구 버전입니다: %d (%e 이 지원되는 버전 중 가장 오래된 "
-"버전)"
+msgstr ""
+"저장된 게임'%s'은(는) 구 버전입니다: %d (%e 이 지원되는 버전 중 가장 오래된 "
+"버전)."
 
 # Shouldn’t this say “%e is the newest supported”?
 # 
@@ -4615,17 +4579,18 @@ msgstr "저장된 게임'%s'은(는) 구 버전입니다: %d (%e 이 지원되�
 # 
 # Ask Randi: The text is old. I won't change it.
 msgid "TXT_TOONEWSG"
-msgstr "저장된 게임'%s'은(는) 새 버전입니다: %d (%e 이 지원되는 버전 중 가장 최근 버"
-"전)"
+msgstr ""
+"저장된 게임'%s'은(는) 새 버전입니다: %d (%e 이 지원되는 버전 중 가장 최근 "
+"버전)."
 
 msgid "TXT_NOMAPSG"
 msgstr "저장된 게임 '%s'에 현재 맵이 없습니다."
 
 msgid "TXT_NOGLOBALSJSON"
-msgstr "%s' 는 유효하지 않습니다: 파일이 없습니다.'globals.json'"
+msgstr "%s' 는 유효하지 않습니다: 파일이 없습니다.'globals.json'."
 
 msgid "TXT_SGINFOERR"
-msgstr "%s'의 저장된 게임 정보에 액세스 할 수 없습니다."
+msgstr "%s'의 저장된 게임 정보에 액세스 할 수 없습니다"
 
 msgid "TXT_SAVEPENDING"
 msgstr "게임 저장이 아직 보류 중입니다."
@@ -4634,10 +4599,10 @@ msgid "TXT_NOTSAVEABLE"
 msgstr "저장 가능한 게임에선 불가능 합니다."
 
 msgid "TXT_NOTINLEVEL"
-msgstr "레벨 안에선 불가능 합니다."
+msgstr "레벨 안에선 불가능 합니다"
 
 msgid "TXT_SPPLAYERDEAD"
-msgstr "플레이어가 싱글 플레이 게임에서 죽었습니다."
+msgstr "플레이어가 싱글 플레이 게임에서 죽었습니다"
 
 msgid "TXT_SAVEFAILED"
 msgstr "저장 실패"
@@ -4648,9 +4613,6 @@ msgstr "스크린샷을 만들 수 없음."
 # As in paused by player %s.
 msgid "TXT_BY"
 msgstr "%s 에 의해"
-
-msgid "TXT_QUITENDOOM"
-msgstr "아무 키를 누르거나 아무 곳이나 클릭하면 종료됩니다."
 
 msgid "HUDMNU_FLASH"
 msgstr "화면 조합 설정"
@@ -4663,9 +4625,6 @@ msgstr "조준점"
 
 msgid "MSGMNU_SUBTITLES"
 msgstr "자막"
-
-msgid "GLPREFMNU_PALTONENOGREY"
-msgstr "회색 그림자 없에기"
 
 msgid "HUDMNU_FONTOPTIONS"
 msgstr "폰트 설정"
@@ -4707,11 +4666,6 @@ msgstr "스케일링 계수"
 msgid "SCALEMNU_RATIO"
 msgstr "화면 비율"
 
-# as in "Build engine". This should not be translated unless there is a
-# translated name for the engine
-msgid "OPTVAL_BUILD"
-msgstr ""
-
 # sv_alwaystally
 msgid "MISCMNU_ALWAYSTALLY"
 msgstr "레벨 종료 시 집계 화면 표시"
@@ -4730,11 +4684,12 @@ msgid "CNTRLMNU_LAYOUT"
 msgstr "기본 키보드 레이아웃"
 
 msgid "OPTVAL_CLASSICZ"
-msgstr "클래식 ZDoom"
+msgstr "클래식 Z둠"
 
 msgid "OPTVAL_MODERN"
 msgstr "모던(WASD)"
 
+#, fuzzy
 msgid "OPTVAL_MODERNLEFT"
 msgstr "모던(키패드)"
 
@@ -4745,7 +4700,7 @@ msgid "MISCMNU_WIPERCENT"
 msgstr "요약 화면에서 퍼센트 사용"
 
 msgid "MISCMNU_CLEANSTAT"
-msgstr "요약 화면에서 클래식 ZDoom 스케일링"
+msgstr "요약 화면에서 클래식 Z둠 스케일링"
 
 # Called "citizens" according to Doomwiki
 msgid "TAG_STRIFEZOMBIE"
@@ -4803,13 +4758,13 @@ msgid "DSPLYMNU_FOV"
 msgstr ""
 
 msgid "CMPTMNU_NOMBF21"
-msgstr "MBF21 기능 비활성화"
+msgstr "모더의 절친한 친구 기능 비활성화"
 
 msgid "ALTHUDMNU_SHOWTIMESTAT"
 msgstr "시간 표시 위젯"
 
 msgid "CMPTMNU_VILEGHOSTS"
-msgstr "분쇄된 몬스터는 유령으로 부활합니다."
+msgstr "분쇄된 몬스터는 유령으로 부활합니다"
 
 msgid "MISCMNU_FVIEWBOB"
 msgstr "비행 중 흔들림 보기"
@@ -5026,9 +4981,6 @@ msgstr ""
 msgid "NETMNU_CHATSLOMO"
 msgstr ""
 
-msgid "JOYMNU_HAPTRIGGERS"
-msgstr ""
-
 msgid "OPTMNU_HAPTICS"
 msgstr ""
 
@@ -5203,3 +5155,22 @@ msgstr "대비"
 
 msgid "DSPLYMNU_SATURATION"
 msgstr "채도"
+
+msgid "OPTMNU_ACCESSIBILITY"
+msgstr "접근성 설정"
+
+#, fuzzy
+msgid "OPTVAL_SMOOTH"
+msgstr "부드럽게"
+
+#, fuzzy
+msgid "TAG_MACIL"
+msgstr "마실"
+
+#, fuzzy
+msgid "TAG_MAULER"
+msgstr "마울러"
+
+#, fuzzy
+msgid "TAG_GLAUNCHER"
+msgstr "유탄발사기"

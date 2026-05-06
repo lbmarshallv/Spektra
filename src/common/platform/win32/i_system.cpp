@@ -65,6 +65,7 @@
 #include "cmdlib.h"
 #include "i_interface.h"
 #include "i_mainwindow.h"
+#include "stringtable.h"
 
 #include "widgets/launcherwindow.h"
 
@@ -823,19 +824,14 @@ void I_OpenShellFolder(const char* infolder)
 	}
 }
 
-bool I_IsDarkMode()
+FString FStringTable::GetSystemLocale()
 {
-    DWORD value = 1; // default to light
-    DWORD size = sizeof(value);
+	wchar_t LocaleName[LOCALE_NAME_MAX_LENGTH];
 
-    HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER,
-                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                      0, KEY_READ, &hKey) == ERROR_SUCCESS)
-    {
-        RegQueryValueExW(hKey, L"AppsUseLightTheme", nullptr, nullptr, reinterpret_cast<LPBYTE>(&value), &size);
-        RegCloseKey(hKey);
-    }
+	if (GetUserDefaultLocaleName(LocaleName, LOCALE_NAME_MAX_LENGTH) > 0)
+	{
+		return FString(LocaleName);
+	}
 
-    return value == 0; // 0 means dark mode
+	return "en-US";
 }

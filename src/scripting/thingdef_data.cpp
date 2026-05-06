@@ -663,7 +663,7 @@ void InitImports();
 struct UserInfoCVarNamePlayer
 {
 	FBaseCVar** addr;
-	FString name;
+	FName name;
 	int pnum;
 };
 
@@ -874,7 +874,7 @@ void InitThingdef()
 				}
 				else
 				{
-					FString name = self->GetName();
+					FName name = self->GetFName();
 					arc("name", name);
 				}
 
@@ -885,7 +885,7 @@ void InitThingdef()
 		{
 			FBaseCVar ** self = (FBaseCVar**)addr;
 
-			FString name;
+			FName name;
 			arc.BeginObject(key);
 
 			arc("name", name);
@@ -899,10 +899,19 @@ void InitThingdef()
 			{
 				if(int pnum; arc.ReadOptionalInt("player", pnum))
 				{
-					*self = nullptr;
-					LoadGameUserInfoCVars.Push({self, name, pnum}); // this needs to be done later, since userinfo isn't loaded yet
-					arc.EndObject();
-					return true;
+					if(arc.IsRollback())
+					{
+						*self = GetCVar(pnum, name.GetChars());
+						arc.EndObject();
+						return true;
+					}
+					else
+					{
+						*self = nullptr;
+						LoadGameUserInfoCVars.Push({self, name, pnum}); // this needs to be done later, since userinfo isn't loaded yet
+						arc.EndObject();
+						return true;
+					}
 				}
 			}
 			

@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"PO-Revision-Date: 2025-11-20 13:51+0000\n"
-"Last-Translator: Douggy Sans <dfr1238@gmail.com>\n"
+"PO-Revision-Date: 2026-04-13 18:01+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Chinese (Traditional Han script) <https://hosted.weblate.org/"
 "projects/uzdoom/zdoom-engine-strings/zh_Hant/>\n"
 "Language: zh_Hant\n"
@@ -11,81 +11,124 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Generator: Weblate 5.15-dev\n"
-"HeaderCode: cht\n"
+"X-Generator: Weblate 5.17-dev\n"
 
 msgid "PRESSKEY"
 msgstr "按下任何鍵。"
 
 msgid "SECRETMESSAGE"
-msgstr ""
+msgstr "發現了一個秘密！"
 
 msgid "D_DEVSTR"
-msgstr ""
+msgstr "無用模式：開"
 
 msgid "QUITMSG"
 msgstr ""
+"你確定你要離開這款\n"
+"偉大遊戲嗎？"
 
 # In some languages, it may make more sense to translate “Press a key” as
 # “Press any key.”
 msgid "LOADNET"
 msgstr ""
+"你不能在多人連線遊戲中讀取！\n"
+"\n"
+"按下任何鍵。"
 
 msgid "QLOADNET"
 msgstr ""
+"你不能在多人連線遊戲中快速讀取！\n"
+"\n"
+"按下任何鍵。"
 
 msgid "QSAVESPOT"
 msgstr ""
+"你還沒選取一個快速儲存位置！\n"
+"\n"
+"按下任何鍵。"
 
 msgid "NEWGAME"
 msgstr ""
+"你無法在進行多人連線\n"
+"時開始新遊戲。\n"
+"\n"
+"按下任何鍵。"
 
 msgid "NIGHTMARE"
 msgstr ""
+"你確定嗎？這個難度等級\n"
+"是極度不公平的。\n"
+"\n"
+"按下 Y 或 N 。"
 
 msgid "SWSTRING"
 msgstr ""
+"這是共享軟體版本的Doom。\n"
+"\n"
+"你需要購買註冊版本。\n"
+"\n"
+"按下任何鍵。"
 
 msgid "NETEND"
 msgstr ""
+"你無法結束一個多人連線遊戲！\n"
+"\n"
+"按下任何鍵。"
 
 msgid "ENDGAME"
 msgstr ""
+"你確定你要結束這場遊戲？\n"
+"\n"
+"按下 Y 或 N 。"
 
 msgid "RAVENQUITMSG"
-msgstr ""
+msgstr "你確定你要離開嗎？"
 
 msgctxt "heretic"
 msgid "SWSTRING"
-msgstr ""
+msgstr "只在註冊版中可用"
 
 msgid "DOSY"
-msgstr ""
+msgstr "（按下 Y 來離開）"
 
 msgid "QUITMSG1"
 msgstr ""
+"請別離開，那裡有更多\n"
+"惡魔要烤熟！"
 
 msgid "QUITMSG2"
 msgstr ""
+"來擊敗它－這正要變成\n"
+"一場大屠殺了！"
 
 msgid "QUITMSG3"
 msgstr ""
+"如果我是你的話我不會離開。\n"
+"相比之下， DOS 更加糟糕。"
 
 msgid "QUITMSG4"
 msgstr ""
+"你是想說你比我還更喜歡 DOS \n"
+"，是嗎？"
 
 msgid "QUITMSG5"
 msgstr ""
+"還別離開，那裡有一隻\n"
+"惡魔正在那角落！"
 
 msgid "QUITMSG6"
 msgstr ""
+"給我記住，下次你再來這的時候\n"
+"我要把你烤成灰。"
 
 msgid "QUITMSG7"
-msgstr ""
+msgstr "給我快滾啦，我才懶得管哩。"
 
 # More info here.
 msgid "QUITMSG8"
 msgstr ""
+"你想離開？\n"
+"那，汝已失去那八分之一的美德！"
 
 # A “dimensional shambler” is a creature appearing in the works of H. P.
 # Lovecraft.
@@ -440,13 +483,13 @@ msgid "SCORE_BONUS"
 msgstr ""
 
 msgid "SCORE_COLOR"
-msgstr ""
+msgstr "顏色"
 
 msgid "SCORE_SECRET"
 msgstr ""
 
 msgid "SCORE_NAME"
-msgstr ""
+msgstr "名字"
 
 msgid "SCORE_DELAY"
 msgstr ""
@@ -479,7 +522,7 @@ msgid "TXT_IMSECRETS"
 msgstr ""
 
 msgid "TXT_IMTIME"
-msgstr ""
+msgstr "時間"
 
 msgid "TXT_IMPAR"
 msgstr ""
@@ -2763,7 +2806,7 @@ msgid "MNU_NEWGAME"
 msgstr ""
 
 msgid "MNU_OPTIONS"
-msgstr ""
+msgstr "選項"
 
 msgid "MNU_GAMEFILES"
 msgstr ""
@@ -2772,7 +2815,7 @@ msgid "MNU_INFO"
 msgstr ""
 
 msgid "MNU_QUITGAME"
-msgstr ""
+msgstr "離開遊戲"
 
 # This text is extremely space limited!
 msgid "MNU_CHOOSESKILL"
@@ -3223,9 +3266,6 @@ msgstr ""
 msgid "CMPTMNU_SECTORSOUNDS"
 msgstr ""
 
-msgid "CMPTMNU_SOUNDCUTOFF"
-msgstr ""
-
 msgid "CMPTMNU_SOUNDTARGET"
 msgstr ""
 
@@ -3248,13 +3288,13 @@ msgid "CMPTMNU_EXPLODE2"
 msgstr ""
 
 msgid "PLYRMNU_RED"
-msgstr ""
+msgstr "紅"
 
 msgid "PLYRMNU_GREEN"
-msgstr ""
+msgstr "綠"
 
 msgid "PLYRMNU_BLUE"
-msgstr ""
+msgstr "藍"
 
 msgid "PLYRMNU_PLAYERCLASS"
 msgstr ""
@@ -3697,9 +3737,6 @@ msgstr ""
 msgid "DSPLYMNU_OLDTRANS"
 msgstr ""
 
-msgid "DSPLYMNU_TRANSSOUL"
-msgstr ""
-
 msgid "DSPLYMNU_FAKECONTRAST"
 msgstr ""
 
@@ -3782,7 +3819,7 @@ msgid "SCALEMNU_ADAPT"
 msgstr ""
 
 msgid "HUDMNU_TITLE"
-msgstr ""
+msgstr "抬頭顯示器選項"
 
 msgid "HUDMNU_ALTHUD"
 msgstr ""
@@ -3848,12 +3885,9 @@ msgid "MISCMNU_INTERSCROLL"
 msgstr ""
 
 msgid "NETMNU_TITLE"
-msgstr ""
+msgstr "網路選項"
 
 msgid "NETMNU_LOCALOPTIONS"
-msgstr ""
-
-msgid "NETMNU_MOVEPREDICTION"
 msgstr ""
 
 msgid "NETMNU_LINESPECIALPREDICTION"
@@ -3869,15 +3903,6 @@ msgid "NETMNU_HOSTOPTIONS"
 msgstr ""
 
 msgid "NETMNU_EXTRATICS"
-msgstr ""
-
-msgid "NETMNU_TICBALANCE"
-msgstr ""
-
-msgid "OPTVAL_ORIGINAL"
-msgstr ""
-
-msgid "OPTVAL_OPTIMIZED"
 msgstr ""
 
 msgid "OPTVAL_CLASSIC"
@@ -3930,30 +3955,21 @@ msgid "OPTVAL_ITEMS"
 msgstr ""
 
 msgid "OPTVAL_WEAPONS"
-msgstr ""
+msgstr "武器"
 
 msgid "OPTVAL_BOTH"
 msgstr ""
 
 msgid "OPTVAL_ZDOOM"
-msgstr ""
+msgstr "ZDoom"
 
 msgid "OPTVAL_STRIFE"
-msgstr ""
+msgstr "Strife"
 
 msgid "OPTVAL_PLAYER"
 msgstr ""
 
 msgid "OPTVAL_MAP"
-msgstr ""
-
-msgid "OPTVAL_SCALETO640X400"
-msgstr ""
-
-msgid "OPTVAL_PIXELDOUBLE"
-msgstr ""
-
-msgid "OPTVAL_PIXELQUADRUPLE"
 msgstr ""
 
 msgid "OPTVAL_CURRENTWEAPON"
@@ -4049,15 +4065,6 @@ msgstr ""
 msgid "OPTVAL_NODOORS"
 msgstr ""
 
-msgid "OPTVAL_DOUBLE"
-msgstr ""
-
-msgid "OPTVAL_TRIPLE"
-msgstr ""
-
-msgid "OPTVAL_QUADRUPLE"
-msgstr ""
-
 msgid "OPTVAL_ITEMPICKUP"
 msgstr ""
 
@@ -4074,39 +4081,36 @@ msgid "OPTVAL_ONLYMONSTERS"
 msgstr ""
 
 msgid "OPTVAL_HEXEN"
-msgstr ""
+msgstr "Hexen"
 
 msgid "OPTVAL_OLD"
 msgstr ""
 
 msgid "OPTVAL_DOOM"
-msgstr ""
+msgstr "Doom"
 
 msgid "OPTVAL_DOOMSTRICT"
 msgstr ""
 
 msgid "OPTVAL_BOOM"
-msgstr ""
+msgstr "Boom"
 
 msgid "OPTVAL_BOOMSTRICT"
 msgstr ""
 
 msgid "OPTVAL_MBF"
-msgstr ""
+msgstr "MBF"
 
 msgid "OPTVAL_MBFSTRICT"
 msgstr ""
 
 msgid "OPTVAL_MBF21"
-msgstr ""
+msgstr "MBF21"
 
 msgid "OPTVAL_MBF21STRICT"
 msgstr ""
 
 msgid "OPTVAL_ZDOOM2063"
-msgstr ""
-
-msgid "OPTVAL_ALLUNACKNOWLEDGED"
 msgstr ""
 
 msgid "OPTVAL_ERRORS"
@@ -4130,12 +4134,6 @@ msgstr ""
 msgid "OPTVAL_SWDOOMTC"
 msgstr ""
 
-msgid "OPTVAL_DEDICATED"
-msgstr ""
-
-msgid "OPTVAL_INTEGRATED"
-msgstr ""
-
 msgid "OPTVAL_VANILLA"
 msgstr ""
 
@@ -4143,12 +4141,6 @@ msgid "OPTVAL_VTFZDOOM"
 msgstr ""
 
 msgid "OPTVAL_VTFVANILLA"
-msgstr ""
-
-msgid "OPTVAL_VTAZDOOM"
-msgstr ""
-
-msgid "OPTVAL_VTAVANILLA"
 msgstr ""
 
 msgid "OPTVAL_SMALL"
@@ -4239,21 +4231,15 @@ msgid "C_TEAL"
 msgstr ""
 
 msgid "OPTSTR_HERETIC"
-msgstr ""
+msgstr "Heretic"
 
 msgid "OPTSTR_CHEX"
-msgstr ""
-
-msgid "OPTSTR_NOSOUND"
-msgstr ""
+msgstr "Chex®"
 
 msgid "OPTSTR_NOINTERPOLATION"
 msgstr ""
 
 msgid "OPTSTR_SPLINE"
-msgstr ""
-
-msgid "OPTSTR_OPENAL"
 msgstr ""
 
 msgid "DSPLYMNU_GLOPT"
@@ -4268,12 +4254,6 @@ msgstr ""
 msgid "GLMNU_DYNLIGHT"
 msgstr ""
 
-msgid "GLMNU_PREFS"
-msgstr ""
-
-msgid "GLTEXMNU_TRIMSPREDGE"
-msgstr ""
-
 msgid "GLTEXMNU_SORTDRAWLIST"
 msgstr ""
 
@@ -4281,9 +4261,6 @@ msgid "GLLIGHTMNU_TITLE"
 msgstr ""
 
 msgid "GLLIGHTMNU_LIGHTSENABLED"
-msgstr ""
-
-msgid "GLLIGHTMNU_LIGHTDEFS"
 msgstr ""
 
 msgid "GLLIGHTMNU_LIGHTSPRITES"
@@ -4301,16 +4278,10 @@ msgstr ""
 msgid "GLLIGHTMNU_LIGHTSHADOWMAPFILTER"
 msgstr ""
 
-msgid "GLPREFMNU_FOGMODE"
-msgstr ""
-
 msgid "GLPREFMNU_FOGFORCEFULLBRIGHT"
 msgstr ""
 
 msgid "GLPREFMNU_WPNLIGHTSTR"
-msgstr ""
-
-msgid "GLPREFMNU_ENVIRONMENTMAPMIRROR"
 msgstr ""
 
 msgid "GLPREFMNU_ENV"
@@ -4335,9 +4306,6 @@ msgid "GLPREFMNU_SPRBILLFACECAMERA"
 msgstr ""
 
 msgid "GLPREFMNU_PARTICLESTYLE"
-msgstr ""
-
-msgid "GLPREFMNU_RENDERQUALITY"
 msgstr ""
 
 msgid "GLPREFMNU_VRMODE"
@@ -4389,9 +4357,6 @@ msgstr ""
 msgid "OPTVAL_SOFTWARE"
 msgstr ""
 
-msgid "OPTVAL_OPTIMAL"
-msgstr ""
-
 msgid "OPTVAL_YAXIS"
 msgstr ""
 
@@ -4402,9 +4367,6 @@ msgid "OPTVAL_SQUARE"
 msgstr ""
 
 msgid "OPTVAL_ROUND"
-msgstr ""
-
-msgid "OPTVAL_RADIAL"
 msgstr ""
 
 msgid "OPTVAL_PIXELFUZZ"
@@ -4470,9 +4432,6 @@ msgstr ""
 msgid "TCMNU_TITLE"
 msgstr ""
 
-msgid "TCMNU_TRUECOLOR"
-msgstr ""
-
 msgid "TCMNU_MINFILTER"
 msgstr ""
 
@@ -4483,21 +4442,6 @@ msgid "TCMNU_MIPMAP"
 msgstr ""
 
 msgid "TCMNU_DYNLIGHTS"
-msgstr ""
-
-msgid "OS_TITLE"
-msgstr ""
-
-msgid "OS_ANY"
-msgstr ""
-
-msgid "OS_ALL"
-msgstr ""
-
-msgid "OS_NO_RESULTS"
-msgstr ""
-
-msgid "OS_LABEL"
 msgstr ""
 
 msgid "AUTOMAPMNU_SHOWKEYS_ALWAYS"
@@ -4576,9 +4520,6 @@ msgstr ""
 msgid "TXT_BY"
 msgstr ""
 
-msgid "TXT_QUITENDOOM"
-msgstr ""
-
 msgid "HUDMNU_FLASH"
 msgstr ""
 
@@ -4589,9 +4530,6 @@ msgid "HUDMNU_CROSSHAIRON"
 msgstr ""
 
 msgid "MSGMNU_SUBTITLES"
-msgstr ""
-
-msgid "GLPREFMNU_PALTONENOGREY"
 msgstr ""
 
 msgid "HUDMNU_FONTOPTIONS"
@@ -4632,11 +4570,6 @@ msgid "SCALEMNU_FACTOR"
 msgstr ""
 
 msgid "SCALEMNU_RATIO"
-msgstr ""
-
-# as in "Build engine". This should not be translated unless there is a
-# translated name for the engine
-msgid "OPTVAL_BUILD"
 msgstr ""
 
 # sv_alwaystally
@@ -4887,7 +4820,7 @@ msgid "JOYMNU_THRESHOLD"
 msgstr ""
 
 msgid "OPTVAL_LINEAR"
-msgstr ""
+msgstr "線性"
 
 msgid "OPTVAL_QUADRATIC"
 msgstr ""
@@ -4903,7 +4836,7 @@ msgid "OPTVAL_TEAMONLYCHAT"
 msgstr ""
 
 msgid "OPTVAL_GLOBALCHAT"
-msgstr ""
+msgstr "全域"
 
 # Disables /me functionality in chat when displaying.
 msgid "NETMNU_NOBOLDCHAT"
@@ -4953,9 +4886,6 @@ msgstr ""
 msgid "NETMNU_CHATSLOMO"
 msgstr ""
 
-msgid "JOYMNU_HAPTRIGGERS"
-msgstr ""
-
 msgid "OPTMNU_HAPTICS"
 msgstr ""
 
@@ -4989,7 +4919,7 @@ msgid "HAPMNU_OPT_WORLD"
 msgstr ""
 
 msgid "PAUSE_STRING"
-msgstr ""
+msgstr "暫停"
 
 msgid "TAG_BACKPACK"
 msgstr ""
@@ -5118,3 +5048,6 @@ msgstr ""
 
 msgid "CNTRLMNU_COOPSPYCANCEL"
 msgstr ""
+
+msgid "OPTMNU_ACCESSIBILITY"
+msgstr "無障礙輔助選項"

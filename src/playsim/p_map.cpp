@@ -1524,7 +1524,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (tm.thing->flags & MF_SKULLFLY)
 	{
 		bool res = tm.thing->CallSlam(tm.thing->BlockingMobj.ForceGet());
-		tm.thing->BlockingMobj = NULL;
+		tm.thing->BlockingMobj = nullptr;
 		return res;
 	}
 
@@ -1863,7 +1863,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 		return true;
 
 	// Check things first, possibly picking things up.
-	thing->BlockingMobj = NULL;
+	thing->BlockingMobj = nullptr;
 	thingblocker = NULL;
 	if (thing->player)
 	{ // [RH] Fake taller height to catch stepping up into things.
@@ -1908,7 +1908,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					{
 						thingblocker = BlockingMobj;
 					}
-					thing->BlockingMobj = NULL;
+					thing->BlockingMobj = nullptr;
 				}
 				else if (thing->player &&
 					thing->Top() - BlockingMobj->Z() <= thing->MaxStepHeight)
@@ -1921,7 +1921,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					}
 					// Nothing is blocking us, but this actor potentially could
 					// if there is something else to step on.
-					thing->BlockingMobj = NULL;
+					thing->BlockingMobj = nullptr;
 				}
 				else
 				{ // Definitely blocking
@@ -1950,7 +1950,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 	spechit.Clear();
 	portalhit.Clear();
 
-	thing->BlockingMobj = NULL;
+	thing->BlockingMobj = nullptr;
 	thing->Height = realHeight;
 	if (actorsonly || (thing->flags & MF_NOCLIP))
 		return (thing->BlockingMobj = thingblocker) == NULL;
@@ -6474,7 +6474,7 @@ int P_RadiusAttack(AActor *bombspot, AActor *bombsource, int bombdamage, double 
 			!(flags & RADF_OLDRADIUSDAMAGE) && !(thing->Level->i_compatflags2 & COMPATF2_EXPLODE2)))
 		{
 			double points = GetRadiusDamage(false, bombspot, thing, bombdamage, bombdistance, fulldamagedistance, bombsource == thing,!!(flags & RADF_CIRCULAR));
-			double check = int(points) * bombdamage;
+			double check = double(int(points)) * bombdamage;
 			// points and bombdamage should be the same sign (the double cast of 'points' is needed to prevent overflows and incorrect values slipping through.)
 			if ((check > 0 || (check == 0 && bombspot->flags7 & MF7_FORCEZERORADIUSDMG)) && P_CheckSight(thing, bombspot, SF_IGNOREVISIBILITY | SF_IGNOREWATERBOUNDARY))
 			{ // OK to damage; target is in direct path

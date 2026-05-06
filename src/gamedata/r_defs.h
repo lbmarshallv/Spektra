@@ -1202,6 +1202,8 @@ enum
 	WALLF_ABSLIGHTING_MID		= WALLF_ABSLIGHTING_TIER << 1, 	// Mid tier light is absolute instead of relative
 	WALLF_ABSLIGHTING_BOTTOM 	= WALLF_ABSLIGHTING_TIER << 2,	// Bottom tier light is absolute instead of relative
 
+	WALLF_BLOCKRENDERING		= 4096,	// [XA] Do not render any geometry on the other side of this line (similar to 1-sided walls, but only when seeing through this side of the line)
+
 	WALLF_DITHERTRANS			= 8192,	// Render with dithering transparency shader (gets reset every frame)
 	WALLF_DITHERTRANS_TOP		= WALLF_DITHERTRANS << 0,	// Top tier (gets reset every frame)
 	WALLF_DITHERTRANS_MID		= WALLF_DITHERTRANS << 1,	// Mid tier (gets reset every frame)
@@ -1274,6 +1276,7 @@ struct side_t
 	int16_t		Light;
 	int16_t		TierLights[3];	// per-tier light levels
 	uint16_t	Flags;
+	double		alpha;
 	int			UDMFIndex;		// needed to access custom UDMF fields which are stored in loading order.
 	LightmapSurface* lightmap;
 	seg_t **segs;	// all segs belonging to this sidedef in ascending order. Used for precise rendering
@@ -1294,6 +1297,22 @@ struct side_t
 		TierLights[which] = l;
 	}
 
+	void SetAlpha(double a)
+	{
+		alpha = a;
+	}
+
+	void ClearAlpha()
+	{
+		// [XA] use DBL_MAX as a sentinel value for "alpha not set",
+		// instructing the renderer to use the linedef's alpha instead
+		alpha = DBL_MAX;
+	}
+
+	bool HasAlpha()
+	{
+		return alpha != DBL_MAX;
+	}
 
 	FLevelLocals *GetLevel()
 	{

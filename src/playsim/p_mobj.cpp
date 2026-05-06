@@ -78,6 +78,7 @@
 #define WATER_SINK_SMALL_FACTOR	0.25
 #define WATER_SINK_SPEED		0.5
 #define WATER_JUMP_SPEED		3.5
+#define Z_UNDERFLOW             -32768.0
 
 // EXTERNAL FUNCTION PROTOTYPES --------------------------------------------
 
@@ -404,7 +405,9 @@ void AActor::Serialize(FSerializer &arc)
 		("morphexitflash", MorphExitFlash)
 		("damagesource", damagesource)
 		("behaviors", Behaviors)
-		A("decalgenerator", DecalGenerator);
+		A("decalgenerator", DecalGenerator)
+		A("minrespawntics", MinRespawnTics)
+		A("respawndice", RespawnDice);
 
 		SerializeTerrain(arc, "floorterrain", floorterrain, &def->floorterrain);
 		SerializeArgs(arc, "args", args, def->args, special);
@@ -3021,6 +3024,12 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 	}
 
 
+	if (mo->Level->i_compatflags2 & COMPATF2_EMULATEMIKOPORTALS && mo->Z() < Z_UNDERFLOW)
+	{
+		mo->SetZ(mo->ceilingz);
+		mo->Prev.Z = mo->Z();
+	}
+
 	mo->CallFallAndSink(grav, oldfloorz);
 
 	// Hexen compatibility handling for floatbobbing. Ugh...
@@ -3086,13 +3095,12 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 		mo->Vel.Z *= friction;
 	}
 
-//
-// clip movement
-//
-
-
+	//
+	// clip movement
+	//
 	if (mo->Z() <= mo->floorz)
-	{	// Hit the floor
+	{
+		// Hit the floor
 		if ((!mo->player || !(mo->player->cheats & CF_PREDICTING)) &&
 			mo->Sector->SecActTarget != NULL &&
 			mo->Sector->floorplane.ZatPoint(mo) == mo->floorz)
@@ -5157,6 +5165,7 @@ void AActor::Tick ()
 			}
 
 		}
+
 		if (Vel.Z != 0 || BlockingMobj.ForceGet() || Z() != floorz)
 		{	// Handle Z velocity and gravity
 			if (((flags2 & MF2_PASSMOBJ) || (flags & MF_SPECIAL)) && !(Level->i_compatflags & COMPATF_NO_PASSMOBJ))
@@ -5324,6 +5333,12 @@ void AActor::Tick ()
 	if (tics == -1 || state->GetCanRaise())
 	{
 		int respawn_monsters = G_SkillProperty(SKILLP_Respawn);
+
+		if (MinRespawnTics > 0)
+			respawn_monsters = MinRespawnTics;
+		else if (MinRespawnTics < 0)
+			respawn_monsters = -MinRespawnTics * TICRATE;
+
 		// check for nightmare respawn
 		if (!(flags5 & MF5_ALWAYSRESPAWN))
 		{
@@ -5343,7 +5358,7 @@ void AActor::Tick ()
 		if (Level->time & 31)
 			return;
 
-		if (pr_nightmarerespawn() > 4)
+		if (pr_nightmarerespawn() > RespawnDice)
 			return;
 
 		P_NightmareRespawn (this);
@@ -6658,6 +6673,8 @@ AActor *FLevelLocals::SpawnPlayer (FPlayerStart *mthing, int playernum, int flag
 	{ // Remove any inventory left from the old actor. Coop handles
 	  // it above, but the other modes don't.
 		DestroyAllInventory(oldactor);
+		// Clean these up as well, otherwise pointer substitution will break a lot of things.
+		oldactor->ClearBehaviors();
 	}
 	// [BC] Handle temporary invulnerability when respawned
 	if (state == PST_REBORN || state == PST_ENTER)

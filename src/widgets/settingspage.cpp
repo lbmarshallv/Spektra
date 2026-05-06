@@ -15,22 +15,20 @@
 **
 */
 
-#include "settingspage.h"
-#include "findfile.h"
-#include "launcherwindow.h"
+#include <zwidget/core/resourcedata.h>
+#include <zwidget/widgets/checkboxlabel/checkboxlabel.h>
+#include <zwidget/widgets/dropdown/dropdown.h>
+#include <zwidget/widgets/listview/listview.h>
+#include <zwidget/widgets/textlabel/textlabel.h>
+
 #include "findfile.h"
 #include "gameconfigfile.h"
 #include "gstrings.h"
 #include "i_interface.h"
 #include "i_system.h"
-#include "v_video.h"
+#include "launcherwindow.h"
 #include "sc_man.h"
-
-#include <zwidget/core/resourcedata.h>
-#include <zwidget/widgets/listview/listview.h>
-#include <zwidget/widgets/dropdown/dropdown.h>
-#include <zwidget/widgets/textlabel/textlabel.h>
-#include <zwidget/widgets/checkboxlabel/checkboxlabel.h>
+#include "settingspage.h"
 
 static constexpr struct { const char* string; int flag; } FILELOAD_OPTS[] = {
 	{"OPTVAL_LAX", REQUIRE_NONE},
@@ -107,8 +105,7 @@ SettingsPage::SettingsPage(LauncherWindow* launcher, const FStartupSelectionInfo
 						FString iso = sc.String;
 						sc.MustGetStringName(",");
 						sc.MustGetString();
-						if(iso.CompareNoCase("auto"))
-							languages.push_back(std::make_pair(iso, FString(sc.String)));
+						languages.push_back(std::make_pair(iso, FString(sc.String)));
 					}
 				}
 			}
@@ -126,7 +123,7 @@ SettingsPage::SettingsPage(LauncherWindow* launcher, const FStartupSelectionInfo
 			LangList->SetSelectedItem(i);
 		++i;
 	}
-	LangList->OnChanged = [=](int i) { OnLanguageChanged(i); };
+	LangList->OnChanged = [this](int i) { OnLanguageChanged(i); };
 
 	ExtraWadFlags = 0;
 
@@ -142,7 +139,7 @@ SettingsPage::SettingsPage(LauncherWindow* launcher, const FStartupSelectionInfo
 	{
 		LoadLabel = new TextLabel(this);
 		LoadList = new Dropdown(this);
-		LoadList->SetMaxDisplayItems(2);
+		LoadList->SetMaxDisplayItems(4);
 		LoadList->SetDropdownDirection(false);
 		int opts = sizeof(FILELOAD_OPTS)/sizeof(FILELOAD_OPTS[0]), selected = opts-1;
 		for (int i = 0; i < opts; i++)
@@ -182,6 +179,8 @@ void SettingsPage::SetValues(FStartupSelectionInfo& info) const
 
 void SettingsPage::UpdateLanguage()
 {
+	GetCanvas()->setLanguage(GStrings.GetLangName().GetChars());
+
 	LangLabel->SetText(GStrings.GetString("OPTMNU_LANGUAGE"));
 	LoadLabel->SetText(GStrings.GetString("PICKER_FILELOADING"));
 	GeneralLabel->SetText(GStrings.GetString("PICKER_GENERAL"));
@@ -193,6 +192,13 @@ void SettingsPage::UpdateLanguage()
 	BrightmapsCheckbox->SetText(GStrings.GetString("PICKER_BRIGHTMAPS"));
 	WidescreenCheckbox->SetText(GStrings.GetString("PICKER_WIDESCREEN"));
 	SupportWadsCheckbox->SetText(GStrings.GetString("PICKER_SUPPORTWADS"));
+	{
+		int opts = sizeof(FILELOAD_OPTS) / sizeof(FILELOAD_OPTS[0]);
+		for (int i = 0; i < opts; i++)
+		{
+			LoadList->UpdateItem(GStrings.GetString(FILELOAD_OPTS[i].string), i);
+		}
+	}
 
 #ifdef RENDER_BACKENDS
 	BackendLabel->SetText(GStrings.GetString("PICKER_PREFERBACKEND"));
@@ -206,6 +212,7 @@ void SettingsPage::OnLanguageChanged(int i)
 {
 	GStrings.UpdateLanguage(languages[i].first.GetChars());
 	UpdateLanguage();
+	OnGeometryChanged();
 	Update();
 	Launcher->UpdateLanguage();
 }
@@ -299,4 +306,6 @@ void SettingsPage::OnGeometryChanged()
 	y += LoadList->GetHeight();
 
 	Launcher->UpdatePlayButton();
+
+	LangList->ScrollToItem(LangList->GetSelectedItem());
 }

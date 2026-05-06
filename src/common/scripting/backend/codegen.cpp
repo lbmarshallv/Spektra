@@ -21,19 +21,16 @@
 **
 */
 
-#include <stdlib.h>
+#include "basics.h"
 #include "cmdlib.h"
 #include "codegen.h"
-#include "sc_man.h"
-#include "v_text.h"
 #include "filesystem.h"
-#include "v_video.h"
-#include "utf8.h"
-#include "texturemanager.h"
 #include "m_random.h"
-#include "v_font.h"
 #include "palettecontainer.h"
-
+#include "printf.h"
+#include "sc_man.h"
+#include "texturemanager.h"
+#include "v_font.h"
 
 extern FRandom pr_exrandom;
 FMemArena FxAlloc(65536);
@@ -6447,14 +6444,7 @@ FxFRandom::FxFRandom(FRandom *r, FxExpression *mi, FxExpression *ma, const FScri
 
 static double NativeFRandom(FRandom *rng, double min, double max)
 {
-	int random = (*rng)(0x40000000);
-	double frandom = random / double(0x40000000);
-
-	if (max < min)
-	{
-		std::swap(max, min);
-	}
-	return frandom * (max - min) + min;
+	return rng->RandomFloat(min, max);
 }
 
 DEFINE_ACTION_FUNCTION_NATIVE(DObject, BuiltinFRandom, NativeFRandom)

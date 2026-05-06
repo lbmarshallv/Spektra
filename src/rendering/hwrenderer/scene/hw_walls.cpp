@@ -1644,7 +1644,8 @@ void HWWall::DoMidTexture(HWWallDispatcher *di, seg_t * seg, bool drawfogboundar
 	// set up alpha blending
 	//
 	// 
-	if (seg->linedef->alpha != 0)
+	bool sideHasAlpha = seg->sidedef->HasAlpha();
+	if (sideHasAlpha || seg->linedef->alpha != 0)
 	{
 		bool translucent = false;
 
@@ -1652,13 +1653,13 @@ void HWWall::DoMidTexture(HWWallDispatcher *di, seg_t * seg, bool drawfogboundar
 		{
 		case 0:
 			RenderStyle=STYLE_Translucent;
-			alpha = seg->linedef->alpha;
+			alpha = sideHasAlpha ? seg->sidedef->alpha : seg->linedef->alpha;
 			translucent =alpha < 1. || (texture && texture->GetTranslucency());
 			break;
 
 		case ML_ADDTRANS:
 			RenderStyle=STYLE_Add;
-			alpha = seg->linedef->alpha;
+			alpha = sideHasAlpha ? seg->sidedef->alpha : seg->linedef->alpha;
 			translucent=true;
 			break;
 		}
