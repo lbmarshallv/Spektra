@@ -50,6 +50,7 @@
 #include "v_draw.h"
 #include "v_text.h"
 #include "v_video.h"
+#include <string>
 
 extern FILE *Logfile;
 extern bool insave;
@@ -293,7 +294,7 @@ CCMD (idclev)
 
 		// So be it.
 		Printf ("%s\n", GStrings.GetString("STSTR_CLEV"));
-      	G_DeferedInitNew (mapname.GetChars());
+		G_DeferedInitNew (mapname.GetChars());
 		//players[0].health = 0;		// Force reset
 	}
 }
@@ -317,7 +318,7 @@ CCMD (hxvisit)
 			{
 				// So be it.
 				Printf ("%s\n", GStrings.GetString("STSTR_CLEV"));
-      			G_DeferedInitNew (mapname.GetChars());
+				G_DeferedInitNew (mapname.GetChars());
 				return;
 			}
 		}
@@ -523,7 +524,7 @@ CCMD (pukename)
 		int argstart = 2;
 		int arg[4] = { 0, 0, 0, 0 };
 		int argn = 0, i;
-		
+
 		if (argc > 2)
 		{
 			if (stricmp(argv[2], "always") == 0)
@@ -636,11 +637,11 @@ CCMD (warp)
 
 UNSAFE_CCMD (load)
 {
-    if (argv.argc() != 2)
+	if (argv.argc() != 2)
 	{
-        Printf ("usage: load <filename>\n");
-        return;
-    }
+		Printf ("usage: load <filename>\n");
+		return;
+	}
 	if (netgame)
 	{
 		Printf ("cannot load during a network game\n");
@@ -682,9 +683,9 @@ UNSAFE_CCMD(save)
 {
 	if (argv.argc() < 2 || argv.argc() > 3 || argv[1][0] == 0)
 	{
-        Printf ("usage: save <filename> [description]\n");
-        return;
-    }
+		Printf ("usage: save <filename> [description]\n");
+		return;
+	}
 	FString fname = argv[1];
 	FixPathSeperator(fname);
 	if (fname[0] == '/')
@@ -705,7 +706,7 @@ UNSAFE_CCMD(save)
 		return;
 	}
 #endif
-    fname = G_BuildSaveName(fname.GetChars());
+	fname = G_BuildSaveName(fname.GetChars());
 	G_SaveGame (fname.GetChars(), argv.argc() > 2 ? argv[2] : argv[1]);
 }
 
@@ -1016,7 +1017,7 @@ CCMD(nextmap)
 				TEXTCOLOR_NORMAL " is for single-player only.\n");
 		return;
 	}
-	
+
 	if (primaryLevel->NextMap.Len() > 0 && primaryLevel->NextMap.Compare("enDSeQ", 6))
 	{
 		G_DeferedInitNew(primaryLevel->NextMap.GetChars());
@@ -1189,6 +1190,23 @@ CCMD(secret)
 	}
 }
 
+CCMD(roundtest)
+{
+	if (argv.argc() < 2) return;
+	double d = std::stod(argv[1]);
+#define p(f) Printf(#f " %8f %d\n", d, f(d))
+	p(RoundUp);
+	p(RoundDown);
+	p(RoundToZero);
+	p(RoundFromZero);
+	p(RoundHalfUp);
+	p(RoundHalfDown);
+	p(RoundHalfEven);
+	p(RoundHalfToZero);
+	p(RoundHalfFromZero);
+#undef p
+}
+
 CCMD(angleconvtest)
 {
 	Printf("Testing degrees to angle conversion:\n");
@@ -1197,7 +1215,7 @@ CCMD(angleconvtest)
 		unsigned ang1 = DAngle::fromDeg(ang).BAMs();
 		unsigned ang2 = (unsigned)(ang * (0x40000000 / 90.));
 		unsigned ang3 = (unsigned)(int)(ang * (0x40000000 / 90.));
-		Printf("Angle = %.5f: xs_RoundToInt = %08x, unsigned cast = %08x, signed cast = %08x\n",
+		Printf("Angle = %.5f: RoundHalfUp = %08x, unsigned cast = %08x, signed cast = %08x\n",
 			ang, ang1, ang2, ang3);
 	}
 }
@@ -1210,7 +1228,7 @@ CCMD(r_showcaps)
 	PRINT_CAP("Flat Sprites", RFF_FLATSPRITES)
 	PRINT_CAP("3D Models", RFF_MODELS)
 	PRINT_CAP("Sloped 3D floors", RFF_SLOPE3DFLOORS)
-	PRINT_CAP("Full Freelook", RFF_TILTPITCH)	
+	PRINT_CAP("Full Freelook", RFF_TILTPITCH)
 	PRINT_CAP("Roll Sprites", RFF_ROLLSPRITES)
 	PRINT_CAP("Unclipped Sprites", RFF_UNCLIPPEDTEX)
 	PRINT_CAP("Material Shaders", RFF_MATSHADER)
@@ -1401,4 +1419,3 @@ CCMD (mapinfo)
 	else
 		Printf("Level redirection is currently not being tested - not in game!\n");
 }
-

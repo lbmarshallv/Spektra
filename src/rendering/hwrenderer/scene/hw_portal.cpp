@@ -28,6 +28,7 @@
 #include "hw_lighting.h"
 #include "hw_cvars.h"
 #include "texturemanager.h"
+#include "hw_viewpointbuffer.h"
 
 void SetPlaneTextureRotation(FRenderState& state, HWSectorPlane* plane, FGameTexture* texture);
 
@@ -81,7 +82,7 @@ void FPortalSceneState::EndFrame(HWDrawInfo *di, FRenderState &state)
 
 	while (di->Portals.Pop(p) && p)
 	{
-		if (gl_portalinfo) 
+		if (gl_portalinfo)
 		{
 			Printf("%sProcessing %s, depth = %d\n", indent.GetChars(), p->GetName(), renderdepth);
 		}
@@ -182,7 +183,7 @@ void HWPortal::DrawPortalStencil(FRenderState &state, int pass)
 	if (mPrimIndices.Size() == 0)
 	{
 		mPrimIndices.Resize(2 * lines.Size());
-		
+
 		for (unsigned int i = 0; i < lines.Size(); i++)
 		{
 			mPrimIndices[i * 2] = lines[i].vertindex;
@@ -216,7 +217,7 @@ void HWPortal::DrawPortalStencil(FRenderState &state, int pass)
 		}
 
 	}
-	
+
 	for (unsigned int i = 0; i < mPrimIndices.Size(); i += 2)
 	{
 		state.Draw(DT_TriangleFan, mPrimIndices[i], mPrimIndices[i + 1], i == 0);
@@ -251,9 +252,15 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 	Clocker c(PortalAll);
 
 	rendered_portals++;
-	
+
 	if (usestencil)
 	{
+		if (GetMirrorSide() != 0) // (strcmp(GetName(), "Planemirror ceiling") == 0) || (strcmp(GetName(), "Planemirror floor") == 0))
+		{
+			di->VPUniforms.mViewMatrix.translate(0.0, -zshift * GetMirrorSide(), 0.0);
+			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
+		}
+
 		// Create stencil
 		state.SetStencil(0, SOP_Increment);	// create stencil, increment stencil of valid pixels
 		state.SetColorMask(false);
@@ -261,20 +268,20 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 		state.EnableTexture(false);
 		state.ResetColor();
 		state.SetDepthFunc(DF_Less);
-			
+
 		if (NeedDepthBuffer())
 		{
 			state.SetDepthMask(false);							// don't write to Z-buffer!
-				
+
 			DrawPortalStencil(state, STP_Stencil);
-				
+
 			// Clear Z-buffer
 			state.SetStencil(1, SOP_Keep); // draw sky into stencil. This stage doesn't modify the stencil.
 			state.SetDepthMask(true);							// enable z-buffer again
 			state.SetDepthRange(1, 1);
 			state.SetDepthFunc(DF_Always);
 			DrawPortalStencil(state, STP_DepthClear);
-				
+
 			// set normal drawing mode
 			state.EnableTexture(true);
 			state.SetDepthRange(0, 1);
@@ -286,7 +293,7 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 		{
 			// No z-buffer is needed therefore we can skip all the complicated stuff that is involved
 			// Note: We must draw the stencil with z-write enabled here because there is no second pass!
-				
+
 			state.SetDepthMask(true);
 			DrawPortalStencil(state, STP_AllInOne);
 			state.SetStencil(1, SOP_Keep); // draw sky into stencil. This stage doesn't modify the stencil.
@@ -297,8 +304,13 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 			state.SetDepthMask(false);							// don't write to Z-buffer!
 		}
 		screen->stencilValue++;
-		
-		
+
+		if (GetMirrorSide() != 0) // (strcmp(GetName(), "Planemirror ceiling") == 0) || (strcmp(GetName(), "Planemirror floor") == 0))
+		{
+			di->VPUniforms.mViewMatrix.translate(0.0, zshift * GetMirrorSide(), 0.0);
+			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
+		}
+
 	}
 	else
 	{
@@ -331,12 +343,18 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 
 	if (usestencil)
 	{
-		
+
+		if (GetMirrorSide() != 0) // (strcmp(GetName(), "Planemirror ceiling") == 0) || (strcmp(GetName(), "Planemirror floor") == 0))
+		{
+			di->VPUniforms.mViewMatrix.translate(0.0, -zshift * GetMirrorSide(), 0.0);
+			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
+		}
+
 		state.SetColorMask(false);						// no graphics
 		state.SetEffect(EFF_NONE);
 		state.ResetColor();
 		state.EnableTexture(false);
-		
+
 		if (needdepth)
 		{
 			// first step: reset the depth buffer to max. depth
@@ -348,22 +366,27 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 		{
 			state.EnableDepthTest(true);
 		}
-		
+
 		// second step: restore the depth buffer to the previous values and reset the stencil
 		state.SetDepthFunc(DF_LEqual);
 		state.SetDepthRange(0, 1);
 		state.SetStencil(0, SOP_Decrement);
 		DrawPortalStencil(state, STP_DepthRestore);
 		state.SetDepthFunc(DF_Less);
-		
-		
+
+
 		state.EnableTexture(true);
 		state.SetEffect(EFF_NONE);
 		state.SetColorMask(true);
 		screen->stencilValue--;
-		
+
 		// restore old stencil op.
 		state.SetStencil(0, SOP_Keep);
+		if (GetMirrorSide() != 0) // (strcmp(GetName(), "Planemirror ceiling") == 0) || (strcmp(GetName(), "Planemirror floor") == 0))
+		{
+			di->VPUniforms.mViewMatrix.translate(0.0, zshift * GetMirrorSide(), 0.0);
+			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
+		}
 	}
 	else
 	{
@@ -376,10 +399,10 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 			state.EnableDepthTest(true);
 			state.SetDepthMask(true);
 		}
-		
+
 		// This draws a valid z-buffer into the stencil's contents to ensure it
 		// doesn't get overwritten by the level's geometry.
-		
+
 		state.ResetColor();
 		state.SetDepthFunc(DF_LEqual);
 		state.SetDepthRange(0, 1);
@@ -398,7 +421,7 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 
 //-----------------------------------------------------------------------------
 //
-// 
+//
 //
 //-----------------------------------------------------------------------------
 
@@ -536,7 +559,7 @@ bool HWMirrorPortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *clippe
 	}
 	else
 	{
-		// any mirror--use floats to avoid integer overflow. 
+		// any mirror--use floats to avoid integer overflow.
 		// Use doubles to avoid losing precision which is very important here.
 
 		double dx = v2->fX() - v1->fX();
@@ -947,6 +970,28 @@ void HWPlaneMirrorPortal::DrawPortalStencil(FRenderState &state, int pass)
 			state.SetNormal(flat.plane.plane.Normal().X, flat.plane.plane.Normal().Z, flat.plane.plane.Normal().Y);
 			state.DrawIndexed(DT_Triangles, flat.iboindex + flat.section->vertexindex, flat.section->vertexcount, i == 0);
 		}
+		// Cannot combine these two for loops because of the DrawIndexed() vs Draw() calls interleaving
+		for (unsigned int i = 0; i < lines.Size(); i++)
+		{
+			flat.section = lines[i].sub->section;
+			flat.iboindex = lines[i].sub->sector->iboindex[isceiling ? sector_t::ceiling : sector_t::floor];
+			flat.plane.GetFromSector(lines[i].sub->sector, isceiling ? sector_t::ceiling : sector_t::floor);
+			screen->mVertexData->Map();
+			auto verts = screen->mVertexData->AllocVertices(5);
+			auto ptr = verts.first;
+			ptr[0].Set(lines[i].vertexes[0]->p.X, flat.plane.plane.ZatPoint(lines[i].vertexes[0]->p),
+					   lines[i].vertexes[0]->p.Y, 0, 0);
+			ptr[1].Set(lines[i].vertexes[1]->p.X, flat.plane.plane.ZatPoint(lines[i].vertexes[1]->p),
+					   lines[i].vertexes[1]->p.Y, 0, 0);
+			ptr[2].Set(lines[i].vertexes[1]->p.X, flat.plane.plane.ZatPoint(lines[i].vertexes[1]->p) + zshift*GetMirrorSide(),
+					   lines[i].vertexes[1]->p.Y, 0, 0);
+			ptr[3].Set(lines[i].vertexes[0]->p.X, flat.plane.plane.ZatPoint(lines[i].vertexes[0]->p) + zshift*GetMirrorSide(),
+					   lines[i].vertexes[0]->p.Y, 0, 0);
+			ptr[4].Set(lines[i].vertexes[0]->p.X, flat.plane.plane.ZatPoint(lines[i].vertexes[0]->p),
+					   lines[i].vertexes[0]->p.Y, 0, 0);
+			screen->mVertexData->Unmap();
+			state.Draw(DT_TriangleStrip, verts.second, 5, screen->IsVulkan());
+		}
 	}
 	else
 	{
@@ -1111,7 +1156,7 @@ void HWHorizonPortal::DrawContents(HWDrawInfo *di, FRenderState &state)
 
 //-----------------------------------------------------------------------------
 //
-// 
+//
 //
 //-----------------------------------------------------------------------------
 
@@ -1159,5 +1204,3 @@ void HWEEHorizonPortal::DrawContents(HWDrawInfo *di, FRenderState &state)
 
 const char *HWHorizonPortal::GetName() { return "Horizon"; }
 const char *HWEEHorizonPortal::GetName() { return "EEHorizon"; }
-
-

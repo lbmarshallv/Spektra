@@ -110,7 +110,7 @@ public:
 		m_pitch = nullAngle;
 		m_explicitPitch = false;
 	}
-	
+
 	void SetType(ELightType type) { m_type = type; }
 	void CopyFrom(const FLightDefaults &other)
 	{
@@ -149,7 +149,7 @@ protected:
 	DAngle m_spotOuterAngle = DAngle::fromDeg(25.0);
 	DAngle m_pitch = nullAngle;
 	double m_LightDefIntensity = 1.0; // Light over/underbright multiplication for GLDEFS-defined lights
-	
+
 	friend FSerializer &Serialize(FSerializer &arc, const char *key, FLightDefaults &value, FLightDefaults *def);
 };
 
@@ -233,9 +233,9 @@ struct FDynamicLight
 
 	bool ShouldLightActor(AActor *check)
 	{
-		return visibletoplayer && IsActive() && GetRadius() > 0 && 
+		return visibletoplayer && IsActive() && GetRadius() > 0 &&
 				(!((*pLightFlags) & LF_DONTLIGHTSELF) || target != check) &&
-				(!((*pLightFlags) & LF_DONTLIGHTOTHERS) || target == check) && 
+				(!((*pLightFlags) & LF_DONTLIGHTOTHERS) || target == check) &&
 				(!((*pLightFlags) & LF_DONTLIGHTACTORS));
 	}
 
@@ -322,5 +322,3 @@ public:
 
 	FDynamicLightTouchLists touchlists;
 };
-
-

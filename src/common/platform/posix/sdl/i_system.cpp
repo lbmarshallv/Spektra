@@ -373,7 +373,7 @@ FString I_GetFromClipboard (bool use_primary_selection)
 FString I_GetCWD()
 {
 	char* curdir = getcwd(NULL,0);
-	if (!curdir) 
+	if (!curdir)
 	{
 		return "";
 	}
@@ -434,9 +434,4 @@ void I_OpenShellFolder(const char* infolder)
 			Printf("Unable to open requested directory\n");
 	}
 	free(curdir);
-}
-
-bool I_IsDarkMode()
-{
-	return false;
 }

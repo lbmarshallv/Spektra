@@ -82,6 +82,7 @@ extern FKeyBindings AutomapBindings;
 
 
 bool C_DoKey (event_t *ev, FKeyBindings *binds, FKeyBindings *doublebinds);
+void C_TickQueuedInputs();
 
 // Stuff used by the customize controls menu
 void C_SetDefaultBindings (const TArray<int> *filter = nullptr);
@@ -104,4 +105,3 @@ struct FKeySection
 extern TArray<FKeySection> KeySections;
 
 #endif //__C_BINDINGS_H__
-

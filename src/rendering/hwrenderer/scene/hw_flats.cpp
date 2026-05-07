@@ -38,6 +38,7 @@
 #include "hw_renderstate.h"
 #include "texturemanager.h"
 #include "hw_viewpointbuffer.h"
+#include "m_round.h"
 
 #ifdef _DEBUG
 CVAR(Int, gl_breaksec, -1, 0)
@@ -124,7 +125,7 @@ void HWFlat::CreateSkyboxVertices(FFlatVertex *vert)
 
 	static float uvals[] = { 0, 0, 1, 1 };
 	static float vvals[] = { 1, 0, 0, 1 };
-	int rot = -xs_FloorToInt(plane.Angle / 90.f);
+	int rot = -RoundDown(plane.Angle / 90.f);
 
 	vert[0].Set(minx, z, miny, uvals[rot & 3], vvals[rot & 3]);
 	vert[1].Set(minx, z, maxy, uvals[(rot + 1) & 3], vvals[(rot + 1) & 3]);
@@ -159,7 +160,7 @@ void HWFlat::SetupLights(HWDrawInfo *di, FDynLightData &lightdata, int portalgro
 		{
 			auto node = pair->Value.get();
 			if (!node) continue;
-			
+
 			FDynamicLight * light = node->lightsource;
 
 			if (!light->IsActive() || light->DontLightMap())
@@ -213,24 +214,24 @@ void HWFlat::DrawSubsectors(HWDrawInfo *di, FRenderState &state)
 
 void HWFlat::DrawOtherPlanes(HWDrawInfo *di, FRenderState &state)
 {
-    state.SetMaterial(texture, UF_Texture, 0, CLAMP_NONE, NO_TRANSLATION, -1);
-    
-    // Draw the subsectors assigned to it due to missing textures
-    auto pNode = (renderflags&SSRF_RENDERFLOOR) ?
-        di->otherFloorPlanes.CheckKey(sector->sectornum) : di->otherCeilingPlanes.CheckKey(sector->sectornum);
-    
-    if (!pNode) return;
-    auto node = *pNode;
-    
-    while (node)
-    {
-        state.SetLightIndex(node->lightindex);
-        auto num = node->sub->numlines;
-        flatvertices += num;
-        flatprimitives++;
-        state.Draw(DT_TriangleFan,node->vertexindex, num);
-        node = node->next;
-    }
+	state.SetMaterial(texture, UF_Texture, 0, CLAMP_NONE, NO_TRANSLATION, -1);
+
+	// Draw the subsectors assigned to it due to missing textures
+	auto pNode = (renderflags&SSRF_RENDERFLOOR) ?
+		di->otherFloorPlanes.CheckKey(sector->sectornum) : di->otherCeilingPlanes.CheckKey(sector->sectornum);
+
+	if (!pNode) return;
+	auto node = *pNode;
+
+	while (node)
+	{
+		state.SetLightIndex(node->lightindex);
+		auto num = node->sub->numlines;
+		flatvertices += num;
+		flatprimitives++;
+		state.Draw(DT_TriangleFan,node->vertexindex, num);
+		node = node->next;
+	}
 }
 
 //==========================================================================
@@ -313,7 +314,6 @@ void HWFlat::DrawFlat(HWDrawInfo *di, FRenderState &state, bool translucent)
 	int rel = getExtraLight();
 
 	state.SetNormal(plane.plane.Normal().X, plane.plane.Normal().Z, plane.plane.Normal().Y);
-	double zshift = (plane.plane.Normal().Z > 0.0 ? 0.1f : -0.1f); // The HWPlaneMirrorPortal::DrawPortalStencil() z-fights with flats
 
 	SetColor(state, di->Level, di->lightmode, lightlevel, rel, di->isFullbrightScene(), Colormap, alpha);
 	SetFog(state, di->Level, di->lightmode, lightlevel, rel, di->isFullbrightScene(), &Colormap, false);
@@ -364,11 +364,7 @@ void HWFlat::DrawFlat(HWDrawInfo *di, FRenderState &state, bool translucent)
 			else state.AlphaFunc(Alpha_GEqual, 0.f);
 			state.SetMaterial(texture, UF_Texture, 0, CLAMP_NONE, NO_TRANSLATION, -1);
 			SetPlaneTextureRotation(state, &plane, texture);
-			di->VPUniforms.mViewMatrix.translate(0.0, zshift, 0.0);
-			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
 			DrawSubsectors(di, state);
-			di->VPUniforms.mViewMatrix.translate(0.0, -zshift, 0.0);
-			screen->mViewpoints->SetViewpoint(state, &di->VPUniforms);
 			state.EnableTextureMatrix(false);
 		}
 		state.SetRenderStyle(DefaultRenderStyle());
@@ -405,7 +401,7 @@ inline void HWFlat::PutFlat(HWDrawInfo *di, bool fog)
 
 //==========================================================================
 //
-// This draws one flat 
+// This draws one flat
 // The whichplane boolean indicates if the flat is a floor(false) or a ceiling(true)
 //
 //==========================================================================
@@ -425,13 +421,13 @@ void HWFlat::Process(HWDrawInfo *di, sector_t * model, int whichplane, bool fog)
 	{
 		texture =  TexMan.GetGameTexture(plane.texture, true);
 		if (!texture || !texture->isValid()) return;
-		if (texture->isFullbright()) 
+		if (texture->isFullbright())
 		{
 			Colormap.MakeWhite();
 			lightlevel=255;
 		}
 	}
-	else 
+	else
 	{
 		texture = NULL;
 		lightlevel = abs(lightlevel);
@@ -452,7 +448,7 @@ void HWFlat::Process(HWDrawInfo *di, sector_t * model, int whichplane, bool fog)
 
 //==========================================================================
 //
-// Sets 3D floor info. Common code for all 4 cases 
+// Sets 3D floor info. Common code for all 4 cases
 //
 //==========================================================================
 
@@ -509,7 +505,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 	sector = &di->Level->sectors[frontsector->sectornum];
 	extsector_t::xfloor &x = sector->e->XFloor;
 	dynlightindex = -1;
-    hacktype = (which & (SSRF_PLANEHACK|SSRF_FLOODHACK));
+	hacktype = (which & (SSRF_PLANEHACK|SSRF_FLOODHACK));
 
 	uint8_t sink;
 	uint8_t &srf = hacktype? sink : di->section_renderflags[di->Level->sections.SectionIndex(section)];
@@ -537,12 +533,12 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 		port = frontsector->ValidatePortal(sector_t::floor);
 		if ((stack = (port != NULL)))
 		{
-            /* to be redone in a less invasive manner
+			/* to be redone in a less invasive manner
 			if (port->mType == PORTS_STACKEDSECTORTHING)
 			{
 				di->AddFloorStack(sector);	// stacked sector things require visplane merging.
 			}
-             */
+			 */
 			alpha = frontsector->GetAlpha(sector_t::floor);
 		}
 		else
@@ -578,7 +574,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 	//
 	// do ceilings
 	//
-	// 
+	//
 	//
 	if ((which & SSRF_RENDERCEILING) && (vp.bDoOrtho ? vp.ViewVector3D.dot(frontsector->ceilingplane.Normal()) < 0.0 : frontsector->ceilingplane.ZatPoint(vp.Pos) >= vp.Pos.Z) && (!section || !(section->flags & FSection::DONTRENDERCEILING)))
 	{
@@ -594,12 +590,12 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 		port = frontsector->ValidatePortal(sector_t::ceiling);
 		if ((stack = (port != NULL)))
 		{
-            /* as above for floors
+			/* as above for floors
 			if (port->mType == PORTS_STACKEDSECTORTHING)
 			{
 				di->AddCeilingStack(sector);
 			}
-             */
+			 */
 			alpha = frontsector->GetAlpha(sector_t::ceiling);
 		}
 		else
@@ -742,4 +738,3 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 		}
 	}
 }
-

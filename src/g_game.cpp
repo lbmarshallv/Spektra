@@ -811,7 +811,7 @@ void G_BuildTiccmd (usercmd_t *cmd)
 	// Handle mice.
 	if (!buttonMap.ButtonDown(Button_Mlook) && !freelook)
 	{
-		forward += xs_CRoundToInt(mousey * m_forward);
+		forward += RoundHalfEven(mousey * m_forward); // why round to even?
 	}
 
 	cmd->pitch = LocalViewPitch >> 16;
@@ -823,7 +823,7 @@ void G_BuildTiccmd (usercmd_t *cmd)
 	}
 
 	if (strafe || lookstrafe)
-		side += xs_CRoundToInt(mousex * m_side);
+		side += RoundHalfEven(mousex * m_side); // why round to even?
 
 	mousex = mousey = 0;
 
@@ -1221,6 +1221,8 @@ static void D_CheckCutsceneAdvance()
 void G_Ticker ()
 {
 	gamestate_t oldgamestate;
+
+	C_TickQueuedInputs();
 
 	// do player reborns if needed
 	// TODO: These should really be moved to queues.

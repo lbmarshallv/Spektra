@@ -28,16 +28,20 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <type_traits>
+
+#include "m_round.h"
+
+// IWYU pragma: end_exports
 
 #if defined(_M_X64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)
 #include <xmmintrin.h>
 #endif
-
-// IWYU pragma: end_exports
 
 #define MAXWIDTH 12000
 #define MAXHEIGHT 5000
@@ -93,7 +97,6 @@ typedef uint32_t			angle_t;
 using INTBOOL = int;
 using BITFIELD = uint32_t;
 
-
 // always use our own definition for consistency.
 #ifdef M_PI
 #undef M_PI
@@ -107,12 +110,12 @@ using std::max;
 template<typename T>
 T clamp(T val, T minval, T maxval)
 {
-    return std::max<T>(std::min<T>(val, maxval), minval);
+	return std::max<T>(std::min<T>(val, maxval), minval);
 }
 
 static inline void PrefetchL3(const void* Address)
 {
 #if defined(_M_X64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)
-    _mm_prefetch(static_cast<const char*>(Address), _MM_HINT_T1);
+	_mm_prefetch(static_cast<const char*>(Address), _MM_HINT_T1);
 #endif
 }

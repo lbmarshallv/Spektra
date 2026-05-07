@@ -47,7 +47,7 @@ CCMD(listlights)
 	int allwalls=0, allsectors=0, allsubsecs = 0;
 	int i=0, shadowcount = 0;
 	FDynamicLight * dl;
-	
+
 	for (auto Level : AllLevels())
 	{
 		Printf("Lights for %s\n", Level->MapName.GetChars());
@@ -61,7 +61,7 @@ CCMD(listlights)
 				   dl->radius, dl->IsAttenuated()? "attenuated" : "", dl->shadowmapped? "shadowmapped" : "");
 			i++;
 			shadowcount += dl->shadowmapped;
-			
+
 			if (dl->target)
 			{
 				FTextureID spr = sprites[dl->target->sprite].GetSpriteFrame(dl->target->frame, 0, nullAngle, nullptr);
@@ -102,10 +102,10 @@ CCMD (countdecals)
 	{
 		auto iterator = Level->GetThinkerIterator<DImpactDecal>(NAME_None, STAT_AUTODECAL);
 		int count = 0;
-		
+
 		while (iterator.Next())
 			count++;
-		
+
 		Printf("%s: Counted %d impact decals, level counter is at %d\n", Level->MapName.GetChars(), count, Level->ImpactDecalCount);
 	}
 }
@@ -117,7 +117,7 @@ CCMD (spray)
 		Printf ("Usage: spray <decal>\n");
 		return;
 	}
-	
+
 	Net_WriteInt8 (DEM_SPRAY);
 	Net_WriteString (argv[1]);
 }
@@ -248,7 +248,7 @@ ADD_STAT (interpolations)
 	{
 		if (out.Len() > 0) out << '\n';
 		out.AppendFormat("%s: %d interpolations", Level->MapName.GetChars(), Level->interpolator.CountInterpolations ());
-		
+
 	}
 	return out;
 }
@@ -389,8 +389,8 @@ CCMD(listmaps)
 		{
 			int mapWadNum = fileSystem.GetFileContainer(map->lumpnum);
 
-			if (argv.argc() == 1 
-			    || CheckWildcards(argv[1], info->MapName.GetChars()) 
+			if (argv.argc() == 1
+			    || CheckWildcards(argv[1], info->MapName.GetChars())
 			    || CheckWildcards(argv[1], info->LookupLevelName().GetChars())
 			    || CheckWildcards(argv[1], fileSystem.GetResourceFileName(mapWadNum)))
 			{

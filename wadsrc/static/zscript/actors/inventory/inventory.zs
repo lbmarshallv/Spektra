@@ -52,7 +52,7 @@ class Inventory : Actor
 	meta int GiveQuest;
 	meta array<class<Actor> > ForbiddenToPlayerClass;
 	meta array<class<Actor> > RestrictedToPlayerClass;
-	
+
 	property PickupMessage: PickupMsg;
 	property GiveQuest: GiveQuest;
 	property Amount: Amount;
@@ -110,9 +110,9 @@ class Inventory : Actor
 	{
 		UpdateLocalPickupStatus();
 	}
-	
+
 	//native override void Tick();
-	
+
 	override void Tick()
 	{
 		if (Owner == null)
@@ -124,7 +124,7 @@ class Inventory : Actor
 		else if (tics != -1)	// ... but at least we have to advance the states
 		{
 			tics--;
-					
+
 			// you can cycle through multiple states in a tic
 			// [RH] Use <= 0 instead of == 0 so that spawnstates
 			// of 0 tics work as expected.
@@ -148,8 +148,8 @@ class Inventory : Actor
 			}
 		}
 	}
-	
-	
+
+
 	native static void PrintPickupMessage (bool localview, String str);
 
 	States(Actor)
@@ -173,7 +173,7 @@ class Inventory : Actor
 		TNT1 A 1;
 		Stop;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: MarkPrecacheSounds
@@ -213,7 +213,7 @@ class Inventory : Actor
 		Inv = NULL;
 		Super.OnDestroy();
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: ShouldSpawn
@@ -230,7 +230,7 @@ class Inventory : Actor
 		}
 		return true;
 	}
-	
+
 	//---------------------------------------------------------------------------
 	//
 	// PROC A_RestoreSpecialThing1
@@ -341,7 +341,7 @@ class Inventory : Actor
 			let state = Level.GetSpotState();
 
 			if (state != NULL) spot = state.GetRandomSpot(SpawnPointClass, false);
-			if (spot != NULL) 
+			if (spot != NULL)
 			{
 				SetOrigin (spot.Pos, false);
 				SetZ(floorz);
@@ -349,7 +349,7 @@ class Inventory : Actor
 		}
 		return true;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: Grind
@@ -375,7 +375,7 @@ class Inventory : Actor
 		}
 		// Non-dropped items call the super method for compatibility.
 		return Super.Grind(items);
-	}		
+	}
 
 	//===========================================================================
 	//
@@ -483,7 +483,7 @@ class Inventory : Actor
 				{
 					Amount += item.Amount;
 				}
-			
+
 				if (Amount > MaxAmount && !sv_unlimited_pickup)
 				{
 					Amount = MaxAmount;
@@ -513,7 +513,7 @@ class Inventory : Actor
 		}
 		return false;
 	}
-		
+
 	//===========================================================================
 	//
 	// Inventory :: TryPickup
@@ -630,7 +630,7 @@ class Inventory : Actor
 	// Inventory :: CanPickup
 	//
 	//===========================================================================
-	
+
 	virtual bool CanPickup(Actor toucher)
 	{
 		if (toucher == null) return false;
@@ -669,7 +669,7 @@ class Inventory : Actor
 		let saved_toucher = toucher;
 		let Invstack = Inv; // A pointer of the inventories item stack.
 
-		// unmorphed versions of a currently morphed actor cannot pick up anything. 
+		// unmorphed versions of a currently morphed actor cannot pick up anything.
 		if (bUnmorphed) return false, null;
 
 		// [AA] starting with true, so that CanReceive can unset it,
@@ -730,7 +730,7 @@ class Inventory : Actor
 		}
 		return res, toucher;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: ShouldStay
@@ -822,7 +822,7 @@ class Inventory : Actor
 		return copy;
 	}
 
-	
+
 	//===========================================================================
 	//
 	// Inventory :: PickupMessage
@@ -835,7 +835,7 @@ class Inventory : Actor
 	{
 		return PickupMsg;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: Touch
@@ -911,7 +911,7 @@ class Inventory : Actor
 			{
 				give.PlayPickupSound (toucher);
 			}
-		}							
+		}
 
 		// [RH] Execute an attached special (if any)
 		DoPickupSpecial (toucher);
@@ -997,12 +997,12 @@ class Inventory : Actor
 	//===========================================================================
 
 	virtual void DoEffect() {}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: Hide
 	//
-	// Hides this actor until it's time to respawn again. 
+	// Hides this actor until it's time to respawn again.
 	//
 	//===========================================================================
 
@@ -1049,7 +1049,7 @@ class Inventory : Actor
 	}
 
 
-	
+
 	//===========================================================================
 	//
 	// Inventory :: ShouldRespawn
@@ -1097,7 +1097,7 @@ class Inventory : Actor
 		}
 		return true;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: GoAwayAndDie
@@ -1172,7 +1172,7 @@ class Inventory : Actor
 	{
 		return bCreatingCopy;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: ModifyDamage
@@ -1193,7 +1193,7 @@ class Inventory : Actor
 	virtual Vector2 ModifyBob(Vector2 Bob, double ticfrac) {return Bob;}
 
 	virtual Vector3, Vector3 ModifyBob3D(Vector3 Translation, Vector3 Rotation, double ticfrac) {return Translation, Rotation;}
-	
+
 
 	virtual bool Use (bool pickup) { return false; }
 	virtual double GetSpeedFactor() { return 1; }
@@ -1201,7 +1201,7 @@ class Inventory : Actor
 	virtual version("2.4") ui void AlterWeaponSprite(VisStyle vis, in out int changed) {}
 	virtual void OwnerDied() {}
 	virtual Color GetBlend () { return 0; }
-	
+
 	virtual void UseAll(Actor user)
 	{
 		if (bInvBar) user.UseInventory(self);
@@ -1287,7 +1287,7 @@ class Inventory : Actor
 	//===========================================================================
 
 	virtual void AbsorbDamage (int damage, Name damageType, out int newdamage, Actor inflictor = null, Actor source = null, int flags = 0, double angle = 0.0) {}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: SpecialDropAction
@@ -1346,7 +1346,7 @@ class Inventory : Actor
 		}
 		return lastgood;
 	}
-	
+
 	//===========================================================================
 	//
 	// Inventory :: OnDrop
@@ -1357,14 +1357,14 @@ class Inventory : Actor
 	//===========================================================================
 
 	virtual void OnDrop (Actor dropper) {}
-	
+
 	//---------------------------------------------------------------------------
 	//
 	// Modifies the drop amount of this item according to the current skill's
 	// settings (also called by ADehackedPickup::TryPickup)
 	//
 	//---------------------------------------------------------------------------
-	
+
 	virtual void ModifyDropAmount(int dropamount)
 	{
 		if (dropamount > 0)
@@ -1372,13 +1372,13 @@ class Inventory : Actor
 			Amount = dropamount;
 		}
 	}
-	
+
 	//---------------------------------------------------------------------------
 	//
 	// Modifies the amount based on what an item should contain if given
 	//
 	//---------------------------------------------------------------------------
-	
+
 	virtual void SetGiveAmount(Actor receiver, int amount, bool givecheat)
 	{
 		if (givecheat)
@@ -1392,13 +1392,13 @@ class Inventory : Actor
 		}
 	}
 
-	
-	
+
+
 }
 
 //===========================================================================
 //
-// 
+//
 //
 //===========================================================================
 
@@ -1406,9 +1406,9 @@ class DehackedPickup : Inventory
 {
 	Inventory RealPickup;
 	bool droppedbymonster;
-	
+
 	private native class<Inventory> DetermineType();
-	
+
 	override bool TryPickup (in out Actor toucher)
 	{
 		let type = DetermineType ();
@@ -1491,26 +1491,26 @@ class DehackedPickup : Inventory
 		}
 		Super.OnDestroy();
 	}
-	
+
 	override void ModifyDropAmount(int dropamount)
 	{
 		// Must forward the adjustment to the real item.
 		// dropamount is not relevant here because Dehacked cannot change it.
 		droppedbymonster = true;
 	}
-	
+
 }
 
 //===========================================================================
 //
-// 
+//
 //
 //===========================================================================
 
 class FakeInventory : Inventory
 {
 	bool Respawnable;
-	
+
 	property respawns: Respawnable;
 
 	override bool ShouldRespawn ()
@@ -1534,5 +1534,5 @@ class FakeInventory : Inventory
 	{
 		// The special was already executed by TryPickup, so do nothing here
 	}
-	
+
 }

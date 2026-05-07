@@ -167,11 +167,11 @@ struct polyblock_t;
 // This is a dynamic array which holds its first MAX_STATIC entries in normal
 // variables to avoid constant allocations which this would otherwise
 // require.
-// 
+//
 // When collecting touched portal groups the normal cases are either
 // no portals == one group or
 // two portals = two groups
-// 
+//
 // Anything with more can happen but far less infrequently, so this
 // organization helps avoiding the overhead from heap allocations
 // in the vast majority of situations.
@@ -338,7 +338,7 @@ class FBlockThingsIterator
 	void SwitchBlock(int x, int y);
 	void ClearHash();
 
-	// The following is only for use in the path traverser 
+	// The following is only for use in the path traverser
 	// and therefore declared private.
 	FBlockThingsIterator(FLevelLocals *);
 
@@ -407,7 +407,7 @@ protected:
 
 	virtual void AddLineIntercepts(int bx, int by);
 	virtual void AddThingIntercepts(int bx, int by, FBlockThingsIterator &it, bool compatible);
-	FPathTraverse(FLevelLocals *l) 
+	FPathTraverse(FLevelLocals *l)
 	{
 		Level = l;
 	}
