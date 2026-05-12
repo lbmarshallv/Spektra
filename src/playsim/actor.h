@@ -1324,6 +1324,10 @@ public:
 	int				DesignatedTeam;	// Allow for friendly fire cacluations to be done on non-players.
 	int				friendlyseeblocks;	// allow to override friendly search distance calculation
 
+	#ifdef _DEBUG
+	const char *debugName; //easy name to show in visual studio visualizer
+	#endif
+
 	TObjPtr<AActor*> BlockingMobj;	// Actor that blocked the last move
 	line_t			*BlockingLine;	// Line that blocked the last move
 	line_t			*MovementBlockingLine; // Line that stopped the Actor's movement in P_XYMovement

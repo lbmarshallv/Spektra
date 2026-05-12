@@ -72,6 +72,10 @@
 	<DisplayString>{Class->TypeName}</DisplayString>
 </Type>
 
+<Type Name="AActor">
+	<DisplayString>{debugName}</DisplayString>
+</Type>
+
 <Type Name="TObjPtr&lt;*&gt;">
 	<DisplayString Condition="o == nullptr">&lt;NULL&gt;</DisplayString>
 	<DisplayString Condition="o != nullptr">{o->Class->TypeName}</DisplayString>

@@ -5632,6 +5632,10 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 	actor->SpawnTime = Level->totaltime;
 	actor->SpawnOrder = Level->spawnindex++;
 
+	#ifdef _DEBUG
+	actor->debugName = actor->GetTag();
+	#endif
+
 	// Set default dialogue
 	actor->ConversationRoot = Level->GetConversation(actor->GetClass()->TypeName);
 	if (actor->ConversationRoot != -1)
