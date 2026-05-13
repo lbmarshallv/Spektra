@@ -344,6 +344,7 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 AllHitsConvexResultCallback FLevelLocals::ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
                                                                 DVector3 &newPos, bool asOrigin)
 {
+	UpdateCollisionModel(tmthing);
 	btTransform fromTrans = tmthing->collisionModel->collider->getWorldTransform();
 	btTransform toTrans   = tmthing->collisionModel->collider->getWorldTransform();
 	toTrans.setOrigin(tmthing->collisionModel->toBulletPoint(newPos));
@@ -362,7 +363,6 @@ AllHitsConvexResultCallback FLevelLocals::ActorMovementTest(AActor *tmthing, TAr
 		return allConvex;
 	}
 
-	UpdateCollisionModel(tmthing);
 	for (AActor *thing : things)
 	{
 		UpdateCollisionModel(thing);

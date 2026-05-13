@@ -577,33 +577,34 @@ static int P_Move (AActor *actor)
 	DVector3 start3 = {origx, origy, actor->Z()};
 	DVector3 end3 = {origx + deltax, origy + deltay, actor->Z()};
 
-	FThingPathTraverse it2(actor->Level, start3, end3, PT_COMPATIBLE, 0, MF_SOLID,
-		                    actor, false);
-	if (it2.things.Size())
+	if (actor)
 	{
-		auto r = level.ActorMovementTest(actor, it2.things, end3);
-		if (r.hasHits())
+		FThingPathTraverse it2(actor->Level, start3, end3, PT_COMPATIBLE, 0, MF_SOLID, actor, false);
+		if (it2.things.Size())
 		{
-			for (auto h : r.hits)
+			auto r = level.ActorMovementTest(actor, it2.things, end3);
+			if (r.hasHits())
 			{
-				const btCollisionObject *b = h.collisionObject;
-				AdvancedCollisionModel  *a = static_cast<AdvancedCollisionModel *>(b->getUserPointer());
-				if (a && a->owner)
+				for (auto h : r.hits)
 				{
-
-					DVector3 wpos = DVector3(h.hitPointWorld.x(), h.hitPointWorld.y(), h.hitPointWorld.z());
-					double ztop = level.GetTop(actor, a->owner, wpos);
-					if (ztop > -INFINITY && ztop - actor->Z() < actor->MaxStepHeight)
+					const btCollisionObject *b = h.collisionObject;
+					AdvancedCollisionModel  *a = static_cast<AdvancedCollisionModel *>(b->getUserPointer());
+					if (a && a->owner)
 					{
-						continue;
+
+						DVector3 wpos = DVector3(h.hitPointWorld.x(), h.hitPointWorld.y(), h.hitPointWorld.z());
+						double   ztop = level.GetTop(actor, a->owner, wpos);
+						if (ztop > -INFINITY && ztop - actor->Z() < actor->MaxStepHeight)
+						{
+							continue;
+						}
+
+						return false;
 					}
-					tm.blockingMobj = a->owner;
-					return false;
 				}
 			}
 		}
 	}
-	
 
 	try_ok = true;
 	for (int i = 1; i <= steps; i++)
@@ -612,6 +613,20 @@ static int P_Move (AActor *actor)
 		// killough 3/15/98: don't jump over dropoffs:
 		try_ok = P_TryMove(actor, ptry, dropoff, NULL, tm);
 		if (!try_ok) break;
+
+		if (tm.stepthing && tm.collisionPoints.Size())
+		{
+			auto v = tm.collisionPoints[0];
+			if (v.Z - actor->Pos().Z > actor->MaxStepHeight)
+			{
+				try_ok = false;
+				break;
+			}
+			else
+			{
+				actor->SetZ(v.Z);
+			}
+		}
 
 		// Handle portal transitions just like P_XYMovement.
 		if (steps > 1 && actor->Pos().XY() != ptry)
