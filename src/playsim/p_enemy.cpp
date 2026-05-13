@@ -574,6 +574,37 @@ static int P_Move (AActor *actor)
 	DVector2 move = { deltax, deltay };
 	DAngle oldangle = actor->Angles.Yaw;
 
+	DVector3 start3 = {origx, origy, actor->Z()};
+	DVector3 end3 = {origx + deltax, origy + deltay, actor->Z()};
+
+	FThingPathTraverse it2(actor->Level, start3, end3, PT_COMPATIBLE, 0, MF_SOLID,
+		                    actor, false);
+	if (it2.things.Size())
+	{
+		auto r = level.ActorMovementTest(actor, it2.things, end3);
+		if (r.hasHits())
+		{
+			for (auto h : r.hits)
+			{
+				const btCollisionObject *b = h.collisionObject;
+				AdvancedCollisionModel  *a = static_cast<AdvancedCollisionModel *>(b->getUserPointer());
+				if (a && a->owner)
+				{
+
+					DVector3 wpos = DVector3(h.hitPointWorld.x(), h.hitPointWorld.y(), h.hitPointWorld.z());
+					double ztop = level.GetTop(actor, a->owner, wpos);
+					if (ztop > -INFINITY && ztop - actor->Z() < actor->MaxStepHeight)
+					{
+						continue;
+					}
+					tm.blockingMobj = a->owner;
+					return false;
+				}
+			}
+		}
+	}
+	
+
 	try_ok = true;
 	for (int i = 1; i <= steps; i++)
 	{

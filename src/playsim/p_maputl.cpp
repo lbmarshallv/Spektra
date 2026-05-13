@@ -1764,12 +1764,6 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 	FBlockThingsIterator btit(Level);
 	for (count = 0; count < maxCount; count++)
 	{
-
-		//if (flags & PT_ADDTHINGS)
-		//{
-		//	AddThingIntercepts(mapx, mapy, btit, compatible);
-		//}
-
 		AActor *thing;
 		btit.SwitchBlock(mapx, mapy);
 		while ((thing = btit.Next(compatible)))
@@ -1855,22 +1849,29 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 		TracePoint = End;
 	}
 
-	auto r = Level->TraceCollisionHit(Start, TracePoint, things);
-	if (r.hasHit())
+	if (useActorCollisionShape && caller)
 	{
-		for (int i = 0; i < r.m_collisionObjects.size(); i++)
-		{
 
-			const btCollisionObject *b = r.m_collisionObjects[i];
-			AdvancedCollisionModel   *a = static_cast<AdvancedCollisionModel*>(b->getUserPointer());
-			if (a && a->owner)
+	}
+	else
+	{
+		auto r = Level->TraceCollisionHit(Start, TracePoint, things);
+		if (r.hasHit())
+		{
+			for (int i = 0; i < r.m_collisionObjects.size(); i++)
 			{
-				intercept_t newintercept;
-				newintercept.frac    = r.m_hitFractions[i];
-				newintercept.isaline = false;
-				newintercept.done    = false;
-				newintercept.d.thing = a->owner;
-				intercepts.Push(newintercept);
+
+				const btCollisionObject *b = r.m_collisionObjects[i];
+				AdvancedCollisionModel  *a = static_cast<AdvancedCollisionModel *>(b->getUserPointer());
+				if (a && a->owner)
+				{
+					intercept_t newintercept;
+					newintercept.frac    = r.m_hitFractions[i];
+					newintercept.isaline = false;
+					newintercept.done    = false;
+					newintercept.d.thing = a->owner;
+					intercepts.Push(newintercept);
+				}
 			}
 		}
 	}

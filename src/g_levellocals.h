@@ -46,6 +46,7 @@
 #include "doom_aabbtree.h"
 #include "doom_levelmesh.h"
 #include "p_visualthinker.h"
+#include <p_collision.h>
 #include <bullet/btBulletCollisionCommon.h>
 #include <memory>
 
@@ -917,9 +918,10 @@ public:
 	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false, bool asOrigin = false);
-	btCollisionWorld::ClosestConvexResultCallback ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
+	AllHitsConvexResultCallback ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
 	                                                                DVector3 &newPos, bool asOrigin = false);
 	double                                        GetTop(AActor *tmthing, AActor *thing);
+	double                                        GetTop(AActor *tmthing, AActor *thing, DVector3 &pos);
 	DVector3         SweepTest(AActor *tmthing, AActor *thing, DVector3 pos);
 	btCollisionWorld::ClosestRayResultCallback    TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing);
 	btCollisionWorld::AllHitsRayResultCallback TraceCollisionHit(DVector3 &from, DVector3 &to, TArray<AActor *> things);

@@ -242,3 +242,54 @@ struct AdvancedCollisionContactResultCallback : public btCollisionWorld::Contact
 		return 1.f;
 	}
 };
+
+struct AllHitsConvexResultCallback : public btCollisionWorld::ConvexResultCallback
+{
+	struct Hit
+	{
+		btCollisionObject *collisionObject;
+		btVector3          hitPointWorld;
+		btVector3          hitNormalWorld;
+		btScalar           hitFraction;
+	};
+
+	std::vector<Hit> hits;
+
+	AllHitsConvexResultCallback()
+	{
+	}
+
+	virtual btScalar addSingleResult(btCollisionWorld::LocalConvexResult &convexResult,
+	                                 bool                                 normalInWorldSpace) override
+	{
+		Hit hit;
+
+		hit.collisionObject = const_cast<btCollisionObject *>(convexResult.m_hitCollisionObject);
+
+		hit.hitFraction = convexResult.m_hitFraction;
+
+		// Convert normal to world space if necessary
+		if (normalInWorldSpace)
+		{
+			hit.hitNormalWorld = convexResult.m_hitNormalLocal;
+		}
+		else
+		{
+			hit.hitNormalWorld = hit.collisionObject->getWorldTransform().getBasis() * convexResult.m_hitNormalLocal;
+		}
+
+		// Compute world-space hit point
+		hit.hitPointWorld = convexResult.m_hitPointLocal;
+
+		hits.push_back(hit);
+
+		// Returning the current closest fraction allows Bullet
+		// to continue collecting additional hits.
+		return m_closestHitFraction;
+	}
+
+	bool hasHits() const
+	{
+		return !hits.empty();
+	}
+};

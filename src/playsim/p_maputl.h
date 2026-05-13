@@ -442,6 +442,7 @@ class FThingPathTraverse
   protected:
 	TArray<intercept_t> intercepts;
 	TArray<AActor *>    ignoreThese;
+	AActor             *caller;
 
 	FLevelLocals *Level;
 	divline_t     trace;
@@ -450,15 +451,22 @@ class FThingPathTraverse
 	unsigned int  intercept_index;
 	unsigned int  intercept_count;
 	unsigned int  count;
+	bool           useActorCollisionShape;
   public:
 	TArray<AActor *> things;
 	intercept_t *Next();
 	FThingPathTraverse(FLevelLocals *l, DVector3 Start, DVector3 End, int flags, double startfrac,
-	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff), AActor *caller = NULL)
+	                   ActorFlags ActorMask = ActorFlags::FromInt(0xffffffff), AActor *caller = NULL,
+	                   bool useActorCollisionShape = false)
 	{
 		Level = l;
 		if (caller)
+		{
+			this->caller = caller;
 			ignoreThese.Push(caller);
+		}
+			
+		this->useActorCollisionShape = useActorCollisionShape;
 		init(Start, End, flags, startfrac, ActorMask);
 	}
 	void init(DVector3 Start, DVector3 End, int flags, double startfrac, ActorFlags ActorMask);
