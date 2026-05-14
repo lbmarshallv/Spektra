@@ -577,7 +577,7 @@ static int P_Move (AActor *actor)
 	DVector3 start3 = {origx, origy, actor->Z()};
 	DVector3 end3 = {origx + deltax, origy + deltay, actor->Z()};
 
-	if (actor)
+	if (actor && !(actor->flags2 & MF2_THRUACTORS))
 	{
 		FThingPathTraverse it2(actor->Level, start3, end3, PT_COMPATIBLE, 0, MF_SOLID, actor, false);
 		if (it2.things.Size())
@@ -598,7 +598,19 @@ static int P_Move (AActor *actor)
 						{
 							continue;
 						}
+						if (actor->flags4 & MF4_CANUSEWALLS &&  a->owner->flags5 & MF5_USESPECIAL)
+						{
 
+							if (P_ActivateThingSpecial(a->owner, actor))
+								return false;
+							IFVIRTUALPTR(a->owner, AActor, Used)
+							{
+								VMValue  params[] = {a->owner, actor};
+								int      ret;
+								VMReturn vret(&ret);
+								VMCall(func, params, 2, &vret, 1);
+							}
+						}
 						return false;
 					}
 				}
