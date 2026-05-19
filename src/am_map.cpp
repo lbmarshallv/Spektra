@@ -2136,7 +2136,9 @@ void DAutomap::drawSubsectors()
 
 			// For lighting and texture determination
 			sector_t *sec = AM_FakeFlat(players[consoleplayer].camera, sub->render_sector, &tempsec);
-			floorlight = sec->GetFloorLight();
+			FTextureID ceiltex = sec->GetTexture(sector_t::ceiling);
+			bool       outside = ceiltex == skyflatnum;
+			floorlight = outside ? 255 : sec->GetFloorLight();
 			// Find texture origin.
 			originpt.x = -sec->GetXOffset(sector_t::floor);
 			originpt.y = sec->GetYOffset(sector_t::floor);
@@ -2184,6 +2186,7 @@ void DAutomap::drawSubsectors()
 					F3DFloor *rover = sec->e->XFloor.ffloors[i];
 					if (!(rover->flags & FF_EXISTS)) continue;
 					if (rover->flags & (FF_FOG | FF_THISINSIDE)) continue;
+					if (!(rover->flags & FF_SOLID)) continue;
 					if (!(rover->flags & FF_RENDERPLANES)) continue;
 					if (rover->alpha == 0) continue;
 					double roverz = rover->top.plane->ZatPoint(secx, secy);
@@ -2208,9 +2211,12 @@ void DAutomap::drawSubsectors()
 					}
 				}
 
-				lightlist_t *light = P_GetPlaneLight(sec, floorplane, false);
-				floorlight = *light->p_lightlevel;
-				colormap = light->extra_colormap;
+				if (!outside)
+				{
+					lightlist_t *light = P_GetPlaneLight(sec, floorplane, false);
+					floorlight         = *light->p_lightlevel;
+					colormap           = light->extra_colormap;
+				}
 			}
 			if (maptex == skyflatnum)
 			{
