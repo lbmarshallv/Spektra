@@ -4763,7 +4763,47 @@ void AActor::Tick ()
 	if (!isFrozen())
 		TickBehaviors();
 
-	if (flags5 & MF5_NOINTERACTION)
+	if (collisionFlags & COLFLAG_STATICSOLID)
+	{
+		// Added by MC: Freeze mode.
+		if (isFrozen())
+		{
+			if (flags9 & MF9_DECOUPLEDANIMATIONS && modelData && !(modelData->anims.curAnim.flags & MODELANIM_NONE))
+			{
+				modelData->anims.curAnim.startTic += 1;
+			}
+			return;
+		}
+		assert(state != NULL);
+		if (state == NULL)
+		{
+			Destroy();
+			return;
+		}
+		if (!CheckNoDelay())
+			return; // freed itself
+
+		UpdateRenderSectorList();
+
+		if (tics != -1)
+		{
+			// cycle through states, calling action functions at transitions
+			// [RH] Use tics <= 0 instead of == 0 so that spawnstates
+			// of 0 tics work as expected.
+			if (--tics <= 0)
+			{
+				if (!SetState(state->GetNextState()))
+					return; // freed itself
+			}
+		}
+
+		if (!(flags9 & MF9_DECOUPLEDANIMATIONS) && modelData && !(modelData->flags & MODELDATA_GET_BONE_INFO_RECALC))
+		{
+			CalcBones(false);
+		}
+		return;
+	}
+	else if (flags5 & MF5_NOINTERACTION)
 	{
 		// only do the minimally necessary things here to save time:
 		// Check the time freezer
@@ -5188,7 +5228,9 @@ void AActor::Tick ()
 							PlayerLandedOnThing (this, onmo);
 						}
 					}
-					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz && !(onmo->collisionFlags & COLFLAG_NOSTEP) && abs(diff) <= MaxStepHeight)
+					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz &&
+					    (abs(diff) <= 1. || (!(onmo->collisionFlags & COLFLAG_NOSTEP) && abs(diff) <= MaxStepHeight))
+						)
 					{
 						double oldZ = Z();
 						double newZ = topZ;
@@ -5311,8 +5353,6 @@ void AActor::Tick ()
 		return; // freed itself
 
 	UpdateRenderSectorList();
-
-	double oz = Z();
 
 	if (tics != -1)
 	{
@@ -5725,7 +5765,7 @@ void ConstructActor(AActor *actor, const DVector3 &pos, bool SpawningMapThing)
 			actor->ceilingpic = actor->ceilingsector->GetTexture(sector_t::ceiling);
 		}
 	}
-	else if (!(actor->flags5 & MF5_NOINTERACTION))
+	else if (!(actor->flags5 & MF5_NOINTERACTION) && !(actor->collisionFlags & COLFLAG_STATICSOLID))
 	{
 		P_FindFloorCeiling (actor);
 	}

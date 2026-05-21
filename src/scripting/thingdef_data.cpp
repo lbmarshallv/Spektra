@@ -383,6 +383,7 @@ static FFlagDef ActorFlagDefs[]=
 
 	//collision flags
 	DEFINE_FLAG2(COLFLAG_NOSTEP, COLNOSTEP, AActor, collisionFlags),
+	DEFINE_FLAG2(COLFLAG_STATICSOLID, COLSTATICSOLID, AActor, collisionFlags),
 
 	// Bounce flags
 	DEFINE_FLAG2(BOUNCE_Walls, BOUNCEONWALLS, AActor, BounceFlags),
