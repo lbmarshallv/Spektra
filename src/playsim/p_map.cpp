@@ -995,7 +995,7 @@ bool PIT_CheckLine(FMultiBlockLinesIterator &mit, FMultiBlockLinesIterator::Chec
 	if (!(tm.thing->flags & MF_DROPOFF) &&
 		!(tm.thing->flags & (MF_NOGRAVITY | MF_NOCLIP)))
 	{
-		if ((open.frontfloorplane.fC() < tm.thing->MaxSlopeSteepness) != (open.backfloorplane.fC() < tm.thing->MaxSlopeSteepness))
+		if (!tm.stepthing && (open.frontfloorplane.fC() < tm.thing->MaxSlopeSteepness) != (open.backfloorplane.fC() < tm.thing->MaxSlopeSteepness))
 		{
 			// on the boundary of a steep slope
 			return false;
@@ -1402,7 +1402,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (!(cres.portalflags & FFCF_RESTRICTEDPORTAL))
 	{
 		if (!(thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) && !(tm.thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY | MF_NOGRAVITY)) &&
-			(thing->flags & MF_SOLID) && (thing->flags4 & MF4_ACTLIKEBRIDGE))
+			(thing->flags & MF_SOLID) && (thing->flags4 & MF4_ACTLIKEBRIDGE || thing->collisionFlags & COLFLAG_STATICSOLID))
 		{
 			// [RH] Let monsters walk on actors as well as floors
 			if ((tm.thing->flags3 & MF3_ISMONSTER) &&
@@ -2637,7 +2637,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				}
 			}
 		}
-		if (!(thing->flags & (MF_FLOAT | MF_MISSILE)) && thing->MaxFloorclip > 0 && tm.floorterrain && thing->floorsector != tm.floorsector) {
+		if (!(thing->flags & (MF_FLOAT | MF_MISSILE)) && !tm.stepthing && thing->MaxFloorclip > 0 && tm.floorterrain && thing->floorsector != tm.floorsector) {
 			double footclip = Terrains[tm.floorterrain].FootClip;
 			if(footclip > thing->Floorclip && footclip > thing->MaxFloorclip)
 			{
@@ -3076,7 +3076,7 @@ bool P_CheckMove(AActor *thing, const DVector2 &pos, FCheckPosition& tm, int fla
 			return false;
 		}
 		if (!(thing->flags & (MF_FLOAT | MF_MISSILE)) && thing->MaxFloorclip > 0 &&
-			thing->Floorclip <= thing->MaxFloorclip && tm.floorterrain &&
+			thing->Floorclip <= thing->MaxFloorclip && !tm.stepthing && tm.floorterrain &&
 			Terrains[tm.floorterrain].FootClip > thing->Floorclip && Terrains[tm.floorterrain].FootClip > thing->MaxFloorclip)
 		{
 			//thing->Vel.X = thing->Vel.Y = 0;
