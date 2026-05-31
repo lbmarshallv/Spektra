@@ -1072,7 +1072,7 @@ bool FPolyObj::CheckMobjBlocking (side_t *sd)
 				{
 					checker.Push (mobj);
 					if ((mobj->flags & MF_SOLID) && !(mobj->flags & MF_NOCLIP) &&
-					    !(mobj-> flags5 & MF5_MOVEWITHSECTOR))
+					    !(mobj-> flags5 & MF5_MOVEWITHSECTOR) && !(mobj->collisionFlags & COLFLAG_NOSTEP))
 					{
 						FLineOpening open;
 						open.top = LINEOPEN_MAX;
@@ -1238,7 +1238,8 @@ void FPolyObj::RecalcActorFloorCeil(FBoundingBox bounds) const
 			actor->X() - actor->radius >= bounds.Right() ||
 			actor->Y() + actor->radius <= bounds.Bottom() ||
 			actor->Y() - actor->radius >= bounds.Top() ||
-			actor->flags5 & MF5_MOVEWITHSECTOR)
+			actor->flags5 & MF5_MOVEWITHSECTOR ||
+			actor->collisionFlags & COLFLAG_NOSTEP)
 		{
 			continue;
 		}
