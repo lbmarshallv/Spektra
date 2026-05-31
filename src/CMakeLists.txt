@@ -817,6 +817,7 @@ set (PCH_SOURCES
 	hu_scores.cpp
 	m_cheat.cpp
 	m_misc.cpp
+	version.cpp
 	playsim/p_collision.cpp
 	playsim/p_acs.cpp
 	playsim/p_actionfunctions.cpp
