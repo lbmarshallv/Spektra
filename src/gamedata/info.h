@@ -235,6 +235,7 @@ private:
 };
 
 struct FDropItem;
+struct LODmodel;
 
 struct FActorInfo
 {
@@ -261,6 +262,8 @@ struct FActorInfo
 	FDropItem *DropItems;
 	FIntCVar *distancecheck;
 
+	LODmodel *LODmodels;
+
 	// This is from PClassPlayerPawn
 	FString DisplayName;
 
@@ -275,6 +278,7 @@ struct FActorInfo
 		PainChances = other.PainChances;
 		VisibleToPlayerClass = other.VisibleToPlayerClass;
 		DropItems = other.DropItems;
+		LODmodels           = other.LODmodels;
 		distancecheck = other.distancecheck;
 		DisplayName = other.DisplayName;
 	}
@@ -315,6 +319,11 @@ public:
 	void SetDropItems(FDropItem *drops)
 	{
 		ActorInfo()->DropItems = drops;
+	}
+
+	void SetLODmodels(LODmodel *lods)
+	{
+		ActorInfo()->LODmodels = lods;
 	}
 
 	const FString &GetDisplayName() const

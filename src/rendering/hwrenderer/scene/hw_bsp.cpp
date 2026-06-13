@@ -813,13 +813,22 @@ void HWDrawInfo::RenderThings(subsector_t * sub, sector_t * sector)
 
 		if(Viewpoint.bDoOob && thing->Sector->isSecret() && thing->Sector->wasSecret() && !r_radarclipper) continue; // This covers things that are touching non-secret sectors
 		FIntCVar *cvar = thing->GetInfo()->distancecheck;
-		if (cvar != nullptr && *cvar >= 0)
+		bool      doDistCheck = (cvar != nullptr && *cvar >= 0);
+		bool      doLOD       = thing->hasmodel && thing->hasLODs();
+		if (doLOD || doDistCheck)
 		{
 			double dist = (thing->Pos() - vp.Pos).LengthSquared();
-			double check = (double)**cvar;
-			if (dist >= check * check)
+			if (doDistCheck)
 			{
-				continue;
+				double check = (double)**cvar;
+				if (dist >= check * check)
+				{
+					continue;
+				}
+			}
+			if (doLOD)
+			{
+				thing->changeLODModel(dist);
 			}
 		}
 		// If this thing is in a map section that's not in view it can't possibly be visible

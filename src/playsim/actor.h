@@ -41,6 +41,7 @@
 #include "portal.h"
 #include "bonecomponents.h"
 #include "p_collision.h"
+#include <map>
 
 struct subsector_t;
 struct FBlockNode;
@@ -704,6 +705,30 @@ struct FDropItem
 	int Amount;
 };
 
+struct LODmodel
+{
+	FName model;
+	FString modelpath = "Models/";
+	double distance = 0;
+	LODmodel *Next = nullptr;
+	LODmodel(FName model, double distance) : model(model), distance(distance){}
+	void push(LODmodel *other)
+	{
+		if (Next == nullptr)
+			Next = other;
+		else
+		{
+			if (Next->distance > other->distance)
+				Next->push(other);
+			else
+			{
+				other->push(Next);
+				Next = other;
+			}
+		}
+	}
+};
+
 enum EViewPosFlags // [MC] Flags for SetViewPos.
 {
 	VPSF_ABSOLUTEOFFSET =		1 << 1,			// Don't include angles.
@@ -855,6 +880,8 @@ public:
 
 
 	FDropItem *GetDropItems() const;
+
+	LODmodel *GetLODmodels() const;
 
 	// Adjusts the angle for deflection/reflection of incoming missiles
 	// Returns true if the missile should be allowed to explode anyway
@@ -1147,6 +1174,14 @@ public:
 
 	void AttachLight(unsigned int count, const FLightDefaults *lightdef);
 	void SetDynamicLights();
+
+	inline bool hasLODs()
+	{
+		return GetInfo()->LODmodels != nullptr;
+	}
+
+	FName getLODModel(double distance);
+	FName changeLODModel(double distance);
 
 // info for drawing
 	AActor			*snext, **sprev;	// links in sector (if needed)

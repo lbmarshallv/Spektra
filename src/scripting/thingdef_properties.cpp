@@ -1184,6 +1184,48 @@ DEFINE_PROPERTY(distancecheck, S, Actor)
 
 //==========================================================================
 //
+//==========================================================================
+DEFINE_PROPERTY(LODmodel, F_S, Actor)
+{
+	PROP_DOUBLE_PARM(dist, 0);
+	PROP_STRING_PARM(model, 1);
+
+	// create a linked list of LOD models sorted by distance
+	if (!bag.LODmodelSet)
+	{
+		bag.LODmodelSet  = true;
+		bag.LODmodelList = NULL;
+	}
+
+	LODmodel *lm = (LODmodel *)ClassDataAllocator.Alloc(sizeof(LODmodel));
+
+	lm->distance     = dist;
+	lm->model        = model;
+	lm->Next         = nullptr;
+	LODmodel *lmprev = bag.LODmodelList;
+
+	if (lmprev != NULL)
+	{
+
+		if (dist <= lmprev->distance)
+		{
+			lm->Next         = lmprev;
+			bag.LODmodelList = lm;
+			return;
+		}
+		else
+		{
+			lmprev->push(lm);
+		}
+	}
+	else
+	{
+		bag.LODmodelList = lm;
+	}
+}
+
+//==========================================================================
+//
 // Special inventory properties
 //
 //==========================================================================
@@ -1928,3 +1970,4 @@ DEFINE_CLASS_PROPERTY(type, S, DynamicLight)
 	if (style < 0) I_Error("Unknown light type '%s'", str);
 	defaults->IntVar(NAME_lighttype) = ltype_values[style];
 }
+

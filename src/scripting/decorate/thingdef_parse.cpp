@@ -1187,6 +1187,10 @@ static void ParseActor(FScanner &sc, PNamespace *ns)
 	{
 		bag.Info->SetDropItems(bag.DropItemList);
 	}
+	if (bag.LODmodelSet)
+	{
+		bag.Info->SetLODmodels(bag.LODmodelList);
+	}
 	try
 	{
 		FinalizeClass(info, bag.statedef);

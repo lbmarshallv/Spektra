@@ -102,6 +102,11 @@ inline FDropItem *AActor::GetDropItems() const
 	return GetInfo()->DropItems;
 }
 
+inline LODmodel *AActor::GetLODmodels() const
+{
+	return GetInfo()->LODmodels;
+}
+
 inline double AActor::GetGravity() const
 {
 	if (flags & MF_NOGRAVITY) return 0;

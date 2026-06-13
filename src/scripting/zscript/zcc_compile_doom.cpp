@@ -880,10 +880,12 @@ void ZCCDoomCompiler::InitDefaults()
 				bag.Info = ti;
 				bag.DropItemSet = false;
 				bag.StateSet = false;
+				bag.LODmodelSet  = false;
 				bag.fromDecorate = false;
 				bag.CurrentState = 0;
 				bag.Lumpnum = c->cls->SourceLump;
 				bag.DropItemList = nullptr;
+				bag.LODmodelList = nullptr;
 				// The actual script position needs to be set per property.
 
 				for (auto d : c->Defaults)
@@ -912,6 +914,10 @@ void ZCCDoomCompiler::InitDefaults()
 				if (bag.DropItemSet)
 				{
 					bag.Info->SetDropItems(bag.DropItemList);
+				}
+				if (bag.LODmodelSet)
+				{
+					bag.Info->SetLODmodels(bag.LODmodelList);
 				}
 
 				if (GetDefaultByType(ti)->IsClientSide() && ti->IsDescendantOf(NAME_Inventory))

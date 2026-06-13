@@ -158,10 +158,15 @@ struct Baggage
 	FDropItem *DropItemList;
 
 	FScriptPosition ScriptPosition;
+
+	LODmodel *LODmodelList;
+	bool      LODmodelSet;
 };
 
 inline void ResetBaggage (Baggage *bag, PClassActor *stateclass)
 {
+	bag->LODmodelList = nullptr;
+	bag->LODmodelSet  = false;
 	bag->DropItemList = nullptr;
 	bag->DropItemSet = false;
 	bag->CurrentState = 0;

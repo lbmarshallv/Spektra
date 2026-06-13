@@ -9043,6 +9043,67 @@ void AActor::RestoreSpecialPosition()
 
 //----------------------------------------------------------------------------
 //
+// LOD (level of detail) handling
+//
+//----------------------------------------------------------------------------
+
+FName AActor::getLODModel(double distance)
+{
+	FName R = NAME_None;
+	LODmodel *model = GetLODmodels();
+	while (model != nullptr)
+	{
+		if (distance <= model->distance * model->distance)
+			return R;
+		else
+		{
+			R = model->model;
+			model = model->Next;
+		}
+	}
+	return R;
+}
+
+FName AActor::changeLODModel(double distance)
+{
+	FName model = getLODModel(distance);
+	auto  modelName = model.GetChars();
+	if (model == NAME_None)
+	{
+		if (modelData != nullptr)
+		{
+			modelData->Destroy();
+			modelData = nullptr;
+		}
+	}
+	else
+	{
+		// right now it's hard coded to only look at the Models folder
+		// and can only put models in index 0
+		int queryModel = FindModel("Models/", model.GetChars());
+		if (modelData == nullptr)
+		{
+			auto ptr = Create<DActorModelData>();
+
+			ptr->flags    = (hasmodel ? MODELDATA_HADMODEL : 0);
+			ptr->modelDef = nullptr;
+			ptr->ObjectFlags |= (ObjectFlags & OF_TransferrableFlags);
+
+			modelData = ptr;
+			hasmodel  = true;
+			GC::WriteBarrier(this, ptr);
+			modelData->models.Push({queryModel, {}});
+		}
+		else
+		{
+			modelData->models[0].modelID = queryModel;
+		}
+	}
+	return model;
+}
+
+//----------------------------------------------------------------------------
+//
 // DropItem handling
 //
 //----------------------------------------------------------------------------
