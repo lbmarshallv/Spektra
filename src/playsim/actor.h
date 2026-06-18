@@ -718,12 +718,13 @@ struct LODmodel
 			Next = other;
 		else
 		{
-			if (Next->distance > other->distance)
-				Next->push(other);
-			else
-			{
+			if (Next->distance > other->distance){
 				other->push(Next);
 				Next = other;
+			}
+			else
+			{
+				Next->push(other);
 			}
 		}
 	}
