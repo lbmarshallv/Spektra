@@ -1449,7 +1449,7 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 
 	// [RH] If the other thing is a bridge, then treat the moving thing as if it had MF2_PASSMOBJ, so
 	// you can use a scrolling floor to move scenery items underneath a bridge.
-	if ((tm.thing->flags2 & MF2_PASSMOBJ || thing->flags4 & MF4_ACTLIKEBRIDGE) && !(tm.thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ))
+	if (!(thing->collisionFlags & COLFLAG_STATICSOLID) && (tm.thing->flags2 & MF2_PASSMOBJ || thing->flags4 & MF4_ACTLIKEBRIDGE) && !(tm.thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ))
 	{ // check if a mobj passed over/under another object
 		if (!(tm.thing->flags & MF_MISSILE) ||
 			!(tm.thing->flags2 & MF2_RIP) ||
@@ -1901,7 +1901,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				}
 				else if (!BlockingMobj->player && !(thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY)) &&
 				         !(BlockingMobj->collisionFlags & COLFLAG_NOSTEP) &&
-				         topZ > BlockingMobj->Z() && topZ - thing->Z() <= thing->MaxStepHeight)
+				         (topZ > BlockingMobj->Z() || thing->collisionFlags & COLFLAG_STATICSOLID) && topZ - thing->Z() <= thing->MaxStepHeight)
 				{
 					if (thingblocker == NULL ||
 						BlockingMobj->Z() > thingblocker->Z())
@@ -1911,7 +1911,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					thing->BlockingMobj = nullptr;
 				}
 				else if (thing->player &&
-					thing->Top() - BlockingMobj->Z() <= thing->MaxStepHeight)
+					thing->Top() - min(topZ,BlockingMobj->Z()) <= thing->MaxStepHeight)
 				{
 					if (thingblocker)
 					{ // There is something to step up on. Return this thing as
