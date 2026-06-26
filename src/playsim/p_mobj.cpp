@@ -8083,7 +8083,15 @@ AActor *P_SpawnMissileXYZ (DVector3 pos, AActor *source, AActor *dest, PClassAct
 	// [RH] Adjust the trajectory if the missile will go over the target's head.
 	else if (pos.Z - source->Z() >= dest->Height)
 	{
-		velocity.Z += (dest->Height - pos.Z + source->Z());
+		if (dest->collisionModelShape == "capsule")
+		{
+			velocity.Z += (dest->Height/2. - pos.Z + source->Z());
+		}
+		else
+		{
+			velocity.Z += (dest->Height - pos.Z + source->Z());
+		}
+			
 	}
 	th->Vel = velocity.Resized(speed);
 
