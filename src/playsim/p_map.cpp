@@ -2213,11 +2213,12 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{
 			continue;
 		}
-		if (actor->Z() > thing->Top() || colTop < thing->Z() || (actor->Z() - colTop) > 1.)
+		if (actor->Z() > thing->Top() || /*colTop < thing->Z() ||*/ (actor->Z() - colTop) > 1.)
 		{ // over thing
 			continue;
 		}
-		if (actor->Top() <= thing->Z())
+	
+		if (!(thing->collisionFlags & COLFLAG_STATICSOLID) && actor->Top() <= thing->Z())
 		{ // under thing
 			continue;
 		}
