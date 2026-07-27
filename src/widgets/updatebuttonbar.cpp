@@ -22,6 +22,8 @@
 
 #include "serializer_rapidjson.h"
 
+#include "printf.h"
+#include "versioninfo.h"
 #include "updatebuttonbar.h"
 #include "launcherwindow.h"
 #include "gstrings.h"
@@ -30,6 +32,8 @@
 #include "i_net.h"
 #include "engineerrors.h"
 #include "widgets/themedata.h"
+#include "c_console.h"
+
 #include <zwidget/widgets/pushbutton/pushbutton.h>
 #include <zwidget/widgets/textlabel/textlabel.h>
 #include "settingspage.h"
@@ -207,7 +211,7 @@ public:
 
 		SetFrameGeometry((screenSize.width - windowWidth) * 0.5, (screenSize.height - windowHeight) * 0.5, windowWidth, windowHeight);
 
-		SetWindowTitle(title);
+		SetWindowTitle(GStrings.GetString(title));
 
 		if(text.size() > 0)
 		{
@@ -249,7 +253,7 @@ public:
 
 				PushButton * btn = new PushButton(this);
 
-				btn->SetText(act.text);
+				btn->SetText(GStrings.GetString(act.text));
 
 				btn->OnClick = [this, act]()
 				{
@@ -459,42 +463,11 @@ UpdateButtonBar::UpdateButtonBar(LauncherWindow *parent, SettingsPage* settings)
 	_settings = settings;
 }
 
-FString UpdateButtonBar::UpdateToString()
-{
-	FString str = "";
-
-	VersionInfo update = currentUpdate->version;
-
-	switch(CURRENT_UPDATE_CHANNEL)
-	{
-	case UpdateChannel::STABLE:
-		str.Format("%u.%u.%u", update.major, update.minor, update.revision);
-		break;
-	case UpdateChannel::PREVIEW:
-		str.Format("%u.%u.%u-pre-%u", update.major, update.minor, update.revision, update.distance);
-		break;
-	case UpdateChannel::TESTING:
-		str.Format("%u.%u.%u-pre-%u (experimental)", update.major, update.minor, update.revision, update.distance); // TODO: localize
-		break;
-	case UpdateChannel::RELEASE_CANDIDATE:
-		if(update.distance != 0 && update.distance != RC_REVISION_NOTRC)
-		{
-			str.Format("%u.%u.%u-rc%u", update.major, update.minor, update.revision, update.distance);
-		}
-		else
-		{
-			str.Format("%u.%u.%u", update.major, update.minor, update.revision);
-		}
-		break;
-	}
-	return str;
-}
-
 void UpdateButtonBar::UpdateLanguage()
 {
 	if(currentUpdate.has_value())
 	{
-		text = "New Update Available: " + UpdateToString(); // TODO: localize
+		text = FStringf("%s: %s", GStrings.GetString("UPDATER_UPDATE_AVAILABLE"), FString(currentUpdate->version));
 	}
 	else
 	{
@@ -573,7 +546,7 @@ bool UpdateButtonBar::OnMouseDown(const Point& pos, InputKey key)
 void UpdateButtonBar::OpenDismissUpdateMenu()
 {
 	PopupBase::ActionListType actions = {
-		{"Skip Update", [=, this](auto &self){ // TODO: localize
+		{"UPDATER_UPDATE_SKIP", [=, this](auto &self){
 			updater_skipped_update = FString(currentUpdate->version);
 			M_SaveDefaults(NULL); // save settings
 			Hide();
@@ -581,21 +554,21 @@ void UpdateButtonBar::OpenDismissUpdateMenu()
 		}},
 	};
 
-	actions.push_back({"Back", [=, this](auto &self){ // TODO: localize
+	actions.push_back({"TXT_BACK", [=, this](auto &self){
 		self.Close();
 	}});
 
-	OpenPopup(this, "Dismiss Update?", {}, actions, 550.0, 0); // TODO: localize
+	OpenPopup(this, "UPDATER_DISMISS_UPDATE", {}, actions, 550.0, 0);
 }
 
 void UpdateButtonBar::OpenFailedUpdateMenu(const std::string &err, bool checker)
 {
 	PopupBase::ActionListType actions = {
-		{"Dismiss", [=, this](auto &self){ // TODO: localize
+		{"TXT_DISMISS", [=, this](auto &self){
 			Hide();
 			self.Close();
 		}},
-		{"Disable Update Checker", [=, this](auto &self){ // TODO: localize
+		{"UPDATER_DISABLE", [=, this](auto &self){
 			updater_check_updates = false;
 			M_SaveDefaults(NULL); // save settings
 			Hide();
@@ -603,35 +576,46 @@ void UpdateButtonBar::OpenFailedUpdateMenu(const std::string &err, bool checker)
 		}}
 	};
 
-	OpenPopup(this, checker ? "Checking for Update Failed" : "Update Failed", SplitNewLines((checker ? "Checking for Update Failed\n" : "Update Failed\n") + err), actions, 550.0, POPUPF_DISALLOW_CLOSE); // TODO: localize
+	std::string title = checker
+		? "UPDATER_CHECK_FAILED"
+		: "UPDATER_UPDATE_FAILED";
+
+	OpenPopup(
+		this,
+		title,
+		SplitNewLines(GStrings.GetString(title) + ("\n" + err)),
+		actions,
+		550.0,
+		POPUPF_DISALLOW_CLOSE
+	);
 }
 
 void UpdateButtonBar::OpenUpdateMenu(bool isAutoUpdate)
 {
 	PopupBase::ActionListType actions = {
-		{"View Release Notes", [this, isAutoUpdate](auto &self){
-			OpenPopup(this, "Release Notes", this->currentUpdate->release_notes, // TODO: localize
+		{"PICKER_SHOWNOTES", [this, isAutoUpdate](auto &self){
+			OpenPopup(this, "PICKER_TAB_RELEASE", this->currentUpdate->release_notes,
 			{
-				{"Back", [this, isAutoUpdate](auto &self){ // TODO: localize
+				{"TXT_BACK", [this, isAutoUpdate](auto &self){
 					OpenUpdateMenu(isAutoUpdate);
 				}}
 			});
 		}},
-		{"Update", [this](auto &currentPopup){ // TODO: localize
+		{"TXT_UPDATE", [this](auto &currentPopup){
 			StartUpdate();
 		}}
 	};
 
 	if(isAutoUpdate)
 	{
-		actions.push_back({"Skip", [this](auto &self){ // TODO: localize
+		actions.push_back({"TXT_SKIP", [this](auto &self){
 			updater_skipped_update = FString(currentUpdate->version);
 			M_SaveDefaults(NULL); // save settings
 			Hide();
 			self.Close();
 		}, ACTIONF_FLOAT_RIGHT});
 
-		actions.push_back({"Dismiss", [this](auto &self){ // TODO: localize
+		actions.push_back({"TXT_DISMISS", [this](auto &self){
 			UpdateLanguage();
 			Show();
 			self.Close();
@@ -651,9 +635,9 @@ void UpdateButtonBar::OpenUpdateMenu(bool isAutoUpdate)
 
 	std::vector<std::string> updateInfo;
 
-	updateInfo.push_back((GAMENAME + (" " + UpdateToString())).GetChars());
+	updateInfo.push_back((GAMENAME + (" " + FString(currentUpdate->version))).GetChars());
 
-	OpenPopup(this, isAutoUpdate ? "New Update Available" : "Update", updateInfo, actions, 500.0/*, isAutoUpdate ? POPUPF_DISALLOW_CLOSE : 0*/); // TODO: localize
+	OpenPopup(this, isAutoUpdate ? "UPDATER_UPDATE_AVAILABLE" : "TXT_UPDATE", updateInfo, actions, 500.0/*, isAutoUpdate ? POPUPF_DISALLOW_CLOSE : 0*/);
 }
 
 bool UpdateButtonBar::OnMouseUp(const Point& pos, InputKey key)
@@ -677,19 +661,19 @@ bool UpdateButtonBar::OnMouseUp(const Point& pos, InputKey key)
 		{
 			if(close_pressed)
 			{
-				OpenPopup(this, "Dismiss Update?", {}, // TODO: localize
+				OpenPopup(this, "UPDATER_DISMISS_UPDATE", {},
 				{
-					{"Dismiss", [this](auto &self){ // TODO: localize
+					{"TXT_DISMISS", [this](auto &self){
 						this->Hide();
 						self.Close();
 					}},
-					{"Skip Update", [this](auto &self){ // TODO: localize
+					{"UPDATER_UPDATE_SKIP", [this](auto &self){
 						updater_skipped_update = FString(currentUpdate->version);
 						M_SaveDefaults(NULL); // save settings
 						this->Hide();
 						self.Close();
 					}},
-					{"Disable Update Checker", [this](auto &self){ // TODO: localize
+					{"UPDATER_DISABLE", [this](auto &self){
 						updater_check_updates = false;
 						M_SaveDefaults(NULL); // save settings
 						this->Hide();
@@ -731,23 +715,24 @@ LauncherWindow* UpdateButtonBar::GetLauncher() const
 
 void UpdateButtonBar::OpenUpdateInitChoice()
 {
-	OpenPopup(this, "Update Checker", {"Would you like to automatically check for updates?", "(this can be changed later in the options tab)"}, // TODO: localize
+
+	OpenPopup(this, "UPDATER_TITLE", SplitNewLines(GStrings.GetString("UPDATER_ASK_AUTO")),
 	{
 		{
-			"Yes", [this](auto &self) // TODO: localize
+			"TXT_YES", [this](auto &self)
 			{
 				updater_auto_updates = false;
 				OpenUpdateIntervalChoice();
 			},
 		},{
-			"Yes, and prompt to install updates", [this](auto &self) // TODO: localize
+			"UPDATER_YES_PROMPT", [this](auto &self)
 			{
 				updater_auto_updates = true;
 				OpenUpdateIntervalChoice();
 			},
 			//ACTIONF_FLOAT_RIGHT
 		},{
-			"No", [this](auto &self) // TODO: localize
+			"TXT_NO", [this](auto &self)
 			{
 				updater_check_updates = false;
 				updater_check_updates_initialized = true;
@@ -763,13 +748,13 @@ void UpdateButtonBar::OpenUpdateInitChoice()
 
 void UpdateButtonBar::OpenUpdateIntervalChoice()
 {
-	OpenPopup(this, "Update Checker", {"How often would you like to check for updates?", "(this can be changed later in the options tab)"}, // TODO: localize
+	OpenPopup(this, "UPDATER_TITLE", SplitNewLines(GStrings.GetString("UPDATER_ASK_INTERVAL")),
 	{
 		{
-			"Every other day", [this](auto &self) // TODO: localize
+			"OPTVAL_DAILY", [this](auto &self)
 			{
 				updater_check_updates = true;
-				updater_update_interval = 2;
+				updater_update_interval = 1;
 				updater_check_updates_initialized = true;
 				updater_last_update_check = std::to_string(getCurrentDate()).c_str();
 				M_SaveDefaults(NULL); // save settings
@@ -777,7 +762,7 @@ void UpdateButtonBar::OpenUpdateIntervalChoice()
 				self.Close();
 			}
 		},{
-			"Every week", [this](auto &self) // TODO: localize
+			"OPTVAL_WEEKLY", [this](auto &self)
 			{
 				updater_check_updates = true;
 				updater_update_interval = 7;
@@ -788,7 +773,7 @@ void UpdateButtonBar::OpenUpdateIntervalChoice()
 				self.Close();
 			}
 		},{
-			"Every month", [this](auto &self) // TODO: localize
+			"OPTVAL_MONTHLY", [this](auto &self)
 			{
 				updater_check_updates = true;
 				updater_update_interval = 30;
@@ -799,7 +784,7 @@ void UpdateButtonBar::OpenUpdateIntervalChoice()
 				self.Close();
 			}
 		},{
-			"Back", [this](auto &self) // TODO: localize
+			"TXT_BACK", [this](auto &self)
 			{
 				updater_auto_updates = false;
 				OpenUpdateInitChoice();
@@ -897,6 +882,8 @@ protected:
 	{
 		if(!curl) return false;
 
+		DEBUG_LOG("fetching %s", url.c_str());
+
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 		curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, acceptEncoding.c_str());
 
@@ -951,85 +938,6 @@ static int callUpdateProgress(void * self, curl_off_t dltotal, curl_off_t dlnow,
 	return ((CurlEasy*)self)->cancelled;
 }
 
-const char * getMainURL(UpdateChannel channel)
-{
-	switch(channel)
-	{
-	case UpdateChannel::STABLE:
-		return UPDATER_URL_STABLE;
-	case UpdateChannel::PREVIEW:
-		return UPDATER_URL_PREVIEW;
-	case UpdateChannel::TESTING:
-		return UPDATER_URL_TESTING;
-	case UpdateChannel::RELEASE_CANDIDATE:
-		return UPDATER_URL_ALL;
-	default:
-		I_Error("Unknown Update Channel");
-	}
-}
-
-const char * getBackupURL(UpdateChannel channel)
-{
-	switch(channel)
-	{
-	case UpdateChannel::STABLE:
-		return UPDATER_URL_STABLE_BACKUP;
-	case UpdateChannel::PREVIEW:
-		return UPDATER_URL_PREVIEW_BACKUP;
-	case UpdateChannel::TESTING:
-		return UPDATER_URL_TESTING_BACKUP;
-	case UpdateChannel::RELEASE_CANDIDATE:
-		return UPDATER_URL_ALL_BACKUP;
-	default:
-		I_Error("Unknown Update Channel");
-	}
-}
-
-class UpdateChecker : public CurlEasy
-{
-	std::string buffer;
-
-	virtual void AcceptData(TArrayView<std::byte> data) override
-	{
-		buffer += std::string((const char *)data.Data(), data.Size());
-	}
-
-	const char * firstErr = nullptr;
-
-	virtual void OnError(const char * err)
-	{
-		if(!firstErr) firstErr = err;
-	};
-public:
-	UpdateChecker() : CurlEasy(GAMENAME " Updater", false, false)
-	{}
-
-	std::optional<rapidjson::Document> Perform(UpdateButtonBar * buttonBar, UpdateChannel channel)
-	{
-		if(!CurlEasy::Perform(getMainURL(channel), "application/vnd.github+json"))
-		{
-			buffer = "";
-			if(!CurlEasy::Perform(getBackupURL(channel), "application/vnd.github+json"))
-			{
-				buttonBar->OpenFailedUpdateMenu(firstErr, true);
-				return std::nullopt;
-			}
-		}
-		Close();
-
-		rapidjson::Document doc;
-		rapidjson::ParseResult ok = doc.Parse(buffer.c_str(), buffer.length());
-
-		if(!ok)
-		{
-			buttonBar->OpenFailedUpdateMenu("Invalid Update JSON", true); // TODO: localize
-			return std::nullopt;
-		}
-
-		return doc;
-	}
-};
-
 class JsonDownloader : public CurlEasy
 {
 	std::string buffer;
@@ -1061,11 +969,7 @@ public:
 		rapidjson::Document doc;
 		rapidjson::ParseResult ok = doc.Parse(buffer.c_str(), buffer.length());
 
-		if(!ok)
-		{
-			buttonBar->OpenFailedUpdateMenu("Invalid Update JSON", true); // TODO: localize
-			return std::nullopt;
-		}
+		if(!ok) return std::nullopt;
 
 		return doc;
 	}
@@ -1137,7 +1041,7 @@ protected:
 	{
 		progress_lock.lock();
 		updateBarPercentage = std::min(1.0, std::max(0.0, ((double)current_download) / ((double)total_download)));
-		text[0]->SetText( std::format("Downloading, {} / {}", shortenByteSize(current_download), shortenByteSize(total_download))); // TODO: localize
+		text[0]->SetText( std::format("{}, {} / {}", GStrings.GetString("TXT_DOWNLOADING"), shortenByteSize(current_download), shortenByteSize(total_download)));
 		progress_lock.unlock();
 		ProgressPopup::RefreshBar();
 	}
@@ -1152,7 +1056,7 @@ protected:
 public:
 	ProgressDownloader(Widget * parent, const std::string &title, const std::vector<std::string> &text, const PopupBase::ActionListType &actions, double _windowWidth, int flags)
 		:	CurlEasy(GAMENAME " Updater", true, false),
-		ProgressPopup(parent, title, ConcatText({"Starting Download..."}, text), actions, _windowWidth, flags) // TODO: localize
+		ProgressPopup(parent, title, ConcatText({GStrings.GetString("UPDATER_STARTING")}, text), actions, _windowWidth, flags)
 	{}
 
 	static void DownloaderThread(ProgressDownloader * self, const std::string &url)
@@ -1205,9 +1109,9 @@ public:
 
 			if(!zip)
 			{
-				OpenPopup(buttonBar, "Failed to open zip file", {"Update was cancelled"}, // TODO: localize
+				OpenPopup(buttonBar, "UPDATER_ZIP_FAIL", {GStrings.GetString("UPDATER_CANCELLED")},
 				{
-					{"Back", [](auto &self){
+					{"TXT_BACK", [](auto &self){
 						self.Close();
 					}}
 				});
@@ -1232,7 +1136,9 @@ public:
 						}
 						else
 						{
-							buttonBar->OpenFailedUpdateMenu("'"+progdir + "update' is not a directory", false); // TODO: localize
+							std::string dirstr = progdir + "update";
+							auto errstr = std::vformat(GStrings.GetString("UPDATER_NOT_A_DIR"), std::make_format_args(dirstr));
+							buttonBar->OpenFailedUpdateMenu(errstr, false);
 							return;
 						}
 					}
@@ -1250,7 +1156,9 @@ public:
 						}
 						else
 						{
-							buttonBar->OpenFailedUpdateMenu("'"+progdir + "update_backup' is not a directory", false); // TODO: localize
+							std::string dirstr = progdir + "update_backup";
+							auto errstr = std::vformat(GStrings.GetString("UPDATER_NOT_A_DIR"), std::make_format_args(dirstr));
+							buttonBar->OpenFailedUpdateMenu(errstr, false);
 							return;
 						}
 					}
@@ -1306,7 +1214,8 @@ public:
 							}
 							catch(...) {} // try to remove created files, but if it fails, only show the main error, not the one from the removal
 
-							buttonBar->OpenFailedUpdateMenu("Failed to extract zip, error: '" + err + "' while writing file '"+newpath+"'", false); // TODO: localize
+							auto errstr = std::vformat(GStrings.GetString("UPDATER_ZIP_ERROR"), std::make_format_args(err, newpath));
+							buttonBar->OpenFailedUpdateMenu(errstr, false);
 							return;
 						}
 						else
@@ -1324,7 +1233,8 @@ public:
 								}
 								catch(...) {} // try to remove created files, but if it fails, only show the main error, not the one from the removal
 
-								buttonBar->OpenFailedUpdateMenu("Failed to extract zip, error: '" + err + "' while writing file '"+newpath+"'", false); // TODO: localize
+							auto errstr = std::vformat(GStrings.GetString("UPDATER_ZIP_ERROR"), std::make_format_args(err, newpath));
+								buttonBar->OpenFailedUpdateMenu(errstr, false);
 								return;
 							}
 							fclose(f);
@@ -1346,9 +1256,9 @@ public:
 					return;
 				}
 
-				OpenPopup(buttonBar, "Updated", {"Update was successful, the launcher will now restart."}, // TODO: localize
+				OpenPopup(buttonBar, "TXT_UPDATED", {GStrings.GetString("UPDATER_SUCCESS")},
 				{
-					{"Confirm", [progdir](auto &self){
+					{"TXT_CONFIRM", [progdir](auto &self){
 						updater_cached_update = "";
 						updater_last_update_check = std::to_string(getCurrentDate()).c_str();
 
@@ -1367,7 +1277,7 @@ public:
 						updater_filename_quoted.Substitute("\\", "\\\\");
 						updater_filename_quoted.Substitute("\"", "\\\"");
 						updater_filename_quoted = "\""+updater_filename_quoted+"\"";
-						
+
 						int numchars = MultiByteToWideChar(CP_UTF8, 0, updater_filename.c_str(), updater_filename.length(), NULL, 0);
 
 						WCHAR * updater_filename_w = new WCHAR[numchars + 1];
@@ -1392,7 +1302,6 @@ public:
 		}
 	}
 
-
 	virtual void OnClose() override
 	{
 		if(downloader_thread)
@@ -1401,9 +1310,9 @@ public:
 			downloader_thread->join();
 			downloader_thread = nullptr;
 
-			OpenPopup(buttonBar, "Cancelled", {"Download was cancelled"}, // TODO: localize
+			OpenPopup(buttonBar, "TXT_CANCELLED", {GStrings.GetString("UPDATER_CANCELLED")},
 			{
-				{"Back", [](auto &self){
+				{"TXT_BACK", [](auto &self){
 					self.Close();
 				}}
 			});
@@ -1427,202 +1336,165 @@ std::optional<update_info_t> UpdateButtonBar::ParseRelease(T &&doc, bool &ok, bo
 	VersionInfo ver;
 
 	std::string downloadName;
-	std::string downloadUrl;
 
-	if(!doc.IsObject() || !doc.HasMember("assets") || !doc["assets"].IsArray())
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
+	DEBUG_LOG("parsing");
 
-	bool release_json_found = false;
+#define HAS_MEMBER(source, id, type) ( source.HasMember(id) && source[id].Is##type() )
+#define FAIL_WITH_ERROR { ok = false; silentfail = false; DEBUG_LOG("errored"); return std::nullopt; }
+#define FAIL_AND_RECOVER { ok = false; silentfail = true; DEBUG_LOG("stopping"); return std::nullopt; }
+
 	bool download_link_found = false;
-	auto arr = doc["assets"].GetArray();
 
-	rapidjson::Document relinfo;
+	if(!HAS_MEMBER(doc, "commit", Object)) FAIL_WITH_ERROR;
+	if(!HAS_MEMBER(doc["commit"], "version", String)) FAIL_WITH_ERROR;
+	if(!HAS_MEMBER(doc["commit"], "message", String)) FAIL_WITH_ERROR;
 
-	for(int i = 0; i < (int)arr.Size(); i++)
-	{
-		if(!arr[i].HasMember("name") || !arr[i]["name"].IsString())
-		{
-			ok = false;
-			silentfail = false;
-			return std::nullopt;
-		}
-		else if(std::string s = arr[i]["name"].GetString(); s == "_release.json")
-		{
-			if(!arr[i].HasMember("browser_download_url") || !arr[i]["browser_download_url"].IsString())
-			{
-				ok = false;
-				silentfail = false;
-				return std::nullopt;
-			}
+	auto version = doc["commit"]["version"].GetString();
+	auto message = doc["commit"]["message"].GetString();
+	ver = VersionInfo{version};
 
-			auto release_info = (JsonDownloader {}).Perform(this, arr[i]["browser_download_url"].GetString());
+	DEBUG_LOG("%s", FString(ver).GetChars());
 
-			if(!release_info.has_value())
-			{
-				ok = false;
-				silentfail = true;
-				return std::nullopt;
-			}
+	if(!HAS_MEMBER(doc, "platforms", Object)) FAIL_WITH_ERROR;
+	if(!HAS_MEMBER(doc["platforms"], RELEASE_JSON_PLATFORM_NAME, String)) FAIL_WITH_ERROR;
 
-			relinfo = std::move(*release_info);
+	downloadName = doc["platforms"][RELEASE_JSON_PLATFORM_NAME].GetString();
 
-			release_json_found = true;
-			break;
-		}
-	}
-
-	if(!release_json_found)
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
-	else if(!relinfo.HasMember("commit") || !relinfo["commit"].IsObject() || !relinfo["commit"].HasMember("parent") || !relinfo["commit"]["parent"].IsString())
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
-
-	ver = VersionInfo(relinfo["commit"]["parent"].GetString());
-
-	if constexpr(CURRENT_UPDATE_CHANNEL != UpdateChannel::STABLE)
-	{
-		if(!relinfo["commit"].HasMember("distance") || !relinfo["commit"]["distance"].IsString())
-		{
-			ok = false;
-			silentfail = false;
-			return std::nullopt;
-		}
-
-		ver.distance = atoi(relinfo["commit"]["distance"].GetString());
-	}
-	else
-	{
-		ver.distance = 0;
-	}
-
-	if(!relinfo.HasMember("platforms") || !relinfo["platforms"].IsObject() || !relinfo["platforms"].HasMember(RELEASE_JSON_PLATFORM_NAME) || !relinfo["platforms"][RELEASE_JSON_PLATFORM_NAME].IsString())
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
-
-	downloadName = relinfo["platforms"][RELEASE_JSON_PLATFORM_NAME].GetString();
-
-	for(int i = 0; i < (int)arr.Size(); i++)
-	{
-		if(!arr[i].HasMember("name") || !arr[i]["name"].IsString())
-		{
-			ok = false;
-			silentfail = false;
-			return std::nullopt;
-		}
-		else if(std::string s = arr[i]["name"].GetString(); s == downloadName)
-		{
-			if(!arr[i].HasMember("browser_download_url") || !arr[i]["browser_download_url"].IsString())
-			{
-				ok = false;
-				silentfail = false;
-				return std::nullopt;
-			}
-
-			downloadUrl = arr[i]["browser_download_url"].GetString();
-			download_link_found = true;
-			break;
-		}
-	}
-
-	if(!download_link_found)
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
-
-	if(!doc.HasMember("body") || !doc["body"].IsString())
-	{
-		ok = false;
-		silentfail = false;
-		return std::nullopt;
-	}
+	DEBUG_LOG("%s", downloadName.c_str());
 
 	ok = true;
-	return update_info_t{ver, false, SplitNewLines(doc["body"].GetString(), doc["body"].GetStringLength()), downloadUrl};
+	return update_info_t{ver, false, { message }, downloadName};
+
+#undef FAIL_AND_RECOVER
+#undef FAIL_WITH_ERROR
+#undef HAS_MEMBER
 }
 
 std::optional<update_info_t> UpdateButtonBar::GetUpdateInfo(bool &ok)
 {
-	if(InitCurl())
-	{
-		auto doc = (UpdateChecker {}).Perform(this, CURRENT_UPDATE_CHANNEL);
+	DEBUG_LOG("starting");
 
-		if(doc.has_value())
+	bool primary;
+	std::string stream = "latest";
+	auto URL = [&stream](bool primary, std::string asset)
+	{
+		return primary
+			? std::format(UPDATER_URL, stream, asset)
+			: (stream == "latest")
+				? std::format(UPDATER_URL_BACKUP, stream, "download", asset)
+				: std::format(UPDATER_URL_BACKUP, "download", stream, asset);
+	};
+	auto TryGetData = [this, &primary, &stream, &URL]()
+	{
+		DEBUG_LOG("Trying '%s'", stream.c_str());
+		auto doc = (JsonDownloader {}).Perform(this, URL(true, "_release.json"));
+		primary = doc.has_value();
+		if (!primary) doc = (JsonDownloader {}).Perform(this, URL(false, "_release.json"));
+		return doc;
+	};
+	auto ToNum = [](unsigned &v, const std::string &str)
+	{
+		auto [p, e] = std::from_chars(str.data(), str.data()+str.size(), v);
+		return (e == std::errc{} && p == str.data()+str.size() && v >= 0);
+	};
+	auto GetReleaseData = [this, &TryGetData, &ToNum, &stream]
+	{
+		std::optional<rapidjson::Document> doc;
+		std::string current = GetVersionString();
+		std::string tag = GetGitTag();
+
+		if (!current.starts_with(tag))
+		{
+			stream = tag;
+			DEBUG_LOG("Preview build");
+			return TryGetData();
+		}
+
+		// try to get next prerelease tag by incrementing numeric prerelease parts
+		VersionInfo temp = GetCurrentVersionForUpdater();
+		auto pre = std::string(temp.prerelease);
+		temp.prerelease[0] = temp.build[0] = '\0';
+		if (pre.empty())
+		{
+			stream = "latest";
+			DEBUG_LOG("Stable build");
+			return TryGetData();
+		}
+		else
+		{
+			unsigned v;
+			auto base = std::string(temp);
+			std::vector<std::string> parts;
+			for (auto part : pre | std::views::split('.'))
+			{
+				parts.emplace_back(part.begin(), part.end());
+			}
+			if (!ToNum(v, parts.back()))
+			{ // final part was not numeric so we'll add it just to test
+				parts.emplace_back("0");
+			}
+			std::vector<std::string> candidates;
+			candidates.emplace_back("latest");
+			while (!parts.empty())
+			{
+				std::string end = parts.back();
+				parts.pop_back();
+				std::string release = base;
+				release += "-";
+				for (auto i = 0; i < parts.size(); i++)
+				{
+					release += parts[i] + ".";
+				}
+				if (ToNum(v, end))
+				{
+					release += std::to_string(v+1);
+					candidates.emplace_back(release);
+				}
+			}
+			candidates.emplace_back(base);
+			for (int i = candidates.size()-1; i >= 0; i--)
+			{
+				stream = candidates[i];
+				if (doc = TryGetData(); doc.has_value()) return doc;
+			}
+		}
+
+		return doc;
+	};
+
+	if(!InitCurl())
+	{
+		DEBUG_LOG("no curl");
+	}
+	else
+	{
+		auto doc = GetReleaseData();
+
+		DEBUG_LOG("Using '%s'", stream.c_str());
+
+		if(!doc.has_value())
+		{
+			DEBUG_LOG("empty response"); // TODO: report network issues.
+			                             // For now, the most likely time this will happen is when we are up-to-date
+			ok = true;
+			return std::nullopt;
+		}
+		else
 		{
 			bool silentfail = false;
 
-			if (CURRENT_UPDATE_CHANNEL == UpdateChannel::RELEASE_CANDIDATE)
+			std::optional<update_info_t> out = ParseRelease(*doc, ok, silentfail);
+
+			if(ok)
 			{
-				if(!doc->IsArray())
-				{
-					silentfail = false;
-				}
-				else
-				{
-					std::vector<std::optional<update_info_t>> updates;
-					auto arr = doc->GetArray();
-					bool anyok = false;
-					for(int i = 0; i < arr.Size(); i++)
-					{
-						if(!arr[i].IsObject() || !arr[i].HasMember("tag_name") || !arr[i]["tag_name"].IsString() || arr[i]["tag_name"].GetString()[0] < '0' || arr[i]["tag_name"].GetString()[0] > '9')
-						{
-							continue;
-						}
-						bool ok2 = true, silentfail2 = true;
+				out->download_url = URL(primary, out->download_url);
 
-						std::optional<update_info_t> out = ParseRelease(arr[i], ok2, silentfail2);
-
-						if(ok2 && out.has_value() && out->version < GetCurrentVersionForUpdate(CURRENT_UPDATE_CHANNEL))
-						{
-							break;
-						}
-
-						if(ok2 && out.has_value())
-						{
-							anyok = true;
-							updates.push_back(out);
-						}
-					}
-
-					if(!anyok)
-					{
-						OpenFailedUpdateMenu("Failed to find any valid updates", true);
-						ok = false;
-						return std::nullopt;
-					}
-
-					return updates[0]; // TODO fully check updates, but otherwise they _should_ be in order so returning the newest one is fine since preview/experimental are excluded by the tag name check
-				}
-			}
-			else
-			{
-				silentfail = false;
-				std::optional<update_info_t> out = ParseRelease(*doc, ok, silentfail);
-
-				if(ok)
-				{
-					return out;
-				}
+				return out;
 			}
 
 			if(!silentfail)
 			{
-				OpenFailedUpdateMenu("Invalid Update JSON", true);
+				OpenFailedUpdateMenu(GStrings.GetString("UPDATER_INVALID_JSON"), true);
 			}
 		}
 	}
@@ -1633,23 +1505,30 @@ std::optional<update_info_t> UpdateButtonBar::GetUpdateInfo(bool &ok)
 
 bool isVersionInvalid(VersionInfo ver)
 {
-	return ver.major == USHRT_MAX || ver.minor == USHRT_MAX || ver.revision == USHRT_MAX || ver == GetCurrentVersion();
+	return ver.major == USHRT_MAX || ver.minor == USHRT_MAX || ver.revision == USHRT_MAX || ver == GetCurrentVersionForUpdater();
 }
 
 void UpdateButtonBar::StartUpdate()
 {
-	OpenPopup<ProgressDownloader>(this, "Updating...").Perform(this, GetDownloadURL()); // TODO: localize
+	OpenPopup<ProgressDownloader>(this, "UPDATER_UPDATING").Perform(this, GetDownloadURL());
 }
 
 void UpdateButtonBar::CheckForUpdate(bool force)
 {
+	DEBUG_LOG("starting");
+
 	Hide();
 
 	if(!updater_check_updates_initialized)
 	{
+		DEBUG_LOG("onboarding");
 		OpenUpdateInitChoice();
 	}
-	else if(updater_check_updates || force)
+	else if(!updater_check_updates && !force)
+	{
+		DEBUG_LOG("skipping");
+	}
+	else
 	{
 		bool new_update = true;
 		if(updater_cached_update->Length() > 0)
@@ -1658,34 +1537,42 @@ void UpdateButtonBar::CheckForUpdate(bool force)
 
 			if(isVersionInvalid(cachedVer))
 			{
+				DEBUG_LOG("invalidating cache");
 				updater_cached_update = "";
 				M_SaveDefaults(NULL); // save settings
 			}
 			else
 			{
+				DEBUG_LOG("using cache");
 				new_update = false;
 				currentUpdate = update_info_t{cachedVer, true, {}, ""};
 			}
 		}
 
-		VersionInfo skippedVer;
+		VersionInfo skippedVer(USHRT_MAX, USHRT_MAX, USHRT_MAX);
+		skippedVer.prerelease[0] = skippedVer.build[0] = '\0';
+
 
 		if(updater_skipped_update->Length() > 0)
 		{
 			VersionInfo skippedVerTmp = VersionInfo((const char *)updater_skipped_update);
 			if(isVersionInvalid(skippedVerTmp))
 			{
+				DEBUG_LOG("clearing skip");
 				updater_skipped_update = "";
 				M_SaveDefaults(NULL); // save settings
 			}
 			else
 			{
+				DEBUG_LOG("skipping");
 				skippedVer = skippedVerTmp;
 			}
 		}
 
 		uint64_t curTime = getCurrentDate();
 		uint64_t nextCheckTime = parseDate((FString)updater_last_update_check) + daysToSeconds(updater_update_interval);
+
+		DEBUG_LOG("%lu → %lu (%d%d)", curTime, nextCheckTime, curTime >= nextCheckTime, force);
 
 		if(curTime >= nextCheckTime || currentUpdate.has_value() || force)
 		{
@@ -1703,7 +1590,7 @@ void UpdateButtonBar::CheckForUpdate(bool force)
 
 				currentUpdate = GetUpdateInfo(ok);
 
-				if(!ok) return;
+				if(!ok || !currentUpdate.has_value()) return;
 
 				new_update = !was_cached || (currentUpdate->version != cachedVer);
 
@@ -1721,19 +1608,17 @@ void UpdateButtonBar::CheckForUpdate(bool force)
 
 			if(currentUpdate.has_value())
 			{
-				bool should_update;
-				if(updater_debug_always_update)
-				{
-					should_update = true;
-				}
-				else if constexpr(CURRENT_UPDATE_CHANNEL == UpdateChannel::TESTING)
-				{
-					should_update = (currentUpdate->version != GetCurrentVersionForUpdate(CURRENT_UPDATE_CHANNEL));
-				}
-				else
-				{
-					should_update = (currentUpdate->version > GetCurrentVersionForUpdate(CURRENT_UPDATE_CHANNEL));
-				}
+				auto current = GetCurrentVersionForUpdater();
+				bool should_update = updater_debug_always_update || (currentUpdate->version > current);
+
+				DEBUG_LOG(
+					"%s → %s (%d%d%d)",
+					FString(current).GetChars(),
+					FString(currentUpdate->version).GetChars(),
+					*updater_debug_always_update,
+					(currentUpdate->version > current),
+					skippedVer != currentUpdate->version
+				);
 
 				if(should_update && (skippedVer != currentUpdate->version))
 				{
@@ -1749,9 +1634,9 @@ void UpdateButtonBar::CheckForUpdate(bool force)
 				}
 				else if(force)
 				{
-					OpenPopup(this, "Up to Date!", {"No updates were found"}, // TODO: localize
+					OpenPopup(this, "UPDATER_UP_TO_DATE", {GStrings.GetString("UPDATER_UP_TO_DATE")},
 					{
-						{"Ok", [](auto &self){
+						{"TXT_OK", [](auto &self){
 							self.Close();
 						}}
 					});
@@ -1759,9 +1644,9 @@ void UpdateButtonBar::CheckForUpdate(bool force)
 			}
 			else if(force)
 			{
-				OpenPopup(this, "Up to Date!", {"No updates were found"}, // TODO: localize
+				OpenPopup(this, "UPDATER_UP_TO_DATE", {GStrings.GetString("UPDATER_UP_TO_DATE")},
 				{
-					{"Ok", [](auto &self){
+					{"TXT_OK", [](auto &self){
 						self.Close();
 					}}
 				});
