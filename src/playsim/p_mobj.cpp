@@ -4158,7 +4158,7 @@ void AActor::SetDynLightLevel ()
 
 					frac = 1.0f - (dist / lightRadius);
 
-					if (light->IsSpot())
+					if (light->IsSpot() && light->pSpotOuterAngle && light->pSpotInnerAngle)
 					{
 						L *= -1.0f / dist;
 						DAngle negPitch = -light->Pitch;
