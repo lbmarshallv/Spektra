@@ -5308,7 +5308,10 @@ void AActor::Tick ()
 			return;
 		}
 
-		SetDynLightLevel ();
+		if (player || (flags3 & MF3_ISMONSTER) || (flags & MF_SHOOTABLE))
+		{
+			SetDynLightLevel();
+		}
 
 		// Check for poison damage, but only once per PoisonPeriod tics (or once per second if none).
 		if (PoisonDurationReceived && (Level->time % (PoisonPeriodReceived ? PoisonPeriodReceived : TICRATE) == 0))
