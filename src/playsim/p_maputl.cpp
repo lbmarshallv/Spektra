@@ -1768,6 +1768,8 @@ void FThingPathTraverse::init(DVector3 Start, DVector3 End, int flags, double st
 		btit.SwitchBlock(mapx, mapy);
 		while ((thing = btit.Next(compatible)))
 		{
+			if ((flags & PT_STATSOL) && !(thing->collisionFlags & COLFLAG_STATICSOLID))
+				continue;
 			if (((thing->flags & ActorMask) || ActorMask == 0xffffffff) && !IsIgnored(thing))
 				things.Push(thing);
 		}

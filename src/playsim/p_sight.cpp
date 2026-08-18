@@ -946,6 +946,9 @@ sightcounts[0]++;
 	}
 
 done:
+	FThingPathTraverse it2(t1->Level, t1->Pos(), t2->Pos(), PT_STATSOL, 0.);
+	if (it2.Next())
+		return false;
 	SightCycles.Unclock();
 	return res;
 }
