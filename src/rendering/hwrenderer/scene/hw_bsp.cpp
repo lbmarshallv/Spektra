@@ -181,7 +181,7 @@ void HWDrawInfo::WorkerThread()
 			}
 			else back = nullptr;
 
-			wall.Process(&disp, job->seg, front, back, job->sub->isCulled);
+			wall.Process(&disp, job->seg, front, back);
 			rendered_lines++;
 			SetupWall.Unclock();
 			break;
@@ -220,100 +220,6 @@ void HWDrawInfo::WorkerThread()
 	}
 }
 
-EXTERN_CVAR(Float, r_line_distance_cull)
-const double MIN_LINE_CULL = 640.0;
-
-static float getLineCullDistance(FRenderViewpoint vp) {
-	/*
-	if (!vp.LastTrace.ffloor && (vp.LastTrace.HitType == TRACE_HitFloor || vp.LastTrace.HitType == TRACE_HitWall))
-		//return vp.LastTrace.Distance + vp.camera->radius*2.;
-		return r_line_distance_cull / 2  > vp.LastTrace.Distance ? r_line_distance_cull / 2 : vp.LastTrace.Distance;
-	else 
-		return r_line_distance_cull;
-	*/
-	double ldc = r_line_distance_cull;
-	double pitch = vp.Angles.Pitch.Degrees();
-	double pchange = (pitch) / DAngle90.Degrees();
-	if (pitch > 0.0 && pitch <= 90.0) {
-		ldc -= (r_line_distance_cull - MIN_LINE_CULL) * pchange;
-	}
-	return max(ldc,MIN_LINE_CULL);
-}
-
-static double DistanceToLine(FRenderViewpoint vp, seg_t* line) {
-	//calcuate the distance between the viewpoint and any point on the line
-	double x1, y1, x2, y2, a, b, c;
-	x1 = line->v1->fPos().X;
-	y1 = line->v1->fPos().Y;
-	x2 = line->v2->fPos().X;
-	y2 = line->v2->fPos().Y;
-	a = y1 - y2;
-	b = x2 - x1;
-	c = x1 * y2 - x2 * y1;
-	return abs(a * vp.Pos.X + b * vp.Pos.Y + c) / sqrt(a * a + b * b);
-}
-
-static double DistanceToSubsector(FRenderViewpoint vp, subsector_t* sub) {
-	int count = sub->numlines;
-	double minDistance = -1.0;
-	seg_t* seg = sub->firstline;
-
-	while (count--)
-	{
-		if (seg->linedef != nullptr && !(seg->sidedef->Flags & WALLF_POLYOBJ))
-		{
-			double lineDistance = DistanceToLine(vp, seg);
-			if (minDistance < 0 || lineDistance < minDistance) {
-				minDistance = lineDistance;
-			}
-		}
-		seg++;
-	}
-	return minDistance;
-}
-
-static double DistanceToSector(FRenderViewpoint vp, sector_t* sector) {
-	DVector2 cp;
-	sector->ClosestPoint(vp.Pos.XY(),cp);
-	DVector2 diff = vp.Pos.XY() - cp;
-	double hdiff = diff.Length();
-	//double vdiff = vp.Pos.Z - sector->floorplane.ZatPoint(cp);
-	//return sqrt((hdiff * hdiff) + (vdiff * vdiff));
-	return hdiff;
-}
-
-static double IsDistanceCulled(FRenderViewpoint vp, subsector_t* sub) {
-	seg_t* seg = sub->firstline;
-	sector_t* sector = sub->sector;
-	if (!sector || !seg)
-		return false;
-	if (DistanceToSector(vp, sector) > getLineCullDistance(vp))
-		return true;
-	return false;
-}
-
-static bool IsDistanceCulled(FRenderViewpoint vp,seg_t *line)
-{
-	double cullDist = getLineCullDistance(vp);
-	if (cullDist <= 0.0)
-		return false;
-	//only lines outside (with sky flat) get culled
-	if(line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum)
-		return false;
-	return DistanceToLine(vp, line) > cullDist;
-}
-
-static bool IsDistanceCulled(double dist, seg_t* line)
-{
-	double cullDist = r_line_distance_cull;
-	if (cullDist <= 0.0)
-		return false;
-	//only lines outside (with sky flat) get culled
-	if (line->frontsector->GetTexture(sector_t::ceiling) != skyflatnum)
-		return false;
-	return dist > cullDist;
-}
-
 static bool IsManuallyCulled(FRenderViewpoint vp, subsector_t* sub)
 {
 	int       count  = sub->numlines;
@@ -331,34 +237,6 @@ static bool IsManuallyCulled(FRenderViewpoint vp, subsector_t* sub)
 	}
 	return false;
 }
-
-/**
-static bool IsPointInFOV(FRenderViewpoint vp, const DVector3 point)
-{
-	double fov = vp.FieldOfView.Degrees();
-	DVector3 cameraPos = vp.Pos;
-	DVector3 cameraDir = DVector3(vp.Angles.Pitch.Radians(), vp.Angles.Yaw.Radians(), vp.Angles.Roll.Radians());
-
-	// Vector from camera to the point
-	DVector3 toPoint = point - cameraPos;
-
-	// Normalize the direction vectors
-	DVector3 toPointDir = toPoint.normalize();
-	DVector3 camDirNormalized = cameraDir.normalize();
-
-	// Calculate the dot product (cosine of the angle between the two vectors)
-	float dotProduct = camDirNormalized.dot(toPointDir);
-
-	// Calculate the angle between the camera direction and the point direction
-	float angleToPoint = std::acos(dotProduct);
-
-	// Convert FOV to radians and compute half of the FOV
-	float halfFOV = (fov * 0.5f) * (M_PI / 180.0f);
-
-	// The point is within the FOV if the angle to the point is less than or equal to half the FOV
-	return angleToPoint <= halfFOV;
-}
-**/
 
 EXTERN_CVAR(Bool, gl_render_segs)
 
@@ -543,103 +421,6 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	}
 }
 
-
-void HWDrawInfo::AddCulledLine(seg_t* seg)
-{
-	sector_t* backsector = nullptr;
-
-	auto& clipper = *mClipper;
-	angle_t startAngle = clipper.GetClipAngle(seg->v2);
-	angle_t endAngle = clipper.GetClipAngle(seg->v1);
-	auto& clipperr = *rClipper;
-	angle_t startAngleR = clipperr.PointToPseudoAngle(seg->v2->fX(), seg->v2->fY());
-	angle_t endAngleR = clipperr.PointToPseudoAngle(seg->v1->fX(), seg->v1->fY());
-
-	if (Viewpoint.IsAllowedOoB() && r_radarclipper && !(Level->flags3 & LEVEL3_NOFOGOFWAR) && (startAngleR - endAngleR >= ANGLE_180))
-	{
-		if (!seg->backsector) clipperr.SafeAddClipRange(startAngleR, endAngleR);
-		else if ((seg->sidedef != nullptr) && !uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ) && (currentsector->sectornum != seg->backsector->sectornum))
-		{
-			if (in_area == area_default) in_area = hw_CheckViewArea(seg->v1, seg->v2, seg->frontsector, seg->backsector);
-			backsector = hw_FakeFlat(seg->backsector, in_area, true);
-			if (hw_CheckClip(seg->sidedef, currentsector, backsector)) clipperr.SafeAddClipRange(startAngleR, endAngleR);
-		}
-	}
-
-	// Back side, i.e. backface culling	- read: endAngle >= startAngle!
-	if (startAngle - endAngle < ANGLE_180)
-	{
-		return;
-	}
-
-	if (seg->sidedef == nullptr)
-	{
-		if (!(currentsubsector->flags & SSECMF_DRAWN))
-		{
-			if (clipper.SafeCheckRange(startAngle, endAngle) && (!r_radarclipper || (Level->flags3 & LEVEL3_NOFOGOFWAR)))
-			{
-				currentsubsector->flags |= SSECMF_DRAWN;
-			}
-			if ((r_radarclipper || !(Level->flags3 & LEVEL3_NOFOGOFWAR)) && clipperr.SafeCheckRange(startAngleR, endAngleR))
-			{
-				currentsubsector->flags |= SSECMF_DRAWN;
-			}
-		}
-		return;
-	}
-
-	if (!clipper.SafeCheckRange(startAngle, endAngle))
-	{
-		return;
-	}
-
-	if (Viewpoint.IsAllowedOoB()) // No need for vertical clipping if viewpoint not allowed out of bounds
-	{
-		auto& clipperv = *vClipper;
-		angle_t startPitch = clipperv.PointToPseudoPitch(seg->v1->fX(), seg->v1->fY(), currentsector->floorplane.ZatPoint(seg->v1));
-		angle_t endPitch = clipperv.PointToPseudoPitch(seg->v1->fX(), seg->v1->fY(), currentsector->ceilingplane.ZatPoint(seg->v1));
-		angle_t startPitch2 = clipperv.PointToPseudoPitch(seg->v2->fX(), seg->v2->fY(), currentsector->floorplane.ZatPoint(seg->v2));
-		angle_t endPitch2 = clipperv.PointToPseudoPitch(seg->v2->fX(), seg->v2->fY(), currentsector->ceilingplane.ZatPoint(seg->v2));
-		angle_t temp;
-		// Wall can be tilted from viewpoint perspective. Find vertical extent on screen in psuedopitch units (0 to 2, bottom to top)
-		if (int(startPitch) > int(startPitch2)) // Handle zero crossing
-		{
-			temp = startPitch; startPitch = startPitch2; startPitch2 = temp; // exchange
-		}
-		if (int(endPitch) > int(endPitch2)) // Handle zero crossing
-		{
-			temp = endPitch; endPitch = endPitch2; endPitch2 = temp; // exchange
-		}
-
-		if (!clipperv.SafeCheckRange(startPitch, endPitch2))
-		{
-			return;
-		}
-	}
-
-	if (!r_radarclipper || (Level->flags3 & LEVEL3_NOFOGOFWAR) || clipperr.SafeCheckRange(startAngleR, endAngleR))
-		currentsubsector->flags |= SSECMF_DRAWN;
-	clipper.SafeAddClipRange(startAngle, endAngle);
-	if (gl_render_walls)
-	{
-		if (multithread)
-		{
-			jobQueue.AddJob(RenderJob::WallJob, seg->Subsector, seg);
-		}
-		else
-		{
-			HWWall wall;
-			HWWallDispatcher disp(this);
-			SetupWall.Clock();
-			wall.sub = seg->Subsector;
-			wall.Process(&disp, seg, currentsector, backsector, true);
-			//rendered_lines++;
-			SetupWall.Unclock();
-			
-		}
-	}
-}
-
 //==========================================================================
 //
 // R_Subsector
@@ -751,10 +532,7 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 			}
 			else if (!(seg->sidedef->Flags & WALLF_POLYOBJ))
 			{
-				if (sub->isCulled)
-					AddCulledLine(seg);
-				else
-					AddLine (seg, mClipPortal != nullptr);
+				AddLine (seg, mClipPortal != nullptr);
 			}
 			seg++;
 		}
@@ -956,10 +734,6 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 	if (mClipper->IsBlocked()) return;	// if we are inside a stacked sector portal which hasn't unclipped anything yet.
 
 	fakesector=hw_FakeFlat(sector, in_area, false);
-
-	bool isCulled = !isNoLineCullMode() && (IsDistanceCulled(Viewpoint, sub) || IsManuallyCulled(Viewpoint,sub));
-	sub->isCulled = isCulled;
-
 	if(doOob && sector->isSecret() && sector->wasSecret() && !r_radarclipper) return;
 
 	// cull everything if subsector outside all relevant clippers
@@ -1049,7 +823,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 	}
 
 	// [RH] Add particles
-	if (!isCulled && gl_render_things && (sub->sprites.Size() > 0 || Level->ParticlesInSubsec[sub->Index()] != NO_PARTICLE))
+	if (gl_render_things && (sub->sprites.Size() > 0 || Level->ParticlesInSubsec[sub->Index()] != NO_PARTICLE))
 	{
 		if (multithread)
 		{
@@ -1075,7 +849,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		sector->validcount = validcount;
 		sector->MoreFlags |= SECMF_DRAWN;
 
-		if (!isCulled && gl_render_things && (sector->touching_renderthings || sector->sectorportal_thinglist))
+		if (gl_render_things && (sector->touching_renderthings || sector->sectorportal_thinglist))
 		{
 			if (multithread)
 			{
@@ -1088,7 +862,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 				SetupSprite.Unclock();
 			}
 		}
-		if (!isCulled && r_dithertransparency && doOob && (RTnum < MAXDITHERACTORS) && mCurrentPortal == nullptr)
+		if (r_dithertransparency && doOob && (RTnum < MAXDITHERACTORS) && mCurrentPortal == nullptr)
 		{
 			// [DVR] Not parallelizable due to variables RTnum and RenderedTargets[]
 			for (auto p = sector->touching_renderthings; p != nullptr; p = p->m_snext)

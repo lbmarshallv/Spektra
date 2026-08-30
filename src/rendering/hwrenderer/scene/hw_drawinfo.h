@@ -346,22 +346,6 @@ public:
 		lightmode = ELightMode::Doom;
 	}
 
-	bool isNoLineCullMode() const
-	{
-		return linecullmode == ELineCullMode::NoCulling;
-	}
-
-	bool isOutDoorLineCullMode() const
-	{
-		return linecullmode == ELineCullMode::OutDoorCulling;
-	}
-
-	bool isGlobalLineCullMode() const
-	{
-		return linecullmode == ELineCullMode::OutDoorCulling;
-	}
-
-
 };
 
 void CleanSWDrawer();

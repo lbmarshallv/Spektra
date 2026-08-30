@@ -2142,7 +2142,7 @@ CVAR(Int, bottomskew, 0, 0)
 //
 //
 //==========================================================================
-void HWWall::Process(HWWallDispatcher *di, seg_t *seg, sector_t * frontsector, sector_t * backsector, bool isculled)
+void HWWall::Process(HWWallDispatcher *di, seg_t *seg, sector_t * frontsector, sector_t * backsector)
 {
 	vertex_t * v1, *v2;
 	float fch1;
@@ -2260,30 +2260,6 @@ void HWWall::Process(HWWallDispatcher *di, seg_t *seg, sector_t * frontsector, s
 	{
 		SkyNormal(di, frontsector, v1, v2);
 		DoHorizon(di, seg, frontsector, v1, v2);
-		return;
-	}
-
-	if (isculled)
-	{
-		if (frontsector->GetTexture(sector_t::ceiling) == skyflatnum)
-		{
-			SkyNormal(di, frontsector, v1, v2);
-		}
-		else
-		{
-			texture = TexMan.GetGameTexture(frontsector->GetTexture(sector_t::ceiling), true);
-			if (texture && texture->isValid())
-			{
-				int skewflag = seg->sidedef->textures[side_t::mid].skew;
-				if (skewflag == 0) skewflag = midskew;
-				float skew =
-					skewflag == side_t::skew_front_ceiling ? fch2 - fch1 :
-					skewflag == side_t::skew_front_floor ? ffh2 - ffh1 : 0.;
-				DoTexture(di, RENDERWALL_TOP, seg, true,
-					crefz, frefz,
-					fch1, fch2, ffh1, ffh2, 0, skew);
-			}
-		}
 		return;
 	}
 

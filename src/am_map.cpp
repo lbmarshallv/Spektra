@@ -2086,12 +2086,6 @@ void DAutomap::drawSubsectors()
 	for (unsigned i = 0; i < subsectors.Size(); ++i)
 	{
 		auto sub = &subsectors[i];
-		#ifdef _DEBUG
-		if (sub->isCulled)
-		{
-			continue;
-		}
-		#endif
 		if (sub->flags & SSECF_POLYORG)
 		{
 			continue;
