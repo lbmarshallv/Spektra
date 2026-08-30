@@ -9058,7 +9058,7 @@ void AActor::RestoreSpecialPosition()
 //
 //----------------------------------------------------------------------------
 
-FName AActor::getLODModel(double distance)
+FName AActor::getLODModelName(double distance)
 {
 	FName R = NAME_None;
 	LODmodel *model = GetLODmodels();
@@ -9074,12 +9074,28 @@ FName AActor::getLODModel(double distance)
 	}
 	return R;
 }
+LODmodel *AActor::getLODModel(double distance)
+{
+	LODmodel *model = GetLODmodels();
+	LODmodel *R     = nullptr;
+	while (model != nullptr)
+	{
+		if (distance <= (model->distance * model->distance))
+			return R;
+		else
+		{
+			R     = model;
+			model = model->Next;
+		}
+	}
+	return R;
+}
 
 FName AActor::changeLODModel(double distance)
 {
-	FName model = getLODModel(distance);
-	auto  modelName = model.GetChars();
-	if (model == NAME_None)
+	LODmodel *model = getLODModel(distance);
+	
+	if (model == nullptr)
 	{
 		if (modelData != nullptr)
 		{
@@ -9091,7 +9107,11 @@ FName AActor::changeLODModel(double distance)
 	{
 		// right now it's hard coded to only look at the Models folder
 		// and can only put models in index 0
-		int queryModel = FindModel("Models/", model.GetChars());
+		int queryModel = model->modelID > 0 && model->modelID < Models.size()
+		                     ? model->modelID
+		                     : FindModel("Models/", model->model.GetChars());
+
+		model->modelID = queryModel;
 		if (modelData == nullptr)
 		{
 			auto ptr = Create<DActorModelData>();
@@ -9110,7 +9130,7 @@ FName AActor::changeLODModel(double distance)
 			modelData->models[0].modelID = queryModel;
 		}
 	}
-	return model;
+	return model != nullptr ? model->model : NAME_None;
 }
 
 //----------------------------------------------------------------------------

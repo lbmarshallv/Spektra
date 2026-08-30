@@ -777,6 +777,9 @@ void InitModels()
 		SpriteModelFrames[i].hashnext = SpriteModelHash[j];
 		SpriteModelHash[j]=i;
 	}
+
+	Printf("InitModels complete");
+
 }
 
 void ParseModelDefLump(int Lump)

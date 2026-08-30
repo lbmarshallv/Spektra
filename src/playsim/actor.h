@@ -708,10 +708,12 @@ struct FDropItem
 struct LODmodel
 {
 	FName model;
+	int       modelID   = 0;
 	FString modelpath = "Models/";
 	double distance = 0;
 	LODmodel *Next = nullptr;
-	LODmodel(FName model, double distance) : model(model), distance(distance){}
+	LODmodel(FName model, double distance){}
+	LODmodel(int modelID, double distance) : modelID(modelID), distance(distance){}
 	void push(LODmodel *other)
 	{
 		if (Next == nullptr)
@@ -1181,7 +1183,8 @@ public:
 		return GetInfo()->LODmodels != nullptr;
 	}
 
-	FName getLODModel(double distance);
+	LODmodel *getLODModel(double distance);
+	FName getLODModelName(double distance);
 	FName changeLODModel(double distance);
 
 // info for drawing

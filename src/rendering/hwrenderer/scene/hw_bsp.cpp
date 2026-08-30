@@ -47,6 +47,9 @@ CVAR(Bool, gl_multithread, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 EXTERN_CVAR(Float, r_actorspriteshadowdist)
 EXTERN_CVAR(Bool, r_radarclipper)
 EXTERN_CVAR(Bool, r_dithertransparency)
+EXTERN_CVAR(Float, r_lod)
+const double MIN_LOD = 0.;
+const double MAX_LOD = 1000.;
 
 thread_local bool isWorkerThread;
 ctpl::thread_pool renderPool(1);
@@ -828,7 +831,7 @@ void HWDrawInfo::RenderThings(subsector_t * sub, sector_t * sector)
 			}
 			if (doLOD)
 			{
-				thing->changeLODModel(dist);
+				thing->changeLODModel(dist * clamp(double(r_lod), MIN_LOD, MAX_LOD));
 			}
 		}
 		// If this thing is in a map section that's not in view it can't possibly be visible
