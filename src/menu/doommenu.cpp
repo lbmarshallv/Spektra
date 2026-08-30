@@ -149,6 +149,15 @@ DEFINE_ACTION_FUNCTION_NATIVE(DMenu, StartGameDirect, StartGameDirect)
 	return 0;
 }
 
+int GetSpacing(const DListMenuDescriptor &desc)
+{
+	if (desc.mFont->IsValidDynamicFont())
+	{
+		return std::max(desc.mLinespacing, desc.mFont->GetHeight());
+	}
+	return desc.mLinespacing;
+}
+
 bool M_SetSpecialMenu(FName& menu, int param)
 {
 	// some menus need some special treatment
@@ -157,7 +166,9 @@ bool M_SetSpecialMenu(FName& menu, int param)
 	case NAME_MainMenu:
 		if (gameinfo.gametype & GAME_DoomStrifeChex)	// Raven's games always used text based menus
 		{
-			if (gameinfo.forcetextinmenus) 	// If text is forced, this overrides any check.
+			FFont *desiredMenuFont = FFont::GetBigTextFont(BigUpper);
+			const bool isDynamicFont   = (desiredMenuFont && desiredMenuFont->IsValidDynamicFont());
+			if (generic_ui || gameinfo.forcetextinmenus)	// If text is forced, this overrides any check.
 			{
 				menu = NAME_MainMenuTextOnly;
 			}
@@ -714,7 +725,7 @@ void M_StartupEpisodeMenu(FNewGameStartup *gs)
 				if (y < topy) topy = y;
 			}
 
-			int spacing = ld->mLinespacing;
+			int spacing = GetSpacing(*ld);
 			for (unsigned i = 0; i < AllEpisodes.Size(); i++)
 			{
 				if (AllEpisodes[i].mPicName.IsNotEmpty())
@@ -765,7 +776,7 @@ void M_StartupEpisodeMenu(FNewGameStartup *gs)
 				for(unsigned i = 0; i < AllEpisodes.Size(); i++)
 				{
 					DMenuItemBase *it = nullptr;
-					if (AllEpisodes[i].mPicName.IsNotEmpty())
+					if (AllEpisodes[i].mPicName.IsNotEmpty() && !generic_ui)
 					{
 						FTextureID tex = GetMenuTexture(AllEpisodes[i].mPicName.GetChars());
 						if (AllEpisodes[i].mEpisodeName.IsEmpty() || OkForLocalization(tex, AllEpisodes[i].mEpisodeName.GetChars()))
@@ -867,7 +878,7 @@ static void BuildPlayerclassMenu()
 			}
 
 			// center the menu on the screen if the top space is larger than the bottom space
-			int totalheight = posy + (numclassitems+1) * ld->mLinespacing - topy;
+			int totalheight = posy + (numclassitems + 1) * GetSpacing(*ld) - topy;
 
 			if (numclassitems <= 1)
 			{
@@ -901,7 +912,7 @@ static void BuildPlayerclassMenu()
 							auto it = CreateListMenuItemText(ld->mXpos, ld->mYpos, ld->mLinespacing, *pname,
 								pname, ld->mFont,ld->mFontColor,ld->mFontColor2, NAME_EpisodeMenu, i);
 							ld->mItems.Push(it);
-							ld->mYpos += ld->mLinespacing;
+							ld->mYpos += GetSpacing(*ld);
 							n++;
 						}
 					}
@@ -1174,6 +1185,8 @@ DEFINE_ACTION_FUNCTION(DNewPlayerMenu, UpdateSkinOptions)
 
 extern int restart;
 
+
+
 void M_StartupSkillMenu(FNewGameStartup *gs)
 {
 	static int done = -1;
@@ -1236,7 +1249,7 @@ void M_StartupSkillMenu(FNewGameStartup *gs)
 				}
 			}
 
-			int spacing = ld->mLinespacing;
+			int spacing = GetSpacing(*ld);
 			//if (done != restart)
 			{
 				//done = restart;
@@ -1261,6 +1274,7 @@ void M_StartupSkillMenu(FNewGameStartup *gs)
 							continue;
 					}
 					if ((gameinfo.gametype & GAME_DoomStrifeChex) && spacing == 16) spacing = 18;
+					//spacing = ld->mFont->GetHeight();
 					break;
 				}
 
@@ -1329,7 +1343,7 @@ void M_StartupSkillMenu(FNewGameStartup *gs)
 
 				EColorRange color = (EColorRange)skill.GetTextColor();
 				if (color == CR_UNTRANSLATED) color = ld->mFontColor;
-				if (skill.PicName.Len() != 0 && pItemText == nullptr)
+				if (!generic_ui && skill.PicName.Len() != 0 && pItemText == nullptr)
 				{
 					FTextureID tex = GetMenuTexture(skill.PicName.GetChars());
 					if (skill.MenuName.IsEmpty() || OkForLocalization(tex, skill.MenuName.GetChars()))

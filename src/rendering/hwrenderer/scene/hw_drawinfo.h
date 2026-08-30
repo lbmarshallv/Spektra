@@ -218,6 +218,7 @@ private:
 
 	void UnclipSubsector(subsector_t *sub);
 
+	bool IsDistanceCulled(seg_t *line);
 	void AddLine(seg_t *seg, bool portalclip);
 	void AddCulledLine(seg_t* seg);
 	void PolySubsector(subsector_t * sub);
