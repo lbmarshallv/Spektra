@@ -373,7 +373,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 	uint8_t ispoly = uint8_t(seg->sidedef->Flags & WALLF_POLYOBJ);
 
-	if (r_distance_cull_type > 0 && IsDistanceCulled(seg))
+	if ((r_distance_cull_type > 0 && IsDistanceCulled(seg)) || IsManuallyCulled(this->Viewpoint,seg->Subsector))
 	{
 		isculled = true;
 		if(doOob)
