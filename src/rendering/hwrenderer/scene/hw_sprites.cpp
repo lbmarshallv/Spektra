@@ -15,6 +15,7 @@
 **
 */
 
+#include "colorspace.h"
 #include "p_local.h"
 #include "p_effect.h"
 #include "g_level.h"
@@ -1251,7 +1252,7 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 
 	lightlevel = rendersector->CheckSpriteGlow(lightlevel, thingpos);
 
-	ThingColor = (thing->RenderStyle.Flags & STYLEF_ColorIsFixed) ? thing->fillcolor : 0xffffff;
+	ThingColor = (thing->RenderStyle.Flags & STYLEF_ColorIsFixed) ? thing->fillcolor : Color::str("#fff");
 	ThingColor.a = 255;
 	RenderStyle = thing->RenderStyle;
 
