@@ -12,7 +12,6 @@ include( CheckCXXCompilerFlag )
 include( CheckIncludeFile )
 include( CheckIncludeFiles )
 include( CheckLibraryExists )
-include( FindPkgConfig )
 
 if( DEM_CMAKE_COMPILER_IS_GNUCXX_COMPATIBLE )
 	option( NO_STRIP "Do not strip Release or MinSizeRel builds" )
@@ -307,7 +306,7 @@ add_subdirectory("common/thirdparty/harfbuzz-7.3.0")
 add_subdirectory("utility/trex")
 list( APPEND PROJECT_LIBRARIES "trex" )
 list( APPEND PROJECT_LIBRARIES "zwidget" )
-list( APPEND PROJECT_LIBRARIES "webp" )
+list( APPEND PROJECT_LIBRARIES "${WEBP_TARGET}" )
 
 message("Building for target architecture: ${TARGET_ARCHITECTURE}")
 
@@ -351,7 +350,7 @@ else()
 	message( SEND_ERROR "Could not find libvpx" )
 endif()
 
-include_directories( SYSTEM "${BZIP2_INCLUDE_DIR}" "${LZMA_INCLUDE_DIR}" "${ZMUSIC_INCLUDE_DIR}")
+include_directories( SYSTEM "${BZIP2_INCLUDE_DIR}" "${LZMA_INCLUDE_DIR}" "${ZMUSIC_INCLUDE_DIR}" "${BOOST_PFR_INCLUDE_DIR}" "${REFLECT_INCLUDE_DIR}")
 
 
 if( ${HAVE_VM_JIT} )
@@ -1400,7 +1399,6 @@ include_directories(
 	launcher
 	../libraries/ZVulkan/include
 	../libraries/ZWidget/include
-	../libraries/webp/include
 	../libraries/range_map/include
 	${SYSTEM_SOURCES_DIR}
 )

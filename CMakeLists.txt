@@ -252,6 +252,11 @@ option( NO_OPENAL "Disable OpenAL sound support" OFF )
 find_package( BZip2 )
 find_package( VPX )
 
+include( FindPkgConfig )
+if( PkgConfig_FOUND )
+	pkg_check_modules( WEBP IMPORTED_TARGET libwebpdecoder libwebpmux )
+endif()
+
 if (CURL_REQUIRED)
 	find_package( CURL )
 	if( MSVC AND NOT CURL_FOUND )
@@ -357,7 +362,6 @@ else()
 		include(CheckSymbolExists)
 		check_symbol_exists( "fts_set" "sys/types.h;sys/stat.h;fts.h" HAVE_FTS )
 		if ( NOT HAVE_FTS )
-			include ( FindPkgConfig )
 			pkg_check_modules( MUSL_FTS musl-fts )
 			if ( MUSL_FTS_FOUND )
 				list(JOIN MUSL_FTS_LDFLAGS " " MUSL_FTS_LDFLAGS_JOINED)
@@ -404,6 +408,7 @@ set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEB_C_FLAGS} -D_DEBUG" )
 
 option(FORCE_INTERNAL_BZIP2 "Use internal bzip2")
 option(FORCE_INTERNAL_CPPDAP "Use internal cppdap" ON)
+option(FORCE_INTERNAL_WEBP "Use internal webp" ON)
 
 if (HAVE_VULKAN)
 	add_subdirectory( libraries/ZVulkan )
@@ -416,8 +421,6 @@ add_subdirectory( libraries/abseil )
 
 set(ZWIDGET_BUILD_EXAMPLE OFF CACHE INTERNAL "" FORCE)
 add_subdirectory( libraries/ZWidget )
-
-add_subdirectory( libraries/webp )
 
 if( HAVE_VM_JIT AND UNIX )
 	check_symbol_exists( "backtrace" "execinfo.h" HAVE_BACKTRACE )
@@ -454,11 +457,20 @@ if ( CPPDAP_FOUND AND NOT FORCE_INTERNAL_CPPDAP )
 	message( STATUS "Using system cppdap library, includes found at ${CPPDAP_INCLUDE_DIR}" )
 else()
 	message( STATUS "Using internal cppdap library" )
-	add_subdirectory( libraries/cppdap )
+	add_subdirectory( libraries/cppdap EXCLUDE_FROM_ALL )
 	set( CPPDAP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/cppdap" )
 	set( CPPDAP_LIBRARIES cppdap )
 	set( CPPDAP_LIBRARY cppdap )
 	set( CPPDAP_FOUND TRUE )
+endif()
+
+if ( WEBP_FOUND AND NOT FORCE_INTERNAL_WEBP )
+	message( STATUS "Using system webp library, includes found at ${WEBP_libwebpdecoder_INCLUDEDIR}" )
+	set( WEBP_TARGET PkgConfig::WEBP )
+else()
+	message( STATUS "Using internal webp library" )
+	add_subdirectory( libraries/webp )
+	set( WEBP_TARGET webp )
 endif()
 
 # ZMUSIC
@@ -469,6 +481,10 @@ set( ZMUSIC_INCLUDE_DIR ${ZMUSIC_ROOT_PATH}/include )
 set( ZMUSIC_LIBRARIES zmusic )
 
 set( LZMA_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/lzma/C" )
+
+set( BOOST_PFR_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/boost_pfr/include" )
+
+set( REFLECT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/reflect" )
 
 if( NOT CMAKE_CROSSCOMPILING )
 	if( NOT CROSS_EXPORTS )
