@@ -905,22 +905,29 @@ public:
 	void RemoveCollisionObject(btCollisionObject *obj);
 	void RemoveCollisionObject(AActor *thing);
 
-	void ClearAllCollisionObjects();
 
 	void UpdateCollisionModel(AActor *thing);
 
-	void AddAllCollisionObjects();
 
 	bool CanCollide(AActor *tmthing, AActor *thing);
 	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
-	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false, bool asOrigin = false);
 	AllHitsConvexResultCallback ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
 	                                                                DVector3 &newPos, bool asOrigin = false);
 	double                                        GetTop(AActor *tmthing, AActor *thing);
 	double                                        GetTop(AActor *tmthing, AActor *thing, DVector3 &pos);
-	DVector3         SweepTest(AActor *tmthing, AActor *thing, DVector3 pos);
-	btCollisionWorld::ClosestRayResultCallback    TraceCollisionHit(DVector3 &from, DVector3 &to, AActor *thing);
+	FSweepHit        SweepActor(AActor *tmthing, AActor *thing, const DVector3 &from, const DVector3 &to,
+	                            double minFaceZ = -2., double ignoreBelowZ = -1e30, double minContactZ = -2.);
+	FSweepHit        SweepFootprint(AActor *tmthing, AActor *thing, const DVector3 &from, const DVector3 &to,
+	                                double minFaceZ = -2., double ignoreBelowZ = -1e30, double inset = 0.);
+	FGroundHit       ClassifyGround(AActor *tmthing, AActor *thing, const DVector3 &pos, double up, const FSweepHit &hit);
+	FGroundHit       ProbeGround(AActor *tmthing, AActor *thing, const DVector3 &pos, double up, double down);
+	FGroundHit       GetSupport(AActor *tmthing, AActor *thing, const DVector3 &pos, double extraDrop = 0.);
+	DVector3         SurfaceNormalAt(AActor *thing, const DVector3 &point, const DVector2 &center, const DVector3 &fallback);
+	bool             Overlaps(AActor *tmthing, AActor *thing, const DVector3 &pos, double tolerance, double minZ = -INFINITY);
+	bool             CanGrowTo(AActor *tmthing, AActor *thing, double fromHeight, double toHeight);
+	void             GetCollisionBox(AActor *thing, DVector3 &mins, DVector3 &maxs);
+	bool             IsStepSizedFace(AActor *tmthing, AActor *thing, const DVector3 &contact, const DVector3 &normal);
 	btCollisionWorld::AllHitsRayResultCallback TraceCollisionHit(DVector3 &from, DVector3 &to, TArray<AActor *> things);
 
 	TArray<AdvancedCollisionModel*> collisionModels;

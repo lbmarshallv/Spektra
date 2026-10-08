@@ -66,6 +66,49 @@ CVAR(Bool, cl_bloodsplats, true, CVAR_ARCHIVE)
 CVAR(Int, sv_smartaim, 0, CVAR_ARCHIVE | CVAR_SERVERINFO)
 CVAR(Bool, cl_doautoaim, false, CVAR_ARCHIVE)
 CVAR(Bool, sv_autocompat, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_SERVERINFO)
+//==========================================================================
+//
+// col_debug [level]
+//
+// Logs why moves are blocked and how 3D-model collision treats actors, for
+// tracking down collision glitches. Level 0 logs nothing, level 1 players,
+// level 2 players and monsters. With no argument it shows the level.
+//
+//==========================================================================
+
+static int colDebugLevel = 0; // 0: off
+static const char *colBlockReason = nullptr; // why the last P_TryMove failed (for col_debug)
+
+CCMD(col_debug)
+{
+	if (argv.argc() >= 2)
+		colDebugLevel = clamp(atoi(argv[1]), 0, 2);
+
+	static const char *const what[] = {"nothing", "players", "players and monsters"};
+	Printf("col_debug %d: logging %s\n", colDebugLevel, what[colDebugLevel]);
+}
+
+// Whether col_debug logs this actor.
+bool P_ColDebug(AActor *mo)
+{
+	if (colDebugLevel <= 0 || mo == nullptr)
+		return false;
+	if (mo->player)
+		return mo->player->mo == mo && !(mo->player->cheats & CF_PREDICTING);
+	return colDebugLevel >= 2 && (mo->flags3 & MF3_ISMONSTER);
+}
+
+// Logs a P_TryMove that failed, and why.
+static void ColDebugBlocked(AActor *thing, const DVector2 &pos, const char *why, FCheckPosition &tm)
+{
+	if (!P_ColDebug(thing))
+		return;
+	AActor *bm = thing->BlockingMobj.ForceGet();
+	Printf("[col %d] %s move (%.2f %.2f %.2f) -> (%.2f %.2f) BLOCKED: %s%s%s | floorz=%.2f tm.floorz=%.2f dropoffz=%.2f ceil=%.2f onmobj=%d sliding=%d\n",
+	       thing->Level->maptime, thing->GetClass()->TypeName.GetChars(), thing->X(), thing->Y(), thing->Z(), pos.X, pos.Y,
+	       why ? why : "?", bm ? " by " : "", bm ? bm->GetClass()->TypeName.GetChars() : "", thing->floorz, tm.floorz,
+	       tm.dropoffz, tm.ceilingz, !!(thing->flags2 & MF2_ONMOBJ), !!(thing->collisionFlags & COLFLAG_SLIDING));
+}
 
 static void CheckForPushSpecial(line_t *line, int side, AActor *mobj, DVector2 * posforwindowcheck = NULL);
 static void SpawnShootDecal(AActor *t1, AActor *defaults, const FTraceResults &trace);
@@ -1379,8 +1422,17 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 	if (!((thing->flags & (MF_SOLID | MF_SPECIAL | MF_SHOOTABLE)) || thing->flags6 & MF6_TOUCHY))
 		return true;	// can't hit thing
 
-	double blockdist = thing->radius + tm.thing->radius;
-	if (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist)
+	double   blockdist = thing->radius + tm.thing->radius;
+	DVector3 boxMin, boxMax; // the space thing's collision shape can occupy (see GetCollisionBox)
+	level->GetCollisionBox(thing, boxMin, boxMax);
+	if (thing->collisionModelName != NAME_None)
+	{
+		double r = tm.thing->radius;
+		if (cres.Position.X + r <= boxMin.X || cres.Position.X - r >= boxMax.X ||
+		    cres.Position.Y + r <= boxMin.Y || cres.Position.Y - r >= boxMax.Y)
+			return true;
+	}
+	else if (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist)
 		return true;
 
 	if ((tm.thing->flags6 & MF6_THRUSPECIES) && (tm.thing->GetSpecies() == thing->GetSpecies()))
@@ -1404,9 +1456,33 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		if (!(thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) && !(tm.thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY | MF_NOGRAVITY)) &&
 			(thing->flags & MF_SOLID) && (thing->flags4 & MF4_ACTLIKEBRIDGE || thing->collisionFlags & COLFLAG_STATICSOLID))
 		{
+			// A monster is on a 3D-model actor only where the model holds it up (GetTop); its bounding
+			// box says little (a bridge's box covers everything parked on it). Of several models, the
+			// one it stands on is the one whose surface is highest under it. Taking any model whose box
+			// it overlaps made a monster on a bus that stands on a bridge think it was on the bridge,
+			// far below, and refuse to move for fear of the drop.
+			if ((tm.thing->flags3 & MF3_ISMONSTER) && thing->collisionModelName != NAME_None)
+			{
+				DVector3 at(tm.pos.XY(), tm.thing->Z());
+				double   top = level->GetTop(tm.thing, thing, at);
+				if (top > -INFINITY && top >= tm.floorz && top <= tm.thing->Z() + tm.thing->MaxStepHeight + COLLISION_SKIN)
+				{
+					tm.stepthing = thing;
+					tm.floorz    = top;
+				}
+				else if (top == -INFINITY && tm.thing->Z() > tm.dropoffz)
+				{
+					// Not on it here, but it may be what the monster would drop onto, like the floor
+					// below a ledge (a bridge deck below the roof of a bus parked on it). The drop-off
+					// checks in P_TryMove measure the drop to it rather than to the sector floor.
+					FGroundHit below = level->ProbeGround(tm.thing, thing, at, 0., tm.thing->Z() - tm.dropoffz + 1.);
+					if (below.hit && below.z > tm.modelfloorz)
+						tm.modelfloorz = below.z;
+				}
+			}
 			// [RH] Let monsters walk on actors as well as floors
-			if ((tm.thing->flags3 & MF3_ISMONSTER) &&
-				topz >= tm.floorz && topz <= tm.thing->Z() + tm.thing->MaxStepHeight)
+			else if ((tm.thing->flags3 & MF3_ISMONSTER) &&
+				topz >= tm.floorz && topz <= tm.thing->Z() + tm.thing->MaxStepHeight + COLLISION_SKIN)
 			{
 				// The commented-out if is an attempt to prevent monsters from walking off a
 				// thing further than they would walk off a ledge. I can't think of an easy
@@ -1459,13 +1535,13 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 			if (thing->flags & MF_SPECIAL)
 			{
 				// Vanilla condition, i.e. without equality, for item pickups
-				if ((tm.thing->Z() > topz) || (tm.thing->Top() < thing->Z()))
+				if ((tm.thing->Z() > topz) || (tm.thing->Top() < boxMin.Z))
 					return true;
 			}
 			// Some things prefer not to overlap each other, if possible (Q: Is this even needed anymore? It was just for dealing with some deficiencies in the code below in Heretic.)
 			else if (!(tm.thing->flags3 & thing->flags3 & MF3_DONTOVERLAP))
 			{
-				if ((tm.thing->Z() >= topz) || (tm.thing->Top() <= thing->Z()))
+				if ((tm.thing->Z() >= topz) || (tm.thing->Top() <= boxMin.Z))
 					return true;
 			}
 			else return unblocking;	// This may not really make sense, but Heretic depends on the broken implementation.
@@ -1871,6 +1947,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 	}
 
 	tm.stepthing = NULL;
+	tm.modelfloorz = -INFINITY;
 	FBoundingBox box(pos.X, pos.Y, thing->radius);
 
 	FPortalGroupArray pcheck;
@@ -1891,6 +1968,13 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				AActor* BlockingMobj = thing->BlockingMobj.ForceGet();
 
 				topZ = tm.TopThingZ();
+				double blockBottom = 0;
+				if (BlockingMobj)
+				{
+					DVector3 boxMin, boxMax;
+					thing->Level->GetCollisionBox(BlockingMobj, boxMin, boxMax);
+					blockBottom = boxMin.Z;
+				}
 
 				// If this blocks through a restricted line portal, it will always completely block.
 				if (BlockingMobj == NULL || (thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ) || (tcres.portalflags & FFCF_RESTRICTEDPORTAL))
@@ -1901,7 +1985,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 				}
 				else if (!BlockingMobj->player && !(thing->flags & (MF_FLOAT | MF_MISSILE | MF_SKULLFLY)) &&
 				         !(BlockingMobj->collisionFlags & COLFLAG_NOSTEP) &&
-				         (topZ > BlockingMobj->Z() || thing->collisionFlags & COLFLAG_STATICSOLID) && topZ - thing->Z() <= thing->MaxStepHeight)
+				         (topZ > blockBottom || thing->collisionFlags & COLFLAG_STATICSOLID) && topZ - thing->Z() <= thing->MaxStepHeight + COLLISION_SKIN)
 				{
 					if (thingblocker == NULL ||
 						BlockingMobj->Z() > thingblocker->Z())
@@ -1911,7 +1995,7 @@ bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, boo
 					thing->BlockingMobj = nullptr;
 				}
 				else if (thing->player &&
-					thing->Top() - min(topZ,BlockingMobj->Z()) <= thing->MaxStepHeight)
+					thing->Top() - min(topZ, blockBottom) <= thing->MaxStepHeight)
 				{
 					if (thingblocker)
 					{ // There is something to step up on. Return this thing as
@@ -2088,6 +2172,8 @@ DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
 	FPortalGroupArray                      check;
 	FMultiBlockThingsIterator              it(check, actor, -1, true);
 	FMultiBlockThingsIterator::CheckResult cres;
+	AActor *bestThing = nullptr;
+	double  bestFraction = 1., bestZ = newPos.Z;
 
 	while (it.Next(&cres))
 	{
@@ -2113,7 +2199,9 @@ DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
 		{ // [RH] Specials and noclippers don't block moves
 			continue;
 		}
-		if (actor->Pos().Z > thing->Top())
+		DVector3 boxMin, boxMax;
+		level.GetCollisionBox(thing, boxMin, boxMax);
+		if (actor->Pos().Z > boxMax.Z)
 		{ // out of bounds
 			continue;
 		}
@@ -2122,22 +2210,179 @@ DVector3 P_TestMobjVelZ(AActor *actor, AActor **hitThing)
 			continue;
 		}
 
-		TArray<DVector3> points = level.GetCollisionPoints(actor, thing, newPos, true);
-		if (points.size())
+		// Resting position of the actor at the moment of contact (not the contact point itself,
+		// which for a capsule or a slope is above the actor's bottom and caused bouncing).
+		// Falling, a capsule that only touches the edge of something with the outermost FOOTPRINT_INSET
+		// of its width can't be held up there: ground that close to its rim can't lift it either (see
+		// GetSupport), so it would hang in the air with nothing to stand on. Let it fall past.
+		double minContactZ = -2.;
+		btCollisionShape *shape = actor->collisionModel ? actor->collisionModel->getCollisionShape() : nullptr;
+		if (newPos.Z < oldPos.Z && shape && shape->getShapeType() == CAPSULE_SHAPE_PROXYTYPE && actor->radius > FOOTPRINT_INSET)
 		{
-			auto p = points[0];
-			double newZ;
-			if (hitThing)
-				*hitThing = thing;
-			P_CollidedWith(actor, thing);
-			if(actor->Vel.Z > 0)
-				newZ = p.Z - actor->Height;
-			else
-				newZ = p.Z;
-			return DVector3(newPos.X, newPos.Y, newZ);
+			double k    = (actor->radius - FOOTPRINT_INSET) / actor->radius;
+			minContactZ = sqrt(1. - k * k);
+		}
+		FSweepHit hit = level.SweepActor(actor, thing, oldPos, newPos, -2., -1e30, minContactZ);
+		if (hit.hit && (!bestThing || hit.fraction < bestFraction))
+		{
+			bestThing    = thing;
+			bestFraction = hit.fraction;
+			bestZ        = hit.origin.Z;
 		}
 	}
+	if (bestThing)
+	{
+		if (hitThing)
+			*hitThing = bestThing;
+		P_CollidedWith(actor, bestThing);
+		return DVector3(newPos.X, newPos.Y, bestZ);
+	}
 	return newPos;
+}
+
+//=============================================================================
+//
+// P_CheckHeadroom
+//
+// Can 'thing' grow in place from fromHeight to toHeight (e.g. stand up from a
+// crouch) without its head entering an actor that has a 3D-model collision
+// shape? The classic position checks reason about bounding boxes and can let
+// the taller shape through, so each 3D-model actor nearby is checked
+// precisely with FLevelLocals::CanGrowTo.
+//
+//=============================================================================
+
+bool P_CheckHeadroom(AActor *thing, double fromHeight, double toHeight)
+{
+	double rise = toHeight - fromHeight;
+	if (rise <= 0 || (thing->flags & MF_NOCLIP) || (thing->flags2 & MF2_THRUACTORS))
+		return true;
+
+	bool fits = true;
+	FPortalGroupArray                      check;
+	FMultiBlockThingsIterator              it(check, thing, -1, true);
+	FMultiBlockThingsIterator::CheckResult cres;
+
+	while (fits && it.Next(&cres))
+	{
+		AActor *other = cres.thing;
+		if (other == thing || other->collisionModelName == NAME_None)
+			continue;
+		if (!(other->flags & MF_SOLID) || (other->flags & (MF_SPECIAL | MF_NOCLIP)) || (other->flags2 & MF2_THRUACTORS))
+			continue;
+		if ((thing->ThruBits & other->ThruBits) && ((thing->flags8 | other->flags8) & MF8_ALLOWTHRUBITS))
+			continue;
+		if (thing->player && P_ShouldPassThroughPlayer(thing, other))
+			continue;
+		if (!P_CanCollideWith(thing, other))
+			continue;
+
+		if (!thing->Level->CanGrowTo(thing, other, fromHeight, toHeight))
+			fits = false;
+	}
+	return fits;
+}
+
+//=============================================================================
+//
+// P_SlideAlongModel
+//
+// Called when 'blocker', an actor with a 3D-model collision shape, stopped a
+// move. Instead of the classic axis-by-axis slide (which was made for square
+// bounding boxes and jams against round or angled shapes like posts and tree
+// trunks), take out the part of the move and of the velocity that heads into
+// the surface that was hit, and try what's left. A second surface is handled
+// the same way for inside corners. If the actor still can't move it is eased
+// a unit away from the surface, so actors pressed into a model drift apart
+// rather than staying stuck. Returns false if no contact with the model was
+// found, so the caller can fall back to the classic slide.
+//
+//=============================================================================
+
+static bool ModelContactNormal(AActor *mo, AActor *blocker, const DVector2 &move, DVector2 &normal)
+{
+	double len = move.Length();
+	if (len < 0.001)
+		return false;
+	// Sweep a little further than the move so a contact right at its end is found too.
+	DVector2  reach = move * ((len + 1.) / len);
+	// Mesh triangles entirely under the mover's feet (roots below the floor) aren't something to slide along.
+	FSweepHit hit   = mo->Level->SweepActor(mo, blocker, mo->Pos(), DVector3(mo->Pos().XY() + reach, mo->Z()), -2.,
+	                                        mo->Z() + COLLISION_SKIN);
+	if (!hit.hit)
+		return false;
+	DVector2 n(hit.normal.X, hit.normal.Y);
+	double   nl = n.Length();
+	if (nl < 0.1)
+		return false; // a floor or ceiling contact, not something to slide along
+	normal = n / nl;
+	return true;
+}
+
+bool P_SlideAlongModel(AActor *mo, AActor *blocker, const DVector2 &move, FCheckPosition &tm)
+{
+	DVector2 remaining = move;
+	DVector2 firstNormal;
+	bool     found = false;
+
+	for (int pass = 0; pass < 2; pass++)
+	{
+		DVector2 n;
+		if (!ModelContactNormal(mo, blocker, remaining, n))
+			break;
+		found = true;
+
+		double into = remaining | n;
+		if (into < 0)
+			remaining -= n * into;
+		if (pass == 1)
+		{
+			// Inside corner: the slide along the first surface ran into a second one.
+			// Move along the crease between them, or stop if that heads into either.
+			DVector2 crease(-firstNormal.Y, firstNormal.X);
+			remaining = crease * (move | crease);
+			if ((remaining | n) < 0 || (remaining | firstNormal) < 0)
+				remaining.Zero();
+		}
+
+		// Velocity heading into the surface is lost; the rest carries on.
+		double vin = mo->Vel.XY() | n;
+		if (vin < 0)
+		{
+			mo->Vel.X -= n.X * vin;
+			mo->Vel.Y -= n.Y * vin;
+		}
+		if (mo->player && mo->player->mo == mo)
+		{
+			double pin = mo->player->Vel | n;
+			if (pin < 0)
+				mo->player->Vel -= n * pin;
+		}
+
+		if (remaining.LengthSquared() < 1e-4)
+			break;
+		if (P_TryMove(mo, mo->Pos().XY() + remaining, true, nullptr, tm))
+			return true;
+		firstNormal = n;
+	}
+
+	if (!found)
+	{
+		if (P_ColDebug(mo))
+			Printf("[col %d] %s slide: no contact normal found for move (%.2f %.2f), using axis slide\n", mo->Level->maptime,
+			       mo->GetClass()->TypeName.GetChars(), move.X, move.Y);
+		return false;
+	}
+
+	// Still blocked: ease away from the surface so the two don't stay locked together.
+	DVector2 n(0., 0.);
+	bool eased = false;
+	if (ModelContactNormal(mo, blocker, move, n))
+		eased = P_TryMove(mo, mo->Pos().XY() + n, true, nullptr, tm);
+	if (P_ColDebug(mo))
+		Printf("[col %d] %s slide: stuck, ease away along (%.2f %.2f) %s\n", mo->Level->maptime, mo->GetClass()->TypeName.GetChars(),
+		       n.X, n.Y, eased ? "ok" : "FAILED");
+	return true;
 }
 
 //=============================================================================
@@ -2190,9 +2435,12 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		}
 		const double blockdist = thing->radius + actor->radius;
 
-		double           colTop          = level.GetTop(actor, thing);
-
-		if (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist)
+		DVector3 boxMin, boxMax; // the space thing's collision shape can occupy (see GetCollisionBox)
+		level.GetCollisionBox(thing, boxMin, boxMax);
+		if (thing->collisionModelName != NAME_None
+		        ? (cres.Position.X + actor->radius <= boxMin.X || cres.Position.X - actor->radius >= boxMax.X ||
+		           cres.Position.Y + actor->radius <= boxMin.Y || cres.Position.Y - actor->radius >= boxMax.Y)
+		        : (fabs(thing->X() - cres.Position.X) >= blockdist || fabs(thing->Y() - cres.Position.Y) >= blockdist))
 		{
 			continue;
 		}
@@ -2213,12 +2461,13 @@ int P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{
 			continue;
 		}
-		if (actor->Z() > thing->Top() || /*colTop < thing->Z() ||*/ (actor->Z() - colTop) > 1.)
+		// (Checked last: for a 3D-model actor, finding its top under the actor is the expensive part.)
+		if (actor->Z() > boxMax.Z || level.GetTop(actor, thing) == -INFINITY)
 		{ // over thing
 			continue;
 		}
 	
-		if (!(thing->collisionFlags & COLFLAG_STATICSOLID) && actor->Top() <= thing->Z())
+		if (!(thing->collisionFlags & COLFLAG_STATICSOLID) && actor->Top() <= boxMin.Z)
 		{ // under thing
 			continue;
 		}
@@ -2425,6 +2674,9 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 	sector_t*	oldsec = thing->Sector;	// [RH] for sector actions
 	sector_t*	newsec;
 	DVector2     newPos = pos;
+	double       stepRise = 0;	// how far we stepped up onto an advanced-collision actor
+	bool         modelStep = false; // the move was blocked by a 3D-model actor, but it can step onto it
+	colBlockReason = "sector geometry (line, floor or ceiling)";
 
 	tm.floatok = false;
 	tm.portalstep = false;
@@ -2443,6 +2695,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			P_CollidedWith(thing, BlockingMobj);
 
 		// Solid wall or thing
+		colBlockReason = BlockingMobj ? "blocked by an actor" : "blocked by a line";
 		if (!BlockingMobj || BlockingMobj->player || !(thing->player || (thing->flags3 & MF3_ISMONSTER)))
 		{
 			goto pushline;
@@ -2460,31 +2713,69 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			{
 				goto pushline;
 			}
-			else if (topZ - thing->Z() > thing->MaxStepHeight ||
-			         ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - (topZ) < thing->Height) &&
-			          BlockingMobj->Sector->PortalBlocksMovement(sector_t::ceiling)) ||
-			         (tm.ceilingz - (topZ) < thing->Height))
+			else
 			{
-				goto pushline;
-			}
-			if (tm.collisionPoints.size() && topZ > thing->Pos().Z)
-			{
-				auto closest = tm.collisionPoints[0];
-				DVector3 cp      = tm.pos;
-				cp.Z             = topZ + thing->MaxStepHeight;
-
-				auto s = level.GetCollisionPoints(thing, BlockingMobj, cp, false, true);
-				if (s.Size())
+				// Step up onto actors with advanced collision: find the surface the actor would stand on
+				// at the destination, then make sure it isn't too high, too steep, or without room above.
+				// Look a little further into what was hit than the move goes: ground can't lift an actor
+				// that's only just over it (see FOOTPRINT_INSET), so a slow walk into a step would never
+				// climb it.
+				DVector2 move = tm.pos.XY() - thing->Pos().XY(), into;
+				if (ModelContactNormal(thing, BlockingMobj, move, into))
+					into = -into;
+				else
 				{
-					tm.pos.X           = closest.X;
-					tm.pos.Y           = closest.Y;
+					double moveLen = move.Length();
+					into           = moveLen > 0.001 ? move / moveLen : DVector2(0, 0);
+				}
+				DVector2   probeXY = tm.pos.XY() + into * (2. * FOOTPRINT_INSET);
+				FGroundHit step    = level.ProbeGround(thing, BlockingMobj, DVector3(probeXY, thing->Z()),
+				                                       thing->MaxStepHeight, 0.);
+				double     stepZ = step.hit ? max(step.z, thing->Z()) : thing->Z();
+
+				const char *why = nullptr;
+				if (stepZ - thing->Z() > thing->MaxStepHeight + COLLISION_SKIN)
+					why = "model: step too high";
+				else if (step.hit && !step.walkable && stepZ > thing->Z() + COLLISION_SKIN)
+					why = "model: steep surface";
+				else if ((BlockingMobj->Sector->ceilingplane.ZatPoint(pos) - stepZ < thing->Height) &&
+				         BlockingMobj->Sector->PortalBlocksMovement(sector_t::ceiling))
+					why = "model: portal ceiling";
+				else if (tm.ceilingz - stepZ < thing->Height)
+					why = "model: ceiling too low";
+				else if (level.Overlaps(thing, BlockingMobj, DVector3(tm.pos.XY(), stepZ + COLLISION_SKIN), COLLISION_SKIN) ||
+				         level.Overlaps(thing, BlockingMobj, DVector3(probeXY, stepZ + COLLISION_SKIN), COLLISION_SKIN))
+					why = "model: would overlap at destination";
+				if (P_ColDebug(thing))
+				{
+					FString pts;
+					for (auto const &p : tm.collisionPoints)
+						pts.AppendFormat(" (%.2f %.2f %.2f)", p.X, p.Y, p.Z);
+					Printf("[col %d] %s hit model %s:%s | step hit=%d z=%.2f walk=%d contactZ=%.2f n=(%.2f %.2f %.2f) -> %s\n",
+					       thing->Level->maptime, thing->GetClass()->TypeName.GetChars(), BlockingMobj->GetClass()->TypeName.GetChars(),
+					       pts.GetChars(), step.hit, step.z, step.walkable, step.contactZ, step.normal.X, step.normal.Y,
+					       step.normal.Z, why ? why : "step up OK");
+				}
+				if (why)
+				{
+					colBlockReason = why;
 					goto pushline;
 				}
+				if (stepZ > thing->Z())
+				{
+					stepRise += stepZ - thing->Z();
+					thing->SetZ(stepZ);
+				}
+				modelStep = BlockingMobj->collisionModelName != NAME_None;
 			}
 
 		}
-		if (!(tm.thing->flags2 & MF2_PASSMOBJ) || (tm.thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ))
+		// Stepping onto other actors needs MF2_PASSMOBJ, as in Doom. A 3D-model actor is scenery the
+		// map could have built from sectors (the roof of a bus, a curb), so the checks above suffice
+		// for anything that walks, monsters included, as they do for sector floors.
+		if (!modelStep && (!(tm.thing->flags2 & MF2_PASSMOBJ) || (tm.thing->Level->i_compatflags & COMPATF_NO_PASSMOBJ)))
 		{
+			ColDebugBlocked(thing, pos, "blocked by an actor (no PASSMOBJ to step onto it)", tm);
 			thing->SetZ(oldz);
 			thing->flags6 &= ~MF6_INTRYMOVE;
 			return false;
@@ -2500,7 +2791,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 		thing->SetZ(tm.ceilingz - thing->Height);
 	}
 
-	if (onfloor && tm.floorsector == thing->floorsector)
+	if (onfloor && stepRise == 0 && tm.floorsector == thing->floorsector)
 	{
 		thing->SetZ(tm.floorz);
 	}
@@ -2558,6 +2849,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				thing->SetZ(savedz);
 				if (!good)
 				{
+					colBlockReason = "an actor is in the way of a sector step-up (P_TestMobjZ)";
 					goto pushline;
 				}
 				if (thing->flags6 & MF6_STEPMISSILE)
@@ -2589,8 +2881,12 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 			dropoff = false;
 		}
 
+		// What a monster walking off something would land on: the floor, or a 3D model above it.
+		double landz = max(tm.dropoffz, tm.modelfloorz);
+		double fromz = (thing->flags2 & MF2_ONMOBJ) ? max(thing->Z(), tm.floorz) : tm.floorz;
+
 		if (dropoff == 2 &&  // large jump down (e.g. dogs)
-			(tm.floorz - tm.dropoffz > 128. || thing->target == NULL || thing->target->Z() >tm.dropoffz))
+			(fromz - landz > 128. || thing->target == NULL || thing->target->Z() > landz + COLLISION_SKIN))
 		{
 			dropoff = false;
 		}
@@ -2615,12 +2911,20 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 						dropoffz = max(tm.floorz, level.GetTop(thing, tm.stepthing));
 						thing->SetXYZ(oldPos);
 					}
+					dropoffz = max(dropoffz, tm.modelfloorz);
 				}
 
 				if (floorz - dropoffz > thing->MaxDropOffHeight &&
 					!(thing->flags2 & MF2_BLASTED) && !missileCheck)
 				{ // Can't move over a dropoff unless it's been blasted
 					// [GZ] Or missile-spawned
+					if (P_ColDebug(thing))
+					{
+						FString msg;
+						msg.Format("dropoff (floorz %.2f - dropoffz %.2f > MaxDropOffHeight %.2f)%s", floorz, dropoffz,
+						           thing->MaxDropOffHeight, tm.stepthing ? "" : ", not standing on an actor");
+						ColDebugBlocked(thing, pos, msg.GetChars(), tm);
+					}
 					thing->SetZ(oldz);
 					thing->flags6 &= ~MF6_INTRYMOVE;
 					return false;
@@ -2633,6 +2937,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 				if (thing->floorz - tm.floorz > thing->MaxDropOffHeight ||
 					thing->dropoffz - tm.dropoffz > thing->MaxDropOffHeight)
 				{
+					ColDebugBlocked(thing, pos, "dropoff (avoiding dropoffs)", tm);
 					thing->flags6 &= ~MF6_INTRYMOVE;
 					return false;
 				}
@@ -2835,6 +3140,14 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 		thing->LinkToWorld(&ctx);
 	}
 
+	if (stepRise > 0 && thing->player && thing->player->mo == thing)
+	{
+		thing->player->viewheight -= stepRise;
+		double deltaview = thing->player->GetDeltaViewHeight();
+		if (deltaview > thing->player->deltaviewheight)
+			thing->player->deltaviewheight = deltaview;
+	}
+
 	if (thing->flags2 & MF2_FLOORCLIP)
 	{
 		thing->AdjustFloorClip();
@@ -2945,6 +3258,7 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 pushline:
 	thing->flags6 &= ~MF6_INTRYMOVE;
 	thing->SetZ(oldz);
+	ColDebugBlocked(thing, pos, colBlockReason, tm);
 
 	// [RH] Don't activate anything if just predicting
 	if (thing->player && (thing->player->cheats & CF_PREDICTING))

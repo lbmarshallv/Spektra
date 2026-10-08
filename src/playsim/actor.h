@@ -512,7 +512,8 @@ enum ActorRenderFlag2
 enum ActorCollisionFlag
 {
 	COLFLAG_NOSTEP = 0x0001, // never allow actors to automatically "step" up onto this actor
-	COLFLAG_STATICSOLID = 0x0002 //functions like nointeraction but with collisions
+	COLFLAG_STATICSOLID = 0x0002, //functions like nointeraction but with collisions
+	COLFLAG_SLIDING = 0x0004 // runtime state set by the engine: sliding down a surface too steep to stand on
 };
 
 // This translucency value produces the closest match to Heretic's TINTTAB.

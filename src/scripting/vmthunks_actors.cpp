@@ -1137,6 +1137,19 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, TryMove, TryMove)
 	ACTION_RETURN_BOOL(TryMove(self, x, y, dropoff, missilecheck, tm));
 }
 
+static int CheckHeadroom(AActor *self, double fromHeight, double toHeight)
+{
+	return P_CheckHeadroom(self, fromHeight, toHeight);
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(AActor, CheckHeadroom, CheckHeadroom)
+{
+	PARAM_SELF_PROLOGUE(AActor);
+	PARAM_FLOAT(fromHeight);
+	PARAM_FLOAT(toHeight);
+	ACTION_RETURN_BOOL(P_CheckHeadroom(self, fromHeight, toHeight));
+}
+
 static int CheckMove(AActor *self ,double x, double y, int flags, FCheckPosition *tm)
 {
 	if (tm == nullptr)

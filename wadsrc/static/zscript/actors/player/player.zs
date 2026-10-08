@@ -1150,7 +1150,7 @@ class PlayerPawn : Actor
 
 		// check whether the move is ok
 		Height  = defaultheight * player.crouchfactor;
-		if (!TryMove(Pos.XY, false, NULL))
+		if (!TryMove(Pos.XY, false, NULL) || (direction > 0 && !CheckHeadroom(savedheight, Height)))
 		{
 			Height = savedheight;
 			if (direction > 0)

@@ -594,10 +594,14 @@ static int P_Move (AActor *actor)
 
 						DVector3 wpos = DVector3(h.hitPointWorld.x(), h.hitPointWorld.y(), h.hitPointWorld.z());
 						double   ztop = level.GetTop(actor, a->owner, wpos);
-						if (ztop > -INFINITY && ztop - actor->Z() < actor->MaxStepHeight)
+						if (ztop > -INFINITY && ztop - actor->Z() <= actor->MaxStepHeight + COLLISION_SKIN)
 						{
 							continue;
 						}
+						if (P_ColDebug(actor))
+							Printf("[col %d] %s P_Move pre-check BLOCKED: hit %s at (%.2f %.2f %.2f), top there %.2f, actor at (%.2f %.2f %.2f) moving (%.2f %.2f)\n",
+							       actor->Level->maptime, actor->GetClass()->TypeName.GetChars(), a->owner->GetClass()->TypeName.GetChars(),
+							       wpos.X, wpos.Y, wpos.Z, ztop, actor->X(), actor->Y(), actor->Z(), deltax, deltay);
 						if (actor->flags4 & MF4_CANUSEWALLS &&  a->owner->flags5 & MF5_USESPECIAL)
 						{
 
@@ -626,18 +630,17 @@ static int P_Move (AActor *actor)
 		try_ok = P_TryMove(actor, ptry, dropoff, NULL, tm);
 		if (!try_ok) break;
 
-		if (tm.stepthing && tm.collisionPoints.Size())
+		if (tm.stepthing)
 		{
-			auto v = tm.collisionPoints[0];
-			if (v.Z - actor->Pos().Z > actor->MaxStepHeight)
-			{
-				try_ok = false;
-				break;
-			}
-			else
-			{
-				actor->SetZ(v.Z);
-			}
+			// P_TryMove has already rejected steps that are too high or too steep;
+			// keep the monster on the surface it is now standing on.
+			FGroundHit g = actor->Level->GetSupport(actor, tm.stepthing, actor->Pos());
+			if (P_ColDebug(actor))
+				Printf("[col %d] %s P_Move on %s: support hit=%d z=%.2f walk=%d | pos=(%.2f %.2f %.2f) onmobj=%d\n", actor->Level->maptime,
+				       actor->GetClass()->TypeName.GetChars(), tm.stepthing->GetClass()->TypeName.GetChars(), g.hit, g.z, g.walkable,
+				       actor->X(), actor->Y(), actor->Z(), !!(actor->flags2 & MF2_ONMOBJ));
+			if (g.hit && g.walkable)
+				actor->SetZ(g.z);
 		}
 
 		// Handle portal transitions just like P_XYMovement.

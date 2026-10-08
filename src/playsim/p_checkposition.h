@@ -45,6 +45,7 @@ struct FCheckPosition
 	bool			FromPMove;
 	line_t			*ceilingline;
 	AActor			*stepthing;
+	double			modelfloorz;	// highest 3D-model surface under a monster at pos that it doesn't stand on, but would drop onto
 	AActor          *blockingMobj;
 	// [RH] These are used by PIT_CheckThing and P_XYMovement to apply
 	// ripping damage once per tic instead of once per move.
@@ -75,6 +76,7 @@ struct FCheckPosition
 		DoRipping = rip;
 		PushTime = 0;
 		FromPMove = false;
+		modelfloorz = -INFINITY;
 	}
 };
 

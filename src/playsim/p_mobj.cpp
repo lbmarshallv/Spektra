@@ -2549,7 +2549,7 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 	DVector2 onestep = startmove / steps;
 
 	start = mo->Pos().XY();
-	step = 0;
+	step = 1; // step 0 would be a zero-length move, which fails whenever the actor is touching a 3D model
 	totalsteps = steps;
 
 	// [RH] Instead of doing ripping damage each step, do it each tic.
@@ -2664,6 +2664,12 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 				}
 				else
 				{ // slide against another actor
+					if (BlockingMobj->collisionModelName != NAME_None && P_SlideAlongModel(mo, BlockingMobj, onestep, tm))
+					{
+						// Slid along the surface of a 3D-model actor (velocity already adjusted).
+					}
+					else
+					{
 					DVector2 t;
 					t.X = 0, t.Y = onestep.Y;
 					walkplane = P_CheckSlopeWalk (mo, t);
@@ -2683,6 +2689,7 @@ static double P_XYMovement (AActor *mo, DVector2 scroll)
 						{
 							mo->Vel.X = mo->Vel.Y = 0;
 						}
+					}
 					}
 					if (player && player->mo == mo)
 					{
@@ -2963,6 +2970,10 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 
 	AActor *blockingMobj;
 	double realZ = P_TestMobjVelZ(mo, &blockingMobj).Z;
+	if (blockingMobj && blockingMobj->collisionModelName != NAME_None && fabs(realZ - oldz) > 0.01 && P_ColDebug(mo))
+		Printf("[col %d] %s falling (velz %.2f) stopped by %s at z=%.2f | pos=(%.2f %.2f %.2f) floorz=%.2f onmobj=%d\n", mo->Level->maptime,
+		       mo->GetClass()->TypeName.GetChars(), mo->Vel.Z, blockingMobj->GetClass()->TypeName.GetChars(), realZ, mo->X(), mo->Y(),
+		       mo->Z(), mo->floorz, !!(mo->flags2 & MF2_ONMOBJ));
 	mo->AddZ(mo->Vel.Z);
 	
 	if (realZ != mo->Z())
@@ -2995,6 +3006,10 @@ static void P_ZMovement (AActor *mo, double oldfloorz)
 		if (colBottomZ > mo->floorz && mo->Z() < colBottomZ)
 		{
 			mo->SetZ(colBottomZ);
+			// Resting on a 3D-model actor is standing on something, like a floor: walking monsters
+			// can walk on (P_Move won't move an actor it thinks is in the air).
+			if (blockingMobj && blockingMobj->collisionModelName != NAME_None && mo->Vel.Z <= 0)
+				mo->flags2 |= MF2_ONMOBJ;
 			if (mo->Vel.Z < 0)
 			{
 				if (mo->flags7 & MF7_SMASHABLE)
@@ -5216,14 +5231,34 @@ void AActor::Tick ()
 		{	// Handle Z velocity and gravity
 			if (((flags2 & MF2_PASSMOBJ) || (flags & MF_SPECIAL)) && !(Level->i_compatflags & COMPATF_NO_PASSMOBJ))
 			{
-				if (!(onmo = P_CheckOnmobj (this)))
+				// P_CheckOnmobj looks where the actor will be after this tic's fall, and then a little
+				// further, so it can find something a falling actor isn't on yet. Only something that
+				// actually holds the actor up (GetSupport) stops it falling; otherwise the fall was
+				// halted in mid-air every few tics, and the actor fluttered down onto models.
+				FGroundHit support;
+				onmo = P_CheckOnmobj (this);
+				if (onmo)
 				{
-					P_ZMovement (this, oldfloorz);
+					// Widen the downward search by how far we're falling this tic so landings snap cleanly.
+					support = level.GetSupport(this, onmo, Pos(), std::max(0., -Vel.Z) + GetGravity());
+					if (P_ColDebug(this) && onmo->collisionModelName != NAME_None)
+						Printf("[col %d] %s on %s: support hit=%d z=%.2f walk=%d n=(%.2f %.2f %.2f) | pos=(%.2f %.2f %.2f) floorz=%.2f vel=(%.2f %.2f %.2f) input=(%d %d)\n",
+						       Level->maptime, GetClass()->TypeName.GetChars(), onmo->GetClass()->TypeName.GetChars(), support.hit,
+						       support.z, support.walkable, support.normal.X, support.normal.Y, support.normal.Z, X(), Y(), Z(), floorz,
+						       Vel.X, Vel.Y, Vel.Z, player ? player->cmd.forwardmove : 0, player ? player->cmd.sidemove : 0);
+				}
+				if (!onmo || !support.hit)
+				{
+					// Falling, or held up only by how its shape rests against a 3D model (on an edge
+					// too far out to stand on, but which the fall can't get past either). P_ZMovement
+					// marks it as standing on the model in that case, so it isn't left unable to walk.
 					flags2 &= ~MF2_ONMOBJ;
+					collisionFlags &= ~COLFLAG_SLIDING;
+					P_ZMovement (this, oldfloorz);
 				}
 				else
 				{
-					topZ = level.GetTop(this, onmo);
+					topZ        = support.z;
 					double diff = topZ - Z();
 
 					if (player)
@@ -5235,23 +5270,20 @@ void AActor::Tick ()
 						}
 					}
 					if (topZ >= this->floorz && (topZ - this->Height) <= ceilingz &&
-					    (abs(diff) <= 1. || (!(onmo->collisionFlags & COLFLAG_NOSTEP) && abs(diff) <= MaxStepHeight))
+					    (diff <= 1. + COLLISION_SKIN || (!(onmo->collisionFlags & COLFLAG_NOSTEP) && diff <= MaxStepHeight + COLLISION_SKIN))
 						)
 					{
-						double oldZ = Z();
-						double newZ = topZ;
-						
-						SetZ(newZ);
-						if (player && player->mo == this)
+						double stepUp = topZ - Z();
+						SetZ(topZ);
+						if (stepUp > 0 && player && player->mo == this)
 						{
-							player->viewheight -= topZ - Z();
+							player->viewheight -= stepUp;
 							double deltaview = player->GetDeltaViewHeight();
 							if (deltaview > player->deltaviewheight)
 							{
 								player->deltaviewheight = deltaview;
 							}
 						}
-						//SetZ(onmo->Top());
 					}
 
 					// Check for MF6_BUMPSPECIAL
@@ -5281,9 +5313,37 @@ void AActor::Tick ()
 						if (!P_BounceActor(this, onmo, true) && (flags & MF_MISSILE))
 							P_ExplodeMissile(this, nullptr, onmo);
 					}
+					else if (support.hit && !support.walkable)
+					{
+						// Can't stand here. Ground snapping (GetSupport) keeps the actor on the
+						// surface while it moves off.
+						flags2 &= ~MF2_ONMOBJ;
+						collisionFlags |= COLFLAG_SLIDING;
+						Vel.Z = 0;
+
+						const DVector3 &n  = support.normal;
+						double          h2 = n.X * n.X + n.Y * n.Y;
+						if (h2 > 0)
+						{
+							// Too steep to stand on: drop velocity pushing into the slope, apply slide
+							// friction, then accelerate downhill by the part of gravity along the surface.
+							double into = Vel.X * n.X + Vel.Y * n.Y;
+							if (into < 0)
+							{
+								Vel.X -= into * n.X / h2;
+								Vel.Y -= into * n.Y / h2;
+							}
+							Vel.X *= SLIDE_FRICTION;
+							Vel.Y *= SLIDE_FRICTION;
+							double grav = GetGravity();
+							Vel.X += grav * n.Z * n.X;
+							Vel.Y += grav * n.Z * n.Y;
+						}
+					}
 					else
 					{
 						flags2 |= MF2_ONMOBJ;
+						collisionFlags &= ~COLFLAG_SLIDING;
 						Vel.Z = 0;
 						Crash();
 					}
@@ -5291,6 +5351,10 @@ void AActor::Tick ()
 			}
 			else
 			{
+				// Without MF2_PASSMOBJ, the only actors this one can stand on are 3D-model actors
+				// (scenery like a fallen tree), and P_ZMovement sets MF2_ONMOBJ again each tic it
+				// lands on one.
+				flags2 &= ~MF2_ONMOBJ;
 				P_ZMovement (this, oldfloorz);
 			}
 
