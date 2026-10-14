@@ -48,9 +48,9 @@ EXTERN_CVAR (Bool, r_drawvoxels)
 extern TDeletingArray<FVoxel *> Voxels;
 extern TDeletingArray<FVoxelDef *> VoxelDefs;
 
-void RenderFrameModels(FModelRenderer* renderer, FLevelLocals* Level, const FSpriteModelFrame *smf, const FState* curState, int curTics, double tic, FTranslationID translation, AActor* actor);
+void RenderFrameModels(FModelRenderer* renderer, FLevelLocals* Level, const FSpriteModelFrame *smf, const FState* curState, int curTics, double tic, FTranslationID translation, AActor* actor, int lodModelID = -1);
 
-void RenderModel(FModelRenderer *renderer, float x, float y, float z, FSpriteModelFrame *smf, AActor *actor, double ticFrac)
+void RenderModel(FModelRenderer *renderer, float x, float y, float z, FSpriteModelFrame *smf, AActor *actor, double ticFrac, int lodModelID)
 {
 	int smf_flags = smf->getFlags(actor->modelData);
 	FTranslationID translation = NO_TRANSLATION;
@@ -66,7 +66,7 @@ void RenderModel(FModelRenderer *renderer, float x, float y, float z, FSpriteMod
 	float orientation = scaleFactorX * scaleFactorY * scaleFactorZ;
 
 	renderer->BeginDrawModel(actor->RenderStyle, smf_flags, objectToWorldMatrix, orientation < 0);
-	RenderFrameModels(renderer, actor->Level, smf, actor->state, actor->tics, ticFrac, translation, actor);
+	RenderFrameModels(renderer, actor->Level, smf, actor->state, actor->tics, ticFrac, translation, actor, lodModelID);
 	renderer->EndDrawModel(actor->RenderStyle, smf_flags);
 }
 
@@ -657,7 +657,7 @@ static inline void RenderModelFrame(FModelRenderer *renderer, int i, const FSpri
 	mdl->RenderFrame(renderer, tex, drawinfo.modelframe, nextFrame ? drawinfo.modelframenext : drawinfo.modelframe, nextFrame ? frameinfo.inter : -1.f, translation, ssidp, boneStartingPosition, actor);
 }
 
-void RenderFrameModels(FModelRenderer *renderer, FLevelLocals *Level, const FSpriteModelFrame *smf, const FState *curState, int curTics, double ticFrac, FTranslationID translation, AActor* actor)
+void RenderFrameModels(FModelRenderer *renderer, FLevelLocals *Level, const FSpriteModelFrame *smf, const FState *curState, int curTics, double ticFrac, FTranslationID translation, AActor* actor, int lodModelID)
 {
 	double tic = actor->GetModelTimer();
 	if (!WorldPaused(true) && !actor->isFrozen())
@@ -679,6 +679,8 @@ void RenderFrameModels(FModelRenderer *renderer, FLevelLocals *Level, const FSpr
 	{
 		if (CalcModelOverrides(i, smf, modelData, frameinfo, drawinfo, is_decoupled))
 		{
+			// Level of detail: replace model index 0 (frames and skins still come from MODELDEF)
+			if (i == 0 && lodModelID >= 0) drawinfo.modelid = lodModelID;
 			RenderModelFrame(renderer, i, smf, modelData, frameinfo, drawinfo, is_decoupled, tic, translation, boneStartingPosition, evaluatedSingle, actor);
 		}
 	}
@@ -695,6 +697,38 @@ static TArray<int> SpriteModelHash;
 //===========================================================================
 
 void ParseModelDefLump(int Lump);
+
+//===========================================================================
+//
+// Looks up the models named by LODModel actor properties. This runs once
+// here, on the main thread, because FindModel may load the file and must
+// never be called from the renderer. A name containing a '/' is a full
+// path; a bare file name is looked for in Models/ as before.
+//
+//===========================================================================
+
+static void ResolveLODModels()
+{
+	// Subclasses share their parent's list, so mark everything first to resolve each entry once.
+	for (auto cls : PClassActor::AllActorClasses)
+	{
+		for (LODmodel *m = cls->ActorInfo()->LODmodels; m != nullptr; m = m->Next) m->modelID = -2;
+	}
+	for (auto cls : PClassActor::AllActorClasses)
+	{
+		for (LODmodel *m = cls->ActorInfo()->LODmodels; m != nullptr; m = m->Next)
+		{
+			if (m->modelID != -2) continue;
+			m->modelID = -1;
+			if (m->type != LOD_Model) continue;
+
+			const char *name = m->model.GetChars();
+			unsigned id = strchr(name, '/') ? FindModel(nullptr, name) : FindModel("Models/", name);
+			if (id < Models.Size()) m->modelID = (int)id;
+			else Printf(TEXTCOLOR_ORANGE "LODModel: model '%s' for %s not found\n", name, cls->TypeName.GetChars());
+		}
+	}
+}
 
 void InitModels()
 {
@@ -777,6 +811,8 @@ void InitModels()
 		SpriteModelFrames[i].hashnext = SpriteModelHash[j];
 		SpriteModelHash[j]=i;
 	}
+
+	ResolveLODModels();
 
 	Printf("InitModels complete");
 

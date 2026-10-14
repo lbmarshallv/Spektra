@@ -706,31 +706,23 @@ struct FDropItem
 	int Amount;
 };
 
+// One level of detail from the LODModel actor property. Entries are kept sorted by distance.
+enum ELODType
+{
+	LOD_Model,		// draw this model in place of model index 0
+	LOD_Sprite,		// LODModel <dist>, "Sprite": draw the actor's sprite frame instead of a model
+	LOD_Hide,		// LODModel <dist>, "None": don't draw the actor at all
+};
+
 struct LODmodel
 {
 	FName model;
-	int       modelID   = 0;
-	FString modelpath = "Models/";
 	double distance = 0;
+	int modelID = -1;		// resolved once by InitModels; -1 if the model could not be found
+	int type = LOD_Model;
 	LODmodel *Next = nullptr;
-	LODmodel(FName model, double distance){}
-	LODmodel(int modelID, double distance) : modelID(modelID), distance(distance){}
-	void push(LODmodel *other)
-	{
-		if (Next == nullptr)
-			Next = other;
-		else
-		{
-			if (Next->distance > other->distance){
-				other->push(Next);
-				Next = other;
-			}
-			else
-			{
-				Next->push(other);
-			}
-		}
-	}
+
+	LODmodel(FName m, double dist) : model(m), distance(dist) {}
 };
 
 enum EViewPosFlags // [MC] Flags for SetViewPos.
@@ -1184,9 +1176,9 @@ public:
 		return GetInfo()->LODmodels != nullptr;
 	}
 
-	LODmodel *getLODModel(double distance);
-	FName getLODModelName(double distance);
-	FName changeLODModel(double distance);
+	// Renderer only: picks the level of detail for the given (r_lod-scaled) view distance.
+	// Returns nullptr for the actor's normal model. Updates LODLevel for hysteresis.
+	const LODmodel *SelectLOD(double distance, double hysteresis);
 
 // info for drawing
 	AActor			*snext, **sprev;	// links in sector (if needed)
@@ -1776,6 +1768,7 @@ public:
 	bool isFrozen() const;
 
 	bool				hasmodel;
+	uint8_t				LODLevel;	// last level of detail picked by the renderer (0 = normal model); not serialized
 
 	void initCollisions();
 	ActorCollisionFlags collisionFlags;

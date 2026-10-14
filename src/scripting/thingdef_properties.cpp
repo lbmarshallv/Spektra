@@ -1190,38 +1190,23 @@ DEFINE_PROPERTY(LODmodel, F_S, Actor)
 	PROP_DOUBLE_PARM(dist, 0);
 	PROP_STRING_PARM(model, 1);
 
-	// create a linked list of LOD models sorted by distance
+	// Each class that sets LODModel starts a fresh list (it doesn't add to the parent's).
 	if (!bag.LODmodelSet)
 	{
 		bag.LODmodelSet  = true;
-		bag.LODmodelList = NULL;
+		bag.LODmodelList = nullptr;
 	}
 
-	LODmodel *lm = (LODmodel *)ClassDataAllocator.Alloc(sizeof(LODmodel));
+	// Class data lives in an arena that never runs constructors, so construct in place.
+	auto lm = new (ClassDataAllocator.Alloc(sizeof(LODmodel))) LODmodel(FName(model), dist);
+	if (!stricmp(model, "Sprite")) lm->type = LOD_Sprite;
+	else if (!stricmp(model, "None")) lm->type = LOD_Hide;
 
-	lm->distance     = dist;
-	lm->model        = model;
-	lm->Next         = nullptr;
-	LODmodel *lmprev = bag.LODmodelList;
-
-	if (lmprev != NULL)
-	{
-
-		if (dist <= lmprev->distance)
-		{
-			lm->Next         = lmprev;
-			bag.LODmodelList = lm;
-			return;
-		}
-		else
-		{
-			lmprev->push(lm);
-		}
-	}
-	else
-	{
-		bag.LODmodelList = lm;
-	}
+	// keep the list sorted by distance
+	LODmodel **link = &bag.LODmodelList;
+	while (*link != nullptr && (*link)->distance <= dist) link = &(*link)->Next;
+	lm->Next = *link;
+	*link = lm;
 }
 
 //==========================================================================

@@ -47,9 +47,6 @@ CVAR(Bool, gl_multithread, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 EXTERN_CVAR(Float, r_actorspriteshadowdist)
 EXTERN_CVAR(Bool, r_radarclipper)
 EXTERN_CVAR(Bool, r_dithertransparency)
-EXTERN_CVAR(Float, r_lod)
-const double MIN_LOD = 0.;
-const double MAX_LOD = 1000.;
 EXTERN_CVAR(Color, gl_cullcolor)
 
 thread_local bool isWorkerThread;
@@ -656,24 +653,16 @@ void HWDrawInfo::RenderThings(subsector_t * sub, sector_t * sector)
 		if(Viewpoint.bDoOob && thing->Sector->isSecret() && thing->Sector->wasSecret() && !r_radarclipper) continue; // This covers things that are touching non-secret sectors
 		FIntCVar *cvar = thing->GetInfo()->distancecheck;
 		bool      doDistCheck = (cvar != nullptr && *cvar >= 0);
-		bool      doLOD       = thing->hasmodel && thing->hasLODs();
-		if (doLOD || doDistCheck)
+		if (doDistCheck)
 		{
 			double dist = (thing->Pos() - (vp.bDoOob ? vp.OffPos : vp.Pos)).LengthSquared();
-			
-			if (doDistCheck)
+			double check = (double)**cvar;
+			if (dist >= check * check)
 			{
-				double check = (double)**cvar;
-				if (dist >= check * check)
-				{
-					continue;
-				}
-			}
-			if (doLOD)
-			{
-				thing->changeLODModel(dist * clamp(double(r_lod), MIN_LOD, MAX_LOD));
+				continue;
 			}
 		}
+		// Level of detail is picked in HWSprite::Process.
 		if (r_distance_cull_type > 0)
 		{
 			bool renderradcheck = thing->RenderRadius() < 0.25 * vp.culldist;

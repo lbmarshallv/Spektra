@@ -110,7 +110,7 @@ void BSPWalkCircle(FLevelLocals *Level, float x, float y, float radiusSquared, c
 		BSPNodeWalkCircle(Level->HeadNode(), x, y, radiusSquared, callback);
 }
 
-void RenderModel(FModelRenderer* renderer, float x, float y, float z, FSpriteModelFrame* smf, AActor* actor, double ticFrac);
+void RenderModel(FModelRenderer* renderer, float x, float y, float z, FSpriteModelFrame* smf, AActor* actor, double ticFrac, int lodModelID = -1);
 void RenderHUDModel(FModelRenderer* renderer, DPSprite* psp, FVector3 translation, FVector3 rotation, FVector3 rotation_pivot, FSpriteModelFrame *smf, double ticFrac);
 
 struct CalcModelFrameInfo

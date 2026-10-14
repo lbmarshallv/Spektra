@@ -66,6 +66,8 @@ EXTERN_CVAR(Float, transsouls)
 EXTERN_CVAR(Float, r_actorspriteshadowalpha)
 EXTERN_CVAR(Float, r_actorspriteshadowfadeheight)
 EXTERN_CVAR(Int, r_distance_cull_type)
+EXTERN_CVAR(Float, r_lod)
+CVARD(Float, r_lod_hysteresis, 0.1f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Width of the band around each LODModel distance where the current level is kept, as a fraction of that distance (0.1 = +/-5%). Stops models flickering between levels.")
 
 //==========================================================================
 //
@@ -316,7 +318,7 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 			}
 
 			FHWModelRenderer renderer(di, state, dynlightindex);
-			RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac));
+			RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac), lodModelID);
 			state.SetVertexBuffer(screen->mVertexData);
 		}
 	}
@@ -890,6 +892,33 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 
 	modelframe = isPicnumOverride ? nullptr : FindModelFrame(thing, spritenum, thing->frame, !!(thing->flags & MF_DROPPED));
 	modelframeflags = modelframe ? modelframe->getFlags(thing->modelData) : 0;
+
+	// Level of detail. This only picks what to draw; the actor's own model data is never touched.
+	lodModelID = -1;
+	if (modelframe && thing->hasLODs())
+	{
+		const double lodscale = clamp<double>(r_lod, 0., 1000.);
+		if (lodscale > 0)
+		{
+			const DVector3 &viewpos = vp.bDoOob ? vp.OffPos : vp.Pos;
+			const LODmodel *lod = thing->SelectLOD((thingpos - viewpos).Length() * lodscale, clamp<double>(r_lod_hysteresis, 0., 1.));
+			if (lod != nullptr)
+			{
+				switch (lod->type)
+				{
+				case LOD_Model:
+					lodModelID = lod->modelID;	// -1 (model not found) falls back to the normal model
+					break;
+				case LOD_Sprite:
+					modelframe = nullptr;		// draw the actor's sprite frame instead
+					modelframeflags = 0;
+					break;
+				case LOD_Hide:
+					return;
+				}
+			}
+		}
+	}
 
 	// Too close to the camera. This doesn't look good if it is a sprite.
 	if (fabs(thingpos.X - vp.Pos.X) < 2 && fabs(thingpos.Y - vp.Pos.Y) < 2

@@ -9126,81 +9126,36 @@ void AActor::RestoreSpecialPosition()
 //
 // LOD (level of detail) handling
 //
+// Picks the level of detail to render this actor with. 'distance' is the
+// distance to the viewer, already scaled by r_lod. Level 0 is the actor's
+// normal model; level N uses the Nth LODModel entry. 'hysteresis' widens each
+// threshold into a band (0.1 = switch out at +5%, back in at -5%) so actors
+// standing near a threshold don't flicker between two levels.
+//
+// This only reads class data and updates LODLevel, which nothing outside the
+// renderer looks at, so it is safe to call from the render worker thread.
+//
 //----------------------------------------------------------------------------
 
-FName AActor::getLODModelName(double distance)
+const LODmodel *AActor::SelectLOD(double distance, double hysteresis)
 {
-	FName R = NAME_None;
-	LODmodel *model = GetLODmodels();
-	while (model != nullptr)
+	static const int MAX_LOD_LEVELS = 16;
+	const LODmodel *levels[MAX_LOD_LEVELS];
+	int count = 0;
+	for (const LODmodel *m = GetLODmodels(); m != nullptr && count < MAX_LOD_LEVELS; m = m->Next)
 	{
-		if (distance <= model->distance * model->distance)
-			return R;
-		else
-		{
-			R = model->model;
-			model = model->Next;
-		}
+		levels[count++] = m;
 	}
-	return R;
-}
-LODmodel *AActor::getLODModel(double distance)
-{
-	LODmodel *model = GetLODmodels();
-	LODmodel *R     = nullptr;
-	while (model != nullptr)
-	{
-		if (distance <= (model->distance * model->distance))
-			return R;
-		else
-		{
-			R     = model;
-			model = model->Next;
-		}
-	}
-	return R;
-}
 
-FName AActor::changeLODModel(double distance)
-{
-	LODmodel *model = getLODModel(distance);
-	
-	if (model == nullptr)
-	{
-		if (modelData != nullptr)
-		{
-			modelData->Destroy();
-			modelData = nullptr;
-		}
-	}
-	else
-	{
-		// right now it's hard coded to only look at the Models folder
-		// and can only put models in index 0
-		int queryModel = model->modelID > 0 && model->modelID < Models.size()
-		                     ? model->modelID
-		                     : FindModel("Models/", model->model.GetChars());
+	const double up = 1.0 + hysteresis * 0.5;
+	const double down = 1.0 - hysteresis * 0.5;
 
-		model->modelID = queryModel;
-		if (modelData == nullptr)
-		{
-			auto ptr = Create<DActorModelData>();
+	int level = min<int>(LODLevel, count);
+	while (level < count && distance > levels[level]->distance * up) level++;
+	while (level > 0 && distance < levels[level - 1]->distance * down) level--;
 
-			ptr->flags    = (hasmodel ? MODELDATA_HADMODEL : 0);
-			ptr->modelDef = nullptr;
-			ptr->ObjectFlags |= (ObjectFlags & OF_TransferrableFlags);
-
-			modelData = ptr;
-			hasmodel  = true;
-			GC::WriteBarrier(this, ptr);
-			modelData->models.Push({queryModel, {}});
-		}
-		else
-		{
-			modelData->models[0].modelID = queryModel;
-		}
-	}
-	return model != nullptr ? model->model : NAME_None;
+	LODLevel = (uint8_t)level;
+	return level > 0 ? levels[level - 1] : nullptr;
 }
 
 //----------------------------------------------------------------------------

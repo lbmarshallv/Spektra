@@ -378,6 +378,7 @@ public:
 	FColormap Colormap;
 	FSpriteModelFrame * modelframe;
 	int modelframeflags;
+	int lodModelID;		// level-of-detail replacement for model index 0, -1 = none
 	FRenderStyle RenderStyle;
 	int OverrideShader;
 
