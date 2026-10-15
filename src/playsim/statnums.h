@@ -37,6 +37,7 @@ enum
 	STAT_CORPSEPOINTER,						// An entry in Hexen's corpse queue
 	STAT_TRAVELLING,						// An actor temporarily travelling to a new map
 	STAT_STATIC,							// persistent across maps.
+	STAT_CLUSTERPROXY,						// collision-only proxy actors of solid foliage (never ticked; see p_foliage.cpp)
 
   // Thinkers that do think
 	STAT_FIRST_THINKING=32,

@@ -118,6 +118,9 @@ public:
 	void ClearScreen() override;
 	void Draw(int dt, int index, int count, bool apply = true) override;
 	void DrawIndexed(int dt, int index, int count, bool apply = true) override;
+	bool SupportsModelInstancing() override;
+	void DrawInstanced(int dt, int index, int count, int instances) override;
+	void DrawIndexedInstanced(int dt, int index, int count, int instances) override;
 
 	bool SetDepthClamp(bool on) override;
 	void SetDepthMask(bool on) override;

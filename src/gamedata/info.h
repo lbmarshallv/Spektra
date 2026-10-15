@@ -264,6 +264,15 @@ struct FActorInfo
 
 	LODmodel *LODmodels;
 
+	// foliage clusters: random scale range applied per placed thing (FoliageRandomScale property)
+	float FoliageScaleMin = 1.f;
+	float FoliageScaleMax = 1.f;
+	// foliage clusters: near-range effects, in map units (FoliageLightRange, FoliageTranslucentRange)
+	float FoliageLightRange = 1024.f;
+	float FoliageLightFadeStart = -1.f;	// lights start fading out here; < 0 = 75% of FoliageLightRange
+	float FoliageFadeStart = 768.f;
+	float FoliageFadeEnd = 1024.f;
+
 	// This is from PClassPlayerPawn
 	FString DisplayName;
 
@@ -279,6 +288,12 @@ struct FActorInfo
 		VisibleToPlayerClass = other.VisibleToPlayerClass;
 		DropItems = other.DropItems;
 		LODmodels           = other.LODmodels;
+		FoliageScaleMin = other.FoliageScaleMin;
+		FoliageScaleMax = other.FoliageScaleMax;
+		FoliageLightRange = other.FoliageLightRange;
+		FoliageLightFadeStart = other.FoliageLightFadeStart;
+		FoliageFadeStart = other.FoliageFadeStart;
+		FoliageFadeEnd = other.FoliageFadeEnd;
 		distancecheck = other.distancecheck;
 		DisplayName = other.DisplayName;
 	}

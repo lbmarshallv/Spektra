@@ -295,6 +295,7 @@ static const char *shaderBindings = R"(
 		int uBoneIndexBase;
 
 		int uDataIndex;
+		int uInstanceBase;
 		int padding2, padding3;
 	};
 
@@ -347,6 +348,8 @@ static const char *shaderBindings = R"(
 	#define SUPPORTS_SHADOWMAPS
 	#define VULKAN_COORDINATE_SYSTEM
 	#define HAS_UNIFORM_VERTEX_DATA
+	#define SUPPORTS_MODEL_INSTANCING
+	#define INSTANCE_ID gl_InstanceIndex
 
 	// GLSL spec 4.60, 8.15. Noise Functions
 	// https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.4.60.pdf

@@ -27,6 +27,7 @@
 
 
 #include <math.h>
+#include "p_foliage.h"
 #include <cmath>	// needed for std::floor on mac
 #include "maploader.h"
 #include "c_cvars.h"
@@ -3222,6 +3223,9 @@ void MapLoader::LoadLevel(MapData *map, const char *lumpname, int position)
 	Spawn3DFloors();
 
 	SpawnThings(position);
+	// Always create it, so Finalized reliably marks the end of map load for scripted spawns.
+	if (Level->Foliage == nullptr) Level->Foliage = new FFoliageSystem;
+	Level->Foliage->Finalize(Level);
 
 	// Load and link lightmaps - must be done after P_Spawn3DFloors (and SpawnThings? Potentially for baking static model actors?)
 	if (!ForceNodeBuild)

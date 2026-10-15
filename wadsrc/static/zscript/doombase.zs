@@ -227,6 +227,7 @@ class Thinker : Object native play
 		STAT_CORPSEPOINTER,						// An entry in Hexen's corpse queue
 		STAT_TRAVELLING,						// An actor temporarily travelling to a new map
 		STAT_STATIC,
+		STAT_CLUSTERPROXY,						// Collision-only proxy actors of solid foliage (never ticked)
 
 		// Thinkers that do think
 		STAT_FIRST_THINKING=32,
@@ -668,6 +669,15 @@ struct LevelLocals native
 
 	native clearscope void SpawnParticle(FSpawnParticleParams p);
 	native play VisualThinker SpawnVisualThinker(Class<VisualThinker> type);
+	// Spawns a plant like a map thing would be: FOLIAGE classes that qualify go into a static foliage cluster
+	// (SOLID ones also get a collision-only proxy actor), others spawn as normal actors. pos.z is the height
+	// above the floor (below the ceiling for SPAWNCEILING classes) unless absoluteZ is set. Scale multiplies
+	// the class scale. randomize applies FOLIAGERANDOMYAW and FoliageRandomScale. Returns the actor that was
+	// spawned (a normal actor or a proxy), or null if the plant only exists in a cluster.
+	native play Actor SpawnFoliage(Class<Actor> type, vector3 pos, double angle = 0, double pitch = 0, double roll = 0, double scaleX = 1, double scaleY = 1, bool absoluteZ = false, bool randomize = true);
+	// Repeatable random number in [0, 1) from a position and a salt. Doesn't touch the game's random
+	// number generators, so it's identical on every machine and on every load of a map.
+	native clearscope double FoliageRandom(vector3 pos, int salt) const;
 	native clearscope VisualThinker SpawnClientSideVisualThinker(Class<VisualThinker> type);
 
 	clearscope native static bool WorldPaused(bool checkLag = false);

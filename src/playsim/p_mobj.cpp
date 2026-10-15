@@ -52,6 +52,7 @@
 #include "hu_stuff.h"
 #include "m_random.h"
 #include "model.h"
+#include "p_foliage.h"
 #include "models.h"
 #include "p_acs.h"
 #include "p_checkposition.h"
@@ -317,6 +318,7 @@ void AActor::Serialize(FSerializer &arc)
 		A("maxslopesteepness", MaxSlopeSteepness)
 		A("maxstepheight", MaxStepHeight)
 		A("bounceflags", BounceFlags)
+		A("perfflags", perfFlags)
 		A("bouncefactor", bouncefactor)
 		A("wallbouncefactor", wallbouncefactor)
 		A("bouncecount", bouncecount)
@@ -4719,6 +4721,14 @@ void AActor::GetObjectToWorldMatrix(double *outMat)
 //
 void AActor::Tick ()
 {
+	// Collision proxy of a solid FOLIAGE thing: the foliage cluster draws it and it has no game logic.
+	// Its first tic (after PostBeginPlay) moves it to a status list that is never ticked again.
+	if (perfFlags & PERF_CLUSTERPROXY)
+	{
+		ChangeStatNum(STAT_CLUSTERPROXY);
+		return;
+	}
+
 	bool debugt = !player && flags3 & MF3_ISMONSTER && Z() > 512.;
 
 	// [RH] Data for Heretic/Hexen scrolling sectors
@@ -7133,6 +7143,18 @@ AActor *FLevelLocals::SpawnMapThing (FMapThing *mthing, int position)
 		if (!ret) return nullptr;
 	}
 
+	// Non-interactive FOLIAGE plants are drawn by a static cluster. Non-solid ones don't become actors at
+	// all; solid ones (trees) still spawn one, but only as a collision proxy that is never drawn or ticked.
+	bool clusterProxy = false;
+	FFoliageResolved resolved;
+	if (info->perfFlags & PERF_FOLIAGE)
+	{
+		if (Foliage == nullptr) Foliage = new FFoliageSystem;
+		const auto result = Foliage->TryAdd(this, mthing, i, resolved);
+		if (result == FFoliageSystem::ADD_Absorbed) return nullptr;
+		clusterProxy = (result == FFoliageSystem::ADD_Proxy);
+	}
+
 	// spawn it
 	double sz;
 
@@ -7144,6 +7166,7 @@ AActor *FLevelLocals::SpawnMapThing (FMapThing *mthing, int position)
 		sz = ONFLOORZ;
 
 	mobj = AActor::StaticSpawn (this, i, DVector3(mthing->pos.XY(), sz), NO_REPLACE, true);
+	if (clusterProxy) mobj->perfFlags |= PERF_CLUSTERPROXY;
 
 	if (sz == ONFLOORZ)
 	{
@@ -7219,6 +7242,12 @@ AActor *FLevelLocals::SpawnMapThing (FMapThing *mthing, int position)
 		mobj->Angles.Pitch = DAngle::fromDeg(mthing->pitch);
 	if (mthing->roll)
 		mobj->Angles.Roll = DAngle::fromDeg(mthing->roll);
+	if (clusterProxy)
+	{
+		// Keep the proxy's collision in line with the drawn plant (random yaw and scale).
+		mobj->PrevAngles.Yaw = mobj->Angles.Yaw = DAngle::fromDeg(resolved.yaw);
+		mobj->Scale = resolved.scale;
+	}
 	if (mthing->score)
 		mobj->Score = mthing->score;
 	if (mthing->fillcolor)

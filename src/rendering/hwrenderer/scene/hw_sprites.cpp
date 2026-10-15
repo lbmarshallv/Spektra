@@ -806,6 +806,10 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 	if (thing == nullptr)
 		return;
 
+	// Collision proxies of solid foliage are drawn by the foliage cluster (hw_foliage.cpp).
+	if (thing->perfFlags & PERF_CLUSTERPROXY)
+		return;
+
 	// [ZZ] allow CustomSprite-style direct picnum specification
 	bool isPicnumOverride = thing->picnum.isValid();
 
@@ -901,7 +905,8 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		if (lodscale > 0)
 		{
 			const DVector3 &viewpos = vp.bDoOob ? vp.OffPos : vp.Pos;
-			const LODmodel *lod = thing->SelectLOD((thingpos - viewpos).Length() * lodscale, clamp<double>(r_lod_hysteresis, 0., 1.));
+			const double hysteresis = (thing->perfFlags & PERF_NOLODHYSTERESIS) ? 0. : clamp<double>(r_lod_hysteresis, 0., 1.);
+			const LODmodel *lod = thing->SelectLOD((thingpos - viewpos).Length() * lodscale, hysteresis);
 			if (lod != nullptr)
 			{
 				switch (lod->type)

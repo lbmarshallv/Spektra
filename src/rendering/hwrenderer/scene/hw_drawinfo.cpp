@@ -194,6 +194,8 @@ void HWDrawInfo::StartScene(FRenderViewpoint &parentvp, HWViewpointUniforms *uni
 	for (int i = 0; i < GLDL_TYPES; i++) drawlists[i].Reset();
 	hudsprites.Clear();
 	Coronas.Clear();
+	FoliageSubsectors.Clear();
+	FoliageTranslucent.Clear();
 	vpIndex = 0;
 
 	// Fullbright information needs to be propagated from the main view.
@@ -578,6 +580,7 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 
 	screen->mBones->Map();
 	drawlists[GLDL_MODELS].Draw(this, state, false);
+	DrawFoliage(state);
 	screen->mBones->Unmap();
 
 	state.SetRenderStyle(STYLE_Translucent);
@@ -607,6 +610,7 @@ void HWDrawInfo::RenderTranslucent(FRenderState &state)
 	drawlists[GLDL_TRANSLUCENTBORDER].Draw(this, state, true);
 	state.SetDepthMask(false);
 
+	DrawFoliageTranslucent(state);
 	drawlists[GLDL_TRANSLUCENT].DrawSorted(this, state);
 	state.EnableBrightmap(false);
 

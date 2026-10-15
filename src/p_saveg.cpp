@@ -52,6 +52,7 @@
 #include "s_music.h"
 #include "model.h"
 #include "d_net.h"
+#include "p_foliage.h"
 
 EXTERN_CVAR(Bool, save_formatted)
 
@@ -987,6 +988,10 @@ void FLevelLocals::Serialize(FSerializer &arc, bool hubload)
 		("interpolator", interpolator)
 		("frozenstate", frozenstate)
 		("actorbehaviors", ActorBehaviors);
+
+	// Foliage that scripts added after map load (the map's own plants were rebuilt by the map load).
+	if (Foliage == nullptr && arc.isReading()) Foliage = new FFoliageSystem;
+	if (Foliage) Foliage->Serialize(arc, this);
 
 
 	// Hub transitions must keep the current total time

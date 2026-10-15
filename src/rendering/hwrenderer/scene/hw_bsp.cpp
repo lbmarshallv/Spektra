@@ -37,6 +37,7 @@
 #include "p_trace.h"
 
 #include "p_visualthinker.h"
+#include "p_foliage.h"
 
 #ifdef ARCH_IA32
 #include <immintrin.h>
@@ -912,6 +913,12 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 			RenderParticles(sub, fakesector);
 			SetupSprite.Unclock();
 		}
+	}
+
+	// Foliage clusters: just note the subsector; DrawFoliage processes its plants in one pass.
+	if (gl_render_things && Level->Foliage != nullptr && Level->Foliage->SubsectorHasFoliage(sub->Index()))
+	{
+		FoliageSubsectors.Push(sub->Index());
 	}
 
 	AddLines(sub, fakesector);

@@ -1162,6 +1162,55 @@ DEFINE_PROPERTY(visibletoplayerclass, Ssssssssssssssssssss, Actor)
 //==========================================================================
 //
 //==========================================================================
+DEFINE_PROPERTY(foliagerandomscale, FF, Actor)
+{
+	PROP_DOUBLE_PARM(minscale, 0);
+	PROP_DOUBLE_PARM(maxscale, 1);
+	if (minscale <= 0 || maxscale <= 0) I_Error("FoliageRandomScale values must be greater than 0");
+	if (minscale > maxscale) std::swap(minscale, maxscale);
+	info->ActorInfo()->FoliageScaleMin = (float)minscale;
+	info->ActorInfo()->FoliageScaleMax = (float)maxscale;
+}
+
+//==========================================================================
+// Foliage within this distance of the viewer gets per-pixel dynamic lights.
+//   FoliageLightRange end			lights fade out between 75% of 'end' and 'end'
+//   FoliageLightRange start, end	full strength closer than 'start', fading out by 'end'
+//==========================================================================
+DEFINE_PROPERTY(foliagelightrange, Ff, Actor)
+{
+	PROP_DOUBLE_PARM(first, 0);
+	if (PROP_PARM_COUNT > 1)
+	{
+		PROP_DOUBLE_PARM(second, 1);
+		const double end = max(second, 0.);
+		info->ActorInfo()->FoliageLightRange = (float)end;
+		info->ActorInfo()->FoliageLightFadeStart = (float)clamp(first, 0., end);
+	}
+	else
+	{
+		info->ActorInfo()->FoliageLightRange = (float)max(first, 0.);
+		info->ActorInfo()->FoliageLightFadeStart = -1.f;
+	}
+}
+
+//==========================================================================
+// Translucent foliage: fully translucent closer than 'start', fully opaque
+// beyond 'end', and fading smoothly in between.
+//==========================================================================
+DEFINE_PROPERTY(foliagetranslucentrange, FF, Actor)
+{
+	PROP_DOUBLE_PARM(start, 0);
+	PROP_DOUBLE_PARM(end, 1);
+	start = max(start, 0.);
+	end = max(end, start);
+	info->ActorInfo()->FoliageFadeStart = (float)start;
+	info->ActorInfo()->FoliageFadeEnd = (float)end;
+}
+
+//==========================================================================
+//
+//==========================================================================
 DEFINE_PROPERTY(distancecheck, S, Actor)
 {
 	PROP_STRING_PARM(cvar, 0);

@@ -235,6 +235,7 @@ protected:
 
 	int mLightIndex;
 	int mBoneIndexBase;
+	int mInstanceBase;		// index of the first instance matrix in the bone buffer, -1 when not instancing
 	int mSpecialEffect;
 	int mTextureMode;
 	int mTextureClamp;
@@ -297,6 +298,7 @@ public:
 		mSpecialEffect = EFF_NONE;
 		mLightIndex = -1;
 		mBoneIndexBase = -1;
+		mInstanceBase = -1;
 		mStreamData.uInterpolationFactor = 0;
 		mRenderStyle = DefaultRenderStyle();
 		mMaterial.Reset();
@@ -592,6 +594,13 @@ public:
 		mBoneIndexBase = index;
 	}
 
+	// Instanced model rendering: each instance reads two matrices (model, normal) from the
+	// bone buffer, starting at this index. -1 disables it and uses ModelMatrix as usual.
+	void SetInstanceBase(int index)
+	{
+		mInstanceBase = index;
+	}
+
 	void SetRenderStyle(FRenderStyle rs)
 	{
 		mRenderStyle = rs;
@@ -742,6 +751,12 @@ public:
 	virtual void ClearScreen() = 0;
 	virtual void Draw(int dt, int index, int count, bool apply = true) = 0;
 	virtual void DrawIndexed(int dt, int index, int count, bool apply = true) = 0;
+
+	// Instanced draws. Only backends that return true from SupportsModelInstancing() implement these;
+	// the fallbacks draw a single instance so a stray call is harmless.
+	virtual bool SupportsModelInstancing() { return false; }
+	virtual void DrawInstanced(int dt, int index, int count, int instances) { Draw(dt, index, count); }
+	virtual void DrawIndexedInstanced(int dt, int index, int count, int instances) { DrawIndexed(dt, index, count); }
 
 	// Immediate render state change commands. These only change infrequently and should not clutter the render state.
 	virtual bool SetDepthClamp(bool on) = 0;					// Deactivated only by skyboxes.

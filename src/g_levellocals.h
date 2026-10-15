@@ -798,6 +798,8 @@ public:
 
 	TObjPtr<DSpotState *> SpotState = MakeObjPtr<DSpotState*>(nullptr);
 
+	struct FFoliageSystem *Foliage = nullptr;	// static foliage clusters (p_foliage.h), rebuilt from the map on every load
+
 	//==========================================================================
 	//
 	//

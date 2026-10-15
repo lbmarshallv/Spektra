@@ -71,6 +71,23 @@ void VkRenderState::DrawIndexed(int dt, int index, int count, bool apply)
 	mCommandBuffer->drawIndexed(count, 1, index, 0, 0);
 }
 
+// Instanced draws do far more GPU work per Apply() than normal draws. Counting each instance
+// toward vk_submit_size makes the command buffer get submitted soon after a large batch, so
+// the GPU starts on it while the CPU keeps recording instead of receiving it all at frame end.
+void VkRenderState::DrawInstanced(int dt, int index, int count, int instances)
+{
+	Apply(dt);
+	mCommandBuffer->draw(count, instances, index, 0);
+	mApplyCount += instances;
+}
+
+void VkRenderState::DrawIndexedInstanced(int dt, int index, int count, int instances)
+{
+	Apply(dt);
+	mCommandBuffer->drawIndexed(count, instances, index, 0, 0);
+	mApplyCount += instances;
+}
+
 bool VkRenderState::SetDepthClamp(bool on)
 {
 	bool lastValue = mDepthClamp;
@@ -392,6 +409,7 @@ void VkRenderState::ApplyPushConstants()
 
 	mPushConstants.uLightIndex = mLightIndex;
 	mPushConstants.uBoneIndexBase = mBoneIndexBase;
+	mPushConstants.uInstanceBase = mInstanceBase;
 	mPushConstants.uDataIndex = mStreamBufferWriter.DataIndex();
 
 	auto passManager = fb->GetRenderPassManager();

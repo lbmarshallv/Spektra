@@ -345,6 +345,9 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 		// bone animation
 		uniform int uBoneIndexBase;
 
+		// model instancing (first matrix index in the bone buffer, -1 = off)
+		uniform int uInstanceBase;
+
 		// Blinn glossiness and specular level
 		uniform vec2 uSpecularMaterial;
 
@@ -462,7 +465,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	if (!lightbuffertype)
 		pre_placeholder.AppendFormat("#define NUM_UBO_LIGHTS %d\n#define NUM_UBO_BONES %d\n", screen->mLights->GetBlockSize(), screen->mBones->GetBlockSize());
 	else
-		pre_placeholder << "#define SHADER_STORAGE_LIGHTS\n#define SHADER_STORAGE_BONES\n";
+		pre_placeholder << "#define SHADER_STORAGE_LIGHTS\n#define SHADER_STORAGE_BONES\n#define SUPPORTS_MODEL_INSTANCING\n#define INSTANCE_ID gl_InstanceID\n";
 
 	if(isGBuffer)
 	{
@@ -718,6 +721,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	muClipSplit.Init(hShader, "uClipSplit");
 	muLightIndex.Init(hShader, "uLightIndex");
 	muBoneIndexBase.Init(hShader, "uBoneIndexBase");
+	muInstanceBase.Init(hShader, "uInstanceBase");
 	muFogColor.Init(hShader, "uFogColor");
 	muDynLightColor.Init(hShader, "uDynLightColor");
 	muObjectColor.Init(hShader, "uObjectColor");

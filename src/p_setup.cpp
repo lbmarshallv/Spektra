@@ -19,6 +19,7 @@
 */
 
 #include <math.h>
+#include "p_foliage.h"
 #ifdef _MSC_VER
 #include <malloc.h>		// for alloca()
 #endif
@@ -332,6 +333,8 @@ void FLevelLocals::ClearLevelData(bool fullgc)
 	ClearTIDHashes();
 	if (SpotState) SpotState->Destroy();
 	SpotState = nullptr;
+	delete Foliage;
+	Foliage = nullptr;
 	ACSThinker = nullptr;
 	ClientSideACSThinker = nullptr;
 	FraggleScriptThinker = nullptr;

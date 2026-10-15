@@ -55,6 +55,7 @@ void CleanSWDrawer()
 
 #include "g_levellocals.h"
 #include "a_dynlight.h"
+#include "p_foliage.h"
 
 
 void CollectLights(FLevelLocals* Level)
@@ -313,6 +314,11 @@ sector_t* RenderView(player_t* player)
 	auto RenderState = screen->RenderState();
 	RenderState->SetVertexBuffer(screen->mVertexData);
 	screen->mVertexData->Reset();
+	ResetFoliageStats();
+	for (auto Level : AllLevels())
+	{
+		if (Level->Foliage) Level->Foliage->RebuildIfDirty(Level);	// plants spawned by script since the last frame
+	}
 	hw_postprocess.SetTonemapMode(level.info ? level.info->tonemap : ETonemapMode::None);
 
 	if (level.flags3 & LEVEL3_NOAMBIENTOCCLUSION)

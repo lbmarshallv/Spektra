@@ -113,6 +113,18 @@ enum DrawListType
 };
 
 
+// A plant close enough to the viewer to be drawn blended in the translucent pass (hw_foliage.cpp).
+struct FFoliageTranslucentItem
+{
+	uint32_t instance;		// index into FFoliageSystem::Instances
+	int lightIndex;			// dynamic light list, -1 = none
+	float distSq;			// for back-to-front sorting
+	uint8_t level;			// level of detail
+	uint8_t fade;			// 0 = fully translucent ... FOLIAGE_FADE_STEPS = fully opaque
+};
+
+constexpr int FOLIAGE_FADE_STEPS = 15;
+
 struct HWDrawInfo
 {
 	struct wallseg
@@ -173,6 +185,8 @@ struct HWDrawInfo
 	TArray<HWDecal *> Decals[2];	// the second slot is for mirrors which get rendered in a separate pass.
 	TArray<HUDSprite> hudsprites;	// These may just be stored by value.
 	TArray<ACorona*> Coronas;
+	TArray<int> FoliageSubsectors;	// visible render subsectors that contain foliage (filled by the BSP walk)
+	TArray<FFoliageTranslucentItem> FoliageTranslucent;	// near translucent plants, drawn in RenderTranslucent
 	uint64_t LastFrameTime = 0;
 
 	TArray<int> culledSectors;
@@ -273,6 +287,8 @@ public:
 	void DrawScene(int drawmode);
 	void CreateScene(bool drawpsprites);
 	void RenderScene(FRenderState &state);
+	void DrawFoliage(FRenderState &state);
+	void DrawFoliageTranslucent(FRenderState &state);
 	void RenderTranslucent(FRenderState &state);
 	void RenderPortal(HWPortal *p, FRenderState &state, bool usestencil);
 	void EndDrawScene(sector_t * viewsector, FRenderState &state);
@@ -398,3 +414,4 @@ bool CheckFog(FLevelLocals* Level, sector_t* frontsector, sector_t* backsector, 
 void SetColor(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, int sectorlightlevel, int rellight, bool fullbright, const FColormap& cm, float alpha, bool weapon = false);
 void SetShaderLight(FRenderState& state, FLevelLocals* Level, float level, float olight);
 void SetFog(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, int lightlevel, int rellight, bool fullbright, const FColormap* cmap, bool isadditive);
+void ResetFoliageStats();

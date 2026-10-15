@@ -30,15 +30,27 @@ void main()
 	vec2 parmTexCoord;
 	vec4 parmPosition;
 
-	BonesResult bones = ApplyBones();
+	BonesResult boneResult = ApplyBones();
 
 	parmTexCoord = aTexCoord;
-	parmPosition = bones.Position;
+	parmPosition = boneResult.Position;
+
+	// Instanced models fetch their per-instance model/normal matrix pair from the bone buffer.
+	mat4 modelMatrix = ModelMatrix;
+	mat4 normalModelMatrix = NormalModelMatrix;
+	#ifdef SUPPORTS_MODEL_INSTANCING
+		if (uInstanceBase >= 0)
+		{
+			int instanceSlot = uInstanceBase + INSTANCE_ID * 2;
+			modelMatrix = bones[instanceSlot];
+			normalModelMatrix = bones[instanceSlot + 1];
+		}
+	#endif
 
 	#ifndef SIMPLE
-		vec4 worldcoord = ModelMatrix * mix(parmPosition, aVertex2, uInterpolationFactor);
+		vec4 worldcoord = modelMatrix * mix(parmPosition, aVertex2, uInterpolationFactor);
 	#else
-		vec4 worldcoord = ModelMatrix * parmPosition;
+		vec4 worldcoord = modelMatrix * parmPosition;
 	#endif
 
 	vec4 eyeCoordPos = ViewMatrix * worldcoord;
@@ -82,7 +94,7 @@ void main()
 			ClipDistance4 = worldcoord.y - ((uSplitBottomPlane.w + uSplitBottomPlane.x * worldcoord.x + uSplitBottomPlane.y * worldcoord.z) * uSplitBottomPlane.z);
 		}
 
-		vWorldNormal = vec4(normalize((NormalModelMatrix * vec4(normalize(bones.Normal), 1.0)).xyz), 1.0);
+		vWorldNormal = vec4(normalize((normalModelMatrix * vec4(normalize(boneResult.Normal), 1.0)).xyz), 1.0);
 		vEyeNormal = vec4(normalize((NormalViewMatrix * vec4(normalize(vWorldNormal.xyz), 1.0)).xyz), 1.0);
 	#endif
 

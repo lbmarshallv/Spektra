@@ -23,6 +23,7 @@
 */
 
 #include <assert.h>
+#include "p_foliage.h"
 
 #include "d_main.h"
 #include "g_level.h"
@@ -1923,6 +1924,7 @@ FLevelLocals::~FLevelLocals()
 	if (localEventManager) delete localEventManager;
 	if (aabbTree) delete aabbTree;
 	if (collisionWorld) delete collisionWorld;
+	delete Foliage;
 }
 
 //==========================================================================

@@ -710,6 +710,7 @@ set( FASTMATH_SOURCES
 	rendering/hwrenderer/scene/hw_sky.cpp
 	rendering/hwrenderer/scene/hw_skyportal.cpp
 	rendering/hwrenderer/scene/hw_sprites.cpp
+	rendering/hwrenderer/scene/hw_foliage.cpp
 	rendering/hwrenderer/scene/hw_spritelight.cpp
 	rendering/hwrenderer/scene/hw_walls.cpp
 	rendering/hwrenderer/scene/hw_walls_vertex.cpp
@@ -824,6 +825,7 @@ set (PCH_SOURCES
 	p_conversation.cpp
 	playsim/p_destructible.cpp
 	playsim/p_effect.cpp
+	playsim/p_foliage.cpp
 	playsim/p_enemy.cpp
 	playsim/p_interaction.cpp
 	playsim/p_lnspec.cpp

@@ -77,7 +77,8 @@ struct PushConstants
 	int uBoneIndexBase;
 
 	int uDataIndex;
-	int padding1, padding2, padding3;
+	int uInstanceBase;	// model instancing: first matrix index in the bone buffer, -1 = off
+	int padding2, padding3;
 };
 
 class VkShaderProgram

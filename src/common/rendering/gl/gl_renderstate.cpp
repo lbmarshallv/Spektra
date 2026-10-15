@@ -218,6 +218,9 @@ bool FGLRenderState::ApplyShader()
 	}
 	activeShader->muBoneIndexBase.Set(index);
 
+	// Instancing is only enabled when the bone buffer is an SSBO (see SupportsModelInstancing), so no rebinding is needed here.
+	activeShader->muInstanceBase.Set(mInstanceBase);
+
 	return true;
 }
 
@@ -427,6 +430,28 @@ void FGLRenderState::DrawIndexed(int dt, int index, int count, bool apply)
 	}
 	drawcalls.Clock();
 	glDrawElements(dt2gl[dt], count, GL_UNSIGNED_INT, (void*)(intptr_t)(index * sizeof(uint32_t)));
+	drawcalls.Unclock();
+}
+
+bool FGLRenderState::SupportsModelInstancing()
+{
+	// Instance matrices live in the bone buffer, which can only be indexed freely when it is a shader storage buffer.
+	return screen->mBones->GetBufferType();
+}
+
+void FGLRenderState::DrawInstanced(int dt, int index, int count, int instances)
+{
+	Apply();
+	drawcalls.Clock();
+	glDrawArraysInstanced(dt2gl[dt], index, count, instances);
+	drawcalls.Unclock();
+}
+
+void FGLRenderState::DrawIndexedInstanced(int dt, int index, int count, int instances)
+{
+	Apply();
+	drawcalls.Clock();
+	glDrawElementsInstanced(dt2gl[dt], count, GL_UNSIGNED_INT, (void*)(intptr_t)(index * sizeof(uint32_t)), instances);
 	drawcalls.Unclock();
 }
 

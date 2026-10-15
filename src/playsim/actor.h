@@ -509,6 +509,18 @@ enum ActorRenderFlag2
 	RF2_NODYNAMICLIGHTING		= 0x4000,	// [MC] Disable dynamic lighting effects on sprites/models
 };
 
+// Performance flags: level of detail, object clusters and other rendering/CPU savings.
+enum ActorPerfFlag
+{
+	PERF_FOLIAGE			= 0x0001,	// non-solid, non-interactive model: absorbed into a static foliage cluster at map load instead of spawning an actor
+	PERF_FOLIAGERANDOMYAW	= 0x0002,	// foliage: random (but repeatable) yaw per placed thing
+	PERF_FOLIAGEALIGNSLOPE	= 0x0004,	// foliage: tilt to match the floor slope it stands on
+	PERF_NOLODHYSTERESIS	= 0x0008,	// switch LODModel levels exactly at their distances (ignore r_lod_hysteresis)
+
+	// Internal, set by the engine only (not exposed to DECORATE/ZScript):
+	PERF_CLUSTERPROXY		= 0x10000,	// solid FOLIAGE thing: a foliage cluster draws it; this actor only provides collision and never ticks
+};
+
 enum ActorCollisionFlag
 {
 	COLFLAG_NOSTEP = 0x0001, // never allow actors to automatically "step" up onto this actor
@@ -625,6 +637,7 @@ typedef TFlags<ActorRenderFlag2> ActorRenderFlags2;
 typedef TFlags<ActorBounceFlag> ActorBounceFlags;
 typedef TFlags<ActorRenderFeatureFlag> ActorRenderFeatureFlags;
 typedef TFlags<ActorCollisionFlag> ActorCollisionFlags;
+typedef TFlags<ActorPerfFlag> ActorPerfFlags;
 DEFINE_TFLAGS_OPERATORS (ActorFlags)
 DEFINE_TFLAGS_OPERATORS (ActorFlags2)
 DEFINE_TFLAGS_OPERATORS (ActorFlags3)
@@ -639,6 +652,7 @@ DEFINE_TFLAGS_OPERATORS (ActorRenderFlags2)
 DEFINE_TFLAGS_OPERATORS (ActorBounceFlags)
 DEFINE_TFLAGS_OPERATORS (ActorRenderFeatureFlags)
 DEFINE_TFLAGS_OPERATORS (ActorCollisionFlags)
+DEFINE_TFLAGS_OPERATORS (ActorPerfFlags)
 
 // Used to affect the logic for thing activation through death, USESPECIAL and BUMPSPECIAL
 // "thing" refers to what has the flag and the special, "trigger" refers to what used or bumped it
@@ -1772,6 +1786,7 @@ public:
 
 	void initCollisions();
 	ActorCollisionFlags collisionFlags;
+	ActorPerfFlags perfFlags;
 
 };
 
