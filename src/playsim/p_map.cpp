@@ -1442,7 +1442,17 @@ bool PIT_CheckThing(FMultiBlockThingsIterator &it, FMultiBlockThingsIterator::Ch
 		return true;
 
 	tm.thing->BlockingMobj = thing;
-	
+
+	// A missile step that can't touch a solid thing passes it (see the collisionPoints check
+	// below); most steps of a fast missile are like that, so skip straight to the answer.
+	if ((tm.thing->flags & MF_MISSILE) && (tm.thing->flags6 & MF6_INTRYMOVE) &&
+	    ((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) &&
+	    !(tm.thing->flags3 & thing->flags3 & MF3_DONTOVERLAP) && level->MissileStepClear(tm.thing, thing, tm.pos))
+	{
+		tm.collisionPoints.Clear();
+		return true;
+	}
+
 	tm.collisionPoints = level->GetCollisionPoints(tm.thing, thing, tm.pos, tm.thing->flags6 & MF6_INTRYMOVE,true);
 	topz               = tm.TopThingZ();
 
@@ -2667,6 +2677,12 @@ bool P_TryMove(AActor *thing, const DVector2 &pos,
 	FCheckPosition &tm,
 	bool missileCheck)	// [GZ] Fired missiles ignore the drop-off test
 {
+	struct MissileTimer
+	{
+		bool on;
+		MissileTimer(AActor *mo) : on(!!(mo->flags & MF_MISSILE)) { if (on) ColStatBegin(COLSTAT_MISSILEMOVE); }
+		~MissileTimer() { if (on) ColStatEnd(COLSTAT_MISSILEMOVE); }
+	} missileTimer(thing);
 	sector_t	*oldsector;
 	double		oldz;
 	int 		side;
@@ -7789,4 +7805,158 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, ActivateSpecial, P_ActivateThingSpecial)
 	PARAM_OBJECT_NOT_NULL(activator, AActor);
 	PARAM_BOOL(death);
 	ACTION_RETURN_BOOL(P_ActivateThingSpecial(self, activator, death));
+}
+
+//==========================================================================
+//
+// P_FastMissileSteps
+//
+// FastProjectile moves in steps no longer than its radius, so that it can't
+// jump over a wall or an actor between two position checks: a bullet with
+// Radius 1 and Speed 325 takes 512 steps per tic. Most of them happen in
+// the open, where nothing could stop the bullet or notice it passing.
+//
+// This returns how many of the next steps (up to maxSteps, each moving by
+// 'frac') can be taken as a single move without changing the outcome: no
+// actor near the path that the missile could touch, no line it could hit
+// or trigger (one-sided, blocking, special, portal), no floor or ceiling it
+// could reach, and no sector that does something when entered (3D floors,
+// deep water, sector actions, portals). Anything doubtful makes it fall back
+// to single steps, which are checked exactly as before.
+//
+//==========================================================================
+
+static double SegmentDistance(const DVector2 &a0, const DVector2 &a1, const DVector2 &b0, const DVector2 &b1)
+{
+	auto pointSeg = [](const DVector2 &p, const DVector2 &s0, const DVector2 &s1) {
+		DVector2 d  = s1 - s0;
+		double   l2 = d.LengthSquared();
+		double   t  = l2 > 0 ? clamp(((p - s0) | d) / l2, 0., 1.) : 0.;
+		return (p - (s0 + d * t)).Length();
+	};
+	auto cross = [](const DVector2 &u, const DVector2 &v) { return u.X * v.Y - u.Y * v.X; };
+	DVector2 r = a1 - a0, s = b1 - b0;
+	double   den = cross(r, s);
+	if (den != 0)
+	{
+		double t = cross(b0 - a0, s) / den, u = cross(b0 - a0, r) / den;
+		if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+			return 0;
+	}
+	return min(min(pointSeg(a0, b0, b1), pointSeg(a1, b0, b1)), min(pointSeg(b0, a0, a1), pointSeg(b1, a0, a1)));
+}
+
+// Does the segment p0-p1 come within 'grow' of the box mn-mx?
+static bool SegmentNearBox(const DVector2 &p0, const DVector2 &p1, DVector2 mn, DVector2 mx, double grow)
+{
+	mn -= DVector2(grow, grow);
+	mx += DVector2(grow, grow);
+	double t0 = 0, t1 = 1;
+	DVector2 d = p1 - p0;
+	for (int axis = 0; axis < 2; axis++)
+	{
+		double p = axis ? p0.Y : p0.X, dd = axis ? d.Y : d.X, lo = axis ? mn.Y : mn.X, hi = axis ? mx.Y : mx.X;
+		if (fabs(dd) < 1e-12)
+		{
+			if (p < lo || p > hi)
+				return false;
+			continue;
+		}
+		double a = (lo - p) / dd, b = (hi - p) / dd;
+		if (a > b)
+			std::swap(a, b);
+		t0 = max(t0, a);
+		t1 = min(t1, b);
+		if (t0 > t1)
+			return false;
+	}
+	return true;
+}
+
+static bool FastMissileStepsClear(AActor *mo, const DVector3 &frac, int steps)
+{
+	FLevelLocals *Level = mo->Level;
+	DVector2      p0    = mo->Pos().XY();
+	DVector2      p1    = p0 + frac.XY() * steps;
+	double        r     = mo->radius;
+	double        reach = r * 1.5 + 1; // the missile's box corners, and some slack
+	double        zlow  = min(mo->Z(), mo->Z() + frac.Z * steps);
+	double        zhigh = max(mo->Z(), mo->Z() + frac.Z * steps) + max(mo->Height, 1.);
+
+	FBoundingBox box(min(p0.X, p1.X) - reach, min(p0.Y, p1.Y) - reach, max(p0.X, p1.X) + reach, max(p0.Y, p1.Y) + reach);
+
+	// The floor and ceiling of every sector the path comes near. Sector planes are flat, so their
+	// highest (lowest) point over the band around the path is at one of the band's corners.
+	DVector2 dir = (p1 - p0).Unit(), side(-dir.Y, dir.X);
+	DVector2 corners[4] = {p0 - dir * reach + side * reach, p0 - dir * reach - side * reach,
+	                       p1 + dir * reach + side * reach, p1 + dir * reach - side * reach};
+	auto sectorClear = [&](sector_t *sec) {
+		if (sec->e->XFloor.ffloors.Size() > 0 || sec->GetHeightSec() != nullptr || sec->SecActTarget != nullptr ||
+		    !sec->PortalBlocksMovement(sector_t::floor) || !sec->PortalBlocksMovement(sector_t::ceiling))
+			return false;
+		for (auto &c : corners)
+		{
+			if (sec->floorplane.ZatPoint(c) >= zlow - 1 || sec->ceilingplane.ZatPoint(c) <= zhigh + 1)
+				return false;
+		}
+		return true;
+	};
+	if (!sectorClear(mo->Sector))
+		return false;
+
+	FBlockLinesIterator lit(Level, box);
+	while (line_t *ld = lit.Next())
+	{
+		if (SegmentDistance(p0, p1, ld->v1->fPos(), ld->v2->fPos()) > reach)
+			continue;
+		if (!ld->backsector || ld->special || ld->isLinePortal() ||
+		    (ld->flags & (ML_BLOCKEVERYTHING | ML_BLOCKPROJECTILE | ML_3DMIDTEX | ML_3DMIDTEX_IMPASS)))
+			return false;
+		if ((ld->frontsector != mo->Sector && !sectorClear(ld->frontsector)) ||
+		    (ld->backsector != mo->Sector && !sectorClear(ld->backsector)))
+			return false;
+	}
+
+	DVector3        dest(p1, mo->Z());
+	FBlockThingsIterator tit(Level, box);
+	while (AActor *thing = tit.Next())
+	{
+		if (thing == mo || !((thing->flags & (MF_SOLID | MF_SPECIAL | MF_SHOOTABLE)) || (thing->flags6 & MF6_TOUCHY)))
+			continue;
+		DVector2 mn, mx;
+		if (thing->collisionModelName != NAME_None)
+		{
+			DVector3 bmn, bmx;
+			Level->GetCollisionBox(thing, bmn, bmx);
+			mn = bmn.XY();
+			mx = bmx.XY();
+		}
+		else
+		{
+			mn = thing->Pos().XY() - DVector2(thing->radius, thing->radius);
+			mx = thing->Pos().XY() + DVector2(thing->radius, thing->radius);
+		}
+		if (!SegmentNearBox(p0, p1, mn, mx, r + 1))
+			continue;
+		// Like PIT_CheckThing: a solid actor only matters where the missile's shape touches its own.
+		if (((thing->flags & MF_SOLID) || (thing->flags6 & (MF6_TOUCHY | MF6_BUMPSPECIAL))) &&
+		    !(mo->flags3 & thing->flags3 & MF3_DONTOVERLAP) && Level->MissileStepClear(mo, thing, dest))
+			continue;
+		return false;
+	}
+	return true;
+}
+
+int P_FastMissileSteps(AActor *mo, const DVector3 &frac, int maxSteps)
+{
+	if (maxSteps <= 1 || (mo->flags2 & MF2_RIP) || (mo->flags & MF_NOCLIP) || !(mo->flags & MF_MISSILE) ||
+	    frac.XY().LengthSquared() < 1e-12)
+		return 1;
+	FColStatTimer timer(COLSTAT_FASTSTEPS);
+	for (int steps = maxSteps; steps > 1; steps /= 2)
+	{
+		if (FastMissileStepsClear(mo, frac, steps))
+			return steps;
+	}
+	return 1;
 }

@@ -951,6 +951,7 @@ class Actor : Thinker native
 	}
 
 	native bool TryMove(vector2 newpos, int dropoff, bool missilecheck = false, FCheckPosition tm = null);
+	native int FastMissileSteps(vector3 frac, int maxsteps);
 	// True if this actor can grow in place from fromHeight to toHeight without its head
 	// entering a 3D-model collision actor (used when standing up from a crouch).
 	native bool CheckHeadroom(double fromHeight, double toHeight);

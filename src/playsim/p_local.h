@@ -247,6 +247,7 @@ DVector3 P_TestMobjVelZ(AActor *mobj, AActor **hitthing);
 bool P_CheckHeadroom(AActor *thing, double fromHeight, double toHeight);
 bool P_SlideAlongModel(AActor *mo, AActor *blocker, const DVector2 &move, FCheckPosition &tm);
 bool P_ColDebug(AActor *mo);
+int  P_FastMissileSteps(AActor *mo, const DVector3 &frac, int maxSteps);
 bool P_CheckPosition(AActor *thing, const DVector2 &pos, bool actorsonly = false);
 void P_DoMissileDamage(AActor* inflictor, AActor* target);
 bool P_CheckPosition(AActor *thing, const DVector2 &pos, FCheckPosition &tm, bool actorsonly = false);

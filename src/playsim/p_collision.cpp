@@ -5,9 +5,103 @@
 #include <bullet/BulletCollision/NarrowPhaseCollision/btRaycastCallback.h>
 #include "c_cvars.h"
 #include "p_effect.h"
+#include "stats.h"
 
 // Shows where 3D-model collisions happen: a particle at each contact point.
 CVAR(Bool, col_showhits, false, 0)
+
+//==========================================================================
+//
+// stat collision
+//
+// Time spent in the collision code, per frame, averaged over the last 10
+// frames. Nested calls of the same kind are counted once.
+//
+//==========================================================================
+
+static struct
+{
+	cycle_t cycles[10];
+	int     calls[10];
+	int     depth;
+} colStats[NUM_COLSTATS];
+
+void ColStatBegin(int which)
+{
+	auto &s = colStats[which];
+	s.calls[0]++;
+	if (s.depth++ == 0)
+		s.cycles[0].Clock();
+}
+
+void ColStatEnd(int which)
+{
+	auto &s = colStats[which];
+	if (--s.depth == 0)
+		s.cycles[0].Unclock();
+}
+
+void ColStatCount(int which)
+{
+	colStats[which].calls[0]++;
+}
+
+ADD_STAT(collision)
+{
+	static const char *const names[NUM_COLSTATS] = {"missile moves (all)", "move checks", "ground checks",
+	                                                "overlap checks",      "traces",      "monster pre-checks",
+	                                                "bounding boxes",      "model setup",
+	                                                "missile path sweeps", "missile steps skipped",
+	                                                "fast missile step merging"};
+	FString out;
+	for (int i = 0; i < NUM_COLSTATS; i++)
+	{
+		auto  &s     = colStats[i];
+		double ms    = 0;
+		int    calls = 0;
+		for (int j = 0; j < 10; j++)
+		{
+			ms += s.cycles[j].TimeMS();
+			calls += s.calls[j];
+		}
+		out.AppendFormat("%s%s: %.2f ms, %d calls", i ? "\n" : "", names[i], ms / 10, calls / 10);
+		memmove(&s.cycles[1], &s.cycles[0], 9 * sizeof(cycle_t));
+		memmove(&s.calls[1], &s.calls[0], 9 * sizeof(int));
+		s.cycles[0].Reset();
+		s.calls[0] = 0;
+	}
+	return out;
+}
+
+//==========================================================================
+//
+// Queries are run against one collision object at a time, without putting
+// it into the collision world. Adding objects to the world and removing them
+// again around every query re-sorts its broadphase each time, which cost far
+// more than the queries themselves: with many 3D-model actors around, every
+// projectile step, sight check and trace did that for each of them.
+//
+//==========================================================================
+
+static void SweepAgainst(btCollisionWorld *world, const btConvexShape *shape, const btTransform &from, const btTransform &to,
+                         const btCollisionObject *obj, btCollisionWorld::ConvexResultCallback &cb)
+{
+	// (No allowed penetration, as btCollisionWorld::convexSweepTest has by default.)
+	btCollisionWorld::objectQuerySingle(shape, from, to, const_cast<btCollisionObject *>(obj), obj->getCollisionShape(),
+	                                    obj->getWorldTransform(), cb, 0.f);
+}
+
+static void RayAgainst(const btVector3 &a, const btVector3 &b, const btCollisionObject *obj,
+                       btCollisionWorld::RayResultCallback &cb)
+{
+	btTransform from, to;
+	from.setIdentity();
+	to.setIdentity();
+	from.setOrigin(a);
+	to.setOrigin(b);
+	btCollisionWorld::rayTestSingle(from, to, const_cast<btCollisionObject *>(obj), obj->getCollisionShape(),
+	                                obj->getWorldTransform(), cb);
+}
 
 void AdvancedCollisionModel::setWorldPos(DVector3 pos)
 {
@@ -59,6 +153,8 @@ void CapsuleCollisionModel::updateTransform()
 	AdvancedCollisionModel::updateTransform();
 }
 
+// The collision world holds no objects: queries are made against one object at a time (see
+// SweepAgainst). It provides the collision dispatcher those queries use.
 void FLevelLocals::InitCollisionWorld()
 {
 	if (collisionWorld)
@@ -72,57 +168,6 @@ void FLevelLocals::InitCollisionWorld()
 #endif
 }
 
-//==========================================================================
-//
-// The collision world only holds the actors taking part in the query being
-// made: they are added before it and removed after.
-//
-//==========================================================================
-
-void FLevelLocals::AddCollisionObject(btCollisionObject *obj)
-{
-	if (collisionWorld)
-		collisionWorld->addCollisionObject(obj);
-	else
-		Printf(TEXTCOLOR_RED "AddCollisionObject was called without a CollisionWorld\n");
-}
-
-void FLevelLocals::AddCollisionObject(AActor *thing)
-{
-	AddCollisionObject(thing->collisionModel);
-}
-
-void FLevelLocals::AddCollisionObject(AdvancedCollisionModel *model)
-{
-	if (collisionModels.Find(model) == collisionModels.Size())
-	{
-		AddCollisionObject(model->collider);
-		collisionModels.Push(model);
-	}
-}
-
-void FLevelLocals::RemoveCollisionObject(btCollisionObject *obj)
-{
-	if (collisionWorld)
-		collisionWorld->removeCollisionObject(obj);
-	else
-		Printf(TEXTCOLOR_RED "RemoveCollisionObject was called without a CollisionWorld\n");
-}
-
-void FLevelLocals::RemoveCollisionObject(AActor *thing)
-{
-	for (unsigned i = 0; i < collisionModels.Size(); i++)
-	{
-		auto c = collisionModels[i];
-		if (c && c->owner == thing)
-		{
-			collisionModels.Delete(i);
-			RemoveCollisionObject(c->collider);
-			return;
-		}
-	}
-}
-
 void FLevelLocals::UpdateCollisionModel(AActor *thing)
 {
 	auto col = thing->collisionModel;
@@ -132,28 +177,181 @@ void FLevelLocals::UpdateCollisionModel(AActor *thing)
 		col = thing->collisionModel;
 	}
 	col->collider->setUserPointer(col);
+	if (col->transformValid && col->placedPos == thing->Pos() && col->placedAngles == thing->Angles &&
+	    col->placedRadius == thing->radius && col->placedHeight == thing->Height)
+		return; // most actors with collision models (scenery) never move
 	col->updateTransform();
+	col->transformValid = true;
+	col->aabbValid      = false;
+	col->placedPos      = thing->Pos();
+	col->placedAngles   = thing->Angles;
+	col->placedRadius   = thing->radius;
+	col->placedHeight   = thing->Height;
+}
+
+// Puts an actor's collider somewhere other than where the actor is, for a test.
+static void PlaceCollider(AdvancedCollisionModel *model, const DVector3 &pos)
+{
+	model->setWorldPos(pos);
+	model->transformValid = false;
+	model->aabbValid      = false;
 }
 
 btCollisionWorld::AllHitsRayResultCallback FLevelLocals::TraceCollisionHit(DVector3 &from, DVector3 &to,
                                                                            TArray<AActor *>  things)
 {
+	FColStatTimer timer(COLSTAT_TRACE);
 	btVector3                                  bFrom(from.X, from.Y, from.Z);
 	btVector3                                  bTo(to.X, to.Y, to.Z);
 	btCollisionWorld::AllHitsRayResultCallback allResults(bFrom, bTo);
 	if (from == to)
 		return allResults;
 
+	// The same actor can be listed once per blockmap block the trace crosses.
+	TArray<const btCollisionObject *> done;
 	for (AActor *thing : things)
 	{
 		UpdateCollisionModel(thing);
-		AddCollisionObject(thing);
-	}
-	collisionWorld->rayTest(bFrom, bTo, allResults);
-	for (AActor *thing : things)
-		RemoveCollisionObject(thing);
+		const btCollisionObject *obj = thing->collisionModel->collider;
+		if (done.Find(obj) < done.Size())
+			continue;
+		done.Push(obj);
 
+		btVector3 mn, mx, n;
+		btScalar  lambda = 1;
+		obj->getCollisionShape()->getAabb(obj->getWorldTransform(), mn, mx);
+		if (btRayAabb(bFrom, bTo, mn, mx, lambda, n))
+			RayAgainst(bFrom, bTo, obj, allResults);
+	}
 	return allResults;
+}
+
+//==========================================================================
+//
+// MissilePathClear
+//
+// Fast missiles move in many small steps per tic (see FastProjectile), and
+// each step used to be swept against every collider near it. Instead, the
+// tic's whole path is swept once per collider with a box a little larger
+// than the missile, and a step is only swept for real when it reaches the
+// point where that box first touches the collider. The box covers the
+// missile wherever a step can put it (steps move sideways at a fixed
+// height, then the height changes by up to Vel.Z), so a step this lets
+// through can't have hit; steps that might hit get the exact sweep as before.
+//
+//==========================================================================
+
+static bool MissilePathClear(btCollisionWorld *world, AActor *mover, AActor *thing, const btVector3 &from,
+                             const btVector3 &to)
+{
+	AdvancedCollisionModel *m   = mover->collisionModel;
+	const DVector3         &vel = mover->Vel;
+	double                  len = vel.XY().Length();
+	if (len < 8) // slow enough that the steps are few
+		return false;
+
+	const btScalar tol   = 0.5f;
+	auto           along = [m, tol](const btVector3 &p, btScalar &t) {
+		btVector3 d    = p - m->pathFrom;
+		btScalar  side = d.x() * m->pathDir.y() - d.y() * m->pathDir.x();
+		t              = (d.x() * m->pathDir.x() + d.y() * m->pathDir.y()) / m->pathLen;
+		return fabs(side) <= tol && fabs(d.z()) <= m->pathZTol && t >= 0 && t <= 1;
+	};
+
+	btScalar t0, t1;
+	if (m->pathTime != mover->Level->maptime || m->pathVel != vel || !along(from, t0) || !along(to, t1))
+	{
+		m->pathTime = mover->Level->maptime;
+		m->pathVel  = vel;
+		m->pathFrom = from;
+		m->pathDir  = btVector3(btScalar(vel.X / len), btScalar(vel.Y / len), 0);
+		m->pathLen  = btScalar(len);
+		m->pathZTol = btScalar(fabs(vel.Z)) + tol;
+		m->pathEntries.Clear();
+		if (!along(from, t0) || !along(to, t1))
+			return false;
+	}
+
+	AdvancedCollisionModel  *other = thing->collisionModel;
+	const btCollisionObject *obj   = other->collider;
+	AdvancedCollisionModel::PathEntry *entry = nullptr;
+	for (auto &e : m->pathEntries)
+	{
+		if (e.obj == obj)
+		{
+			if (e.pos != other->placedPos || e.angles != other->placedAngles)
+				e.firstFrac = -1; // it moved: sweep again
+			entry = &e;
+			break;
+		}
+	}
+	if (!entry)
+	{
+		m->pathEntries.Push({obj, other->placedPos, other->placedAngles, -1});
+		entry = &m->pathEntries.Last();
+	}
+
+	if (entry->firstFrac < 0)
+	{
+		FColStatTimer timer(COLSTAT_MISSILEPATH);
+		entry->pos    = other->placedPos;
+		entry->angles = other->placedAngles;
+
+		// The missile's bounding box where the path starts, grown to cover how far a step may stray.
+		btVector3 mn, mx;
+		mover->collisionModel->getCollisionShape()->getAabb(mover->collisionModel->collider->getWorldTransform(), mn, mx);
+		btVector3 half   = (mx - mn) * 0.5f + btVector3(2 * tol, 2 * tol, m->pathZTol + tol);
+		btVector3 center = (mn + mx) * 0.5f - mover->collisionModel->collider->getWorldTransform().getOrigin() + from;
+		btBoxShape box(half);
+
+		btTransform start, end;
+		start.setIdentity();
+		start.setOrigin(center);
+		end.setIdentity();
+		end.setOrigin(center + m->pathDir * m->pathLen);
+
+		// A cast can miss what the box already overlaps where it starts.
+		btCollisionObject probe;
+		probe.setCollisionShape(&box);
+		probe.setWorldTransform(start);
+		ContactPointsCallback contacts;
+		world->contactPairTest(&probe, const_cast<btCollisionObject *>(obj), contacts);
+		bool touching = false;
+		for (auto &p : contacts.points)
+			touching |= p.distance < tol;
+
+		if (touching)
+			entry->firstFrac = 0;
+		else
+		{
+			btCollisionWorld::ClosestConvexResultCallback cb(start.getOrigin(), end.getOrigin());
+			SweepAgainst(world, &box, start, end, obj, cb);
+			entry->firstFrac = cb.hasHit() ? cb.m_closestHitFraction : 2;
+		}
+	}
+
+	if (max(t0, t1) < entry->firstFrac)
+	{
+		ColStatCount(COLSTAT_SKIPPED);
+		return true;
+	}
+	return false;
+}
+
+// For PIT_CheckThing: a missile's step to newPos certainly misses thing, so the
+// full GetCollisionPoints call can be skipped.
+bool FLevelLocals::MissileStepClear(AActor *missile, AActor *thing, const DVector3 &newPos)
+{
+	if (!collisionWorld || missile == thing || missile->Level != thing->Level)
+		return false;
+	FColStatTimer timer(COLSTAT_MOVES);
+	UpdateCollisionModel(missile);
+	UpdateCollisionModel(thing);
+	btCollisionObject *a = missile->collisionModel->collider;
+	if (!a->getCollisionShape()->isConvex() || (newPos - missile->Pos()).LengthSquared() <= 1e-6)
+		return false;
+	return MissilePathClear(collisionWorld, missile, thing, a->getWorldTransform().getOrigin(),
+	                        missile->collisionModel->toBulletPoint(newPos));
 }
 
 //==========================================================================
@@ -168,6 +366,7 @@ btCollisionWorld::AllHitsRayResultCallback FLevelLocals::TraceCollisionHit(DVect
 
 TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &pos, bool moving, bool asOrigin)
 {
+	FColStatTimer timer(COLSTAT_MOVES);
 	TArray<DVector3> ret;
 	if (tmthing->Level != thing->Level)
 	{
@@ -198,12 +397,13 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 		btVector3 fromPos = fromTrans.getOrigin();
 		btVector3 toPos   = toTrans.getOrigin();
 
+		if ((tmthing->flags & MF_MISSILE) && MissilePathClear(collisionWorld, tmthing, thing, fromPos, toPos))
+			return ret;
+
 		MovingConvexResultCallback closestConvex(fromPos, toPos);
 		// Mesh triangles entirely under the mover's feet (e.g. tree roots below the floor) can't block it.
 		closestConvex.ignoreBelowZ = min(tmthing->Z(), pos.Z) + COLLISION_SKIN;
-		AddCollisionObject(thing);
-		collisionWorld->convexSweepTest(static_cast<btConvexShape *>(shape), fromTrans, toTrans, closestConvex);
-		RemoveCollisionObject(thing);
+		SweepAgainst(collisionWorld, static_cast<btConvexShape *>(shape), fromTrans, toTrans, b, closestConvex);
 
 		if (closestConvex.hasHit())
 		{
@@ -222,13 +422,9 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 	}
 	else
 	{
-		tmthing->collisionModel->setWorldPos(pos);
+		PlaceCollider(tmthing->collisionModel, pos);
 		ContactPointsCallback cb;
-		AddCollisionObject(tmthing);
-		AddCollisionObject(thing);
 		collisionWorld->contactPairTest(a, b, cb);
-		RemoveCollisionObject(tmthing);
-		RemoveCollisionObject(thing);
 
 		for (auto &point : cb.points)
 		{
@@ -248,6 +444,7 @@ TArray<DVector3> FLevelLocals::GetCollisionPoints(AActor *tmthing, AActor *thing
 AllHitsConvexResultCallback FLevelLocals::ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
                                                                 DVector3 &newPos, bool asOrigin)
 {
+	FColStatTimer timer(COLSTAT_MONSTERMOVE);
 	AllHitsConvexResultCallback allConvex;
 
 	UpdateCollisionModel(tmthing);
@@ -261,14 +458,16 @@ AllHitsConvexResultCallback FLevelLocals::ActorMovementTest(AActor *tmthing, TAr
 	btTransform toTrans   = fromTrans;
 	toTrans.setOrigin(tmthing->collisionModel->toBulletPoint(newPos));
 
+	TArray<const btCollisionObject *> done;
 	for (AActor *thing : things)
 	{
 		UpdateCollisionModel(thing);
-		AddCollisionObject(thing);
+		const btCollisionObject *obj = thing->collisionModel->collider;
+		if (thing == tmthing || done.Find(obj) < done.Size())
+			continue;
+		done.Push(obj);
+		SweepAgainst(collisionWorld, static_cast<btConvexShape *>(shape), fromTrans, toTrans, obj, allConvex);
 	}
-	collisionWorld->convexSweepTest(static_cast<btConvexShape *>(shape), fromTrans, toTrans, allConvex);
-	for (AActor *thing : things)
-		RemoveCollisionObject(thing);
 
 	return allConvex;
 }
@@ -289,6 +488,7 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing)
 
 bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 {
+	FColStatTimer timer(COLSTAT_OVERLAP);
 	if (tmthing->Level != thing->Level)
 	{
 		Printf(TEXTCOLOR_RED "Two objects compared for CanCollide belong to different levels\n");
@@ -301,15 +501,11 @@ bool FLevelLocals::CanCollide(AActor *tmthing, AActor *thing, DVector3 &pos)
 	}
 
 	UpdateCollisionModel(tmthing);
-	tmthing->collisionModel->setWorldPos(pos);
+	PlaceCollider(tmthing->collisionModel, pos);
 	UpdateCollisionModel(thing);
 
 	ContactPointsCallback cb;
-	AddCollisionObject(thing);
-	AddCollisionObject(tmthing);
 	collisionWorld->contactPairTest(tmthing->collisionModel->collider, thing->collisionModel->collider, cb);
-	RemoveCollisionObject(tmthing);
-	RemoveCollisionObject(thing);
 	return cb.points.Size() > 0;
 }
 
@@ -346,10 +542,8 @@ double FLevelLocals::GetTop(AActor *tmthing, AActor *thing, DVector3 &pos)
 	btVector3 from = tmthing->collisionModel->toBulletPoint(
 		DVector3(pos.X, pos.Y, pos.Z + tmthing->MaxStepHeight + COLLISION_SKIN));
 	btVector3 to = tmthing->collisionModel->toBulletPoint(DVector3(pos.X, pos.Y, pos.Z - tmthing->MaxStepHeight));
-	AddCollisionObject(thing);
 	WalkableRayResultCallback closestResults(from, to, (btScalar)tmthing->MaxSlopeSteepness);
-	collisionWorld->rayTest(from, to, closestResults);
-	RemoveCollisionObject(thing);
+	RayAgainst(from, to, thing->collisionModel->collider, closestResults);
 
 	return closestResults.hasHit() ? (double)closestResults.m_hitPointWorld.z() : -INFINITY;
 }
@@ -367,8 +561,8 @@ static bool RayZ(btCollisionWorld *world, const btCollisionObject *target, const
 	btVector3 from(xy.X, xy.Y, fromZ), to(xy.X, xy.Y, toZ);
 	btCollisionWorld::ClosestRayResultCallback cb(from, to);
 	cb.m_flags |= btTriangleRaycastCallback::kF_FilterBackfaces;
-	world->rayTest(from, to, cb);
-	if (!cb.hasHit() || cb.m_collisionObject != target)
+	RayAgainst(from, to, target, cb);
+	if (!cb.hasHit())
 		return false;
 	if (hitZ)
 		*hitZ = cb.m_hitPointWorld.z();
@@ -450,14 +644,12 @@ FSweepHit FLevelLocals::SweepActor(AActor *tmthing, AActor *thing, const DVector
 	transFrom.setOrigin(model->toBulletPoint(from));
 	transTo.setOrigin(model->toBulletPoint(to));
 
-	AddCollisionObject(thing);
 	MovingConvexResultCallback cb(transFrom.getOrigin(), transTo.getOrigin());
 	cb.oneSidedVertical = fabs(to.Z - from.Z) > (to - from).XY().Length();
 	cb.minFaceZ         = (float)minFaceZ;
 	cb.ignoreBelowZ     = ignoreBelowZ;
 	cb.minContactZ      = (float)minContactZ;
-	collisionWorld->convexSweepTest(static_cast<btConvexShape *>(shape), transFrom, transTo, cb);
-	RemoveCollisionObject(thing);
+	SweepAgainst(collisionWorld, static_cast<btConvexShape *>(shape), transFrom, transTo, thing->collisionModel->collider, cb);
 
 	if (cb.hasHit())
 	{
@@ -509,13 +701,11 @@ FSweepHit FLevelLocals::SweepFootprint(AActor *tmthing, AActor *thing, const DVe
 	transFrom.setOrigin(btVector3(from.X, from.Y, from.Z + halfHeight));
 	transTo.setOrigin(btVector3(to.X, to.Y, to.Z + halfHeight));
 
-	AddCollisionObject(thing);
 	MovingConvexResultCallback cb(transFrom.getOrigin(), transTo.getOrigin());
 	cb.oneSidedVertical = true;
 	cb.minFaceZ         = (float)minFaceZ;
 	cb.ignoreBelowZ     = ignoreBelowZ;
-	collisionWorld->convexSweepTest(&disc, transFrom, transTo, cb);
-	RemoveCollisionObject(thing);
+	SweepAgainst(collisionWorld, &disc, transFrom, transTo, thing->collisionModel->collider, cb);
 
 	if (cb.hasHit())
 	{
@@ -560,13 +750,12 @@ DVector3 FLevelLocals::SurfaceNormalAt(AActor *thing, const DVector3 &point, con
 	btVector3 from(point.X + nudge.X, point.Y + nudge.Y, point.Z + 2.);
 	btVector3 to(point.X + nudge.X, point.Y + nudge.Y, point.Z - 2.);
 
-	AddCollisionObject(thing);
+	UpdateCollisionModel(thing);
 	btCollisionWorld::ClosestRayResultCallback cb(from, to);
 	cb.m_flags |= btTriangleRaycastCallback::kF_FilterBackfaces;
-	collisionWorld->rayTest(from, to, cb);
-	RemoveCollisionObject(thing);
+	RayAgainst(from, to, thing->collisionModel->collider, cb);
 
-	if (cb.hasHit() && cb.m_collisionObject == thing->collisionModel->collider && cb.m_hitNormalWorld.z() > 0.)
+	if (cb.hasHit() && cb.m_hitNormalWorld.z() > 0.)
 	{
 		btVector3 n = cb.m_hitNormalWorld.normalized();
 		return DVector3(n.x(), n.y(), n.z());
@@ -701,7 +890,6 @@ FGroundHit FLevelLocals::ProbeGround(AActor *tmthing, AActor *thing, const DVect
 				DVector2 where  = flat.point.XY();
 				DVector2 out    = flat.point.XY() - pos.XY();
 				double   len    = out.Length();
-				AddCollisionObject(thing);
 				if (len >= 0.01)
 				{
 					double    hz;
@@ -746,7 +934,6 @@ FGroundHit FLevelLocals::ProbeGround(AActor *tmthing, AActor *thing, const DVect
 						}
 					}
 				}
-				RemoveCollisionObject(thing);
 				if (hold && z > pos.Z + COLLISION_SKIN && where != pos.XY())
 				{
 					// This would lift the actor onto an edge: it must be over it by more than
@@ -840,8 +1027,6 @@ bool FLevelLocals::IsStepSizedFace(AActor *tmthing, AActor *thing, const DVector
 		return true;
 	};
 
-	AddCollisionObject(thing);
-
 	bool     result = false;
 	DVector3 start;
 	// Without a point on the face itself (e.g. the contact is just past the end of the model)
@@ -905,7 +1090,6 @@ bool FLevelLocals::IsStepSizedFace(AActor *tmthing, AActor *thing, const DVector
 		} while (false);
 	}
 
-	RemoveCollisionObject(thing);
 	return result;
 }
 
@@ -935,6 +1119,7 @@ bool FLevelLocals::IsStepSizedFace(AActor *tmthing, AActor *thing, const DVector
 
 FGroundHit FLevelLocals::GetSupport(AActor *tmthing, AActor *thing, const DVector3 &pos, double extraDrop)
 {
+	FColStatTimer timer(COLSTAT_GROUND);
 	static struct
 	{
 		FLevelLocals *level = nullptr;
@@ -1039,22 +1224,19 @@ FGroundHit FLevelLocals::GetSupport(AActor *tmthing, AActor *thing, const DVecto
 
 bool FLevelLocals::Overlaps(AActor *tmthing, AActor *thing, const DVector3 &pos, double tolerance, double minZ)
 {
+	FColStatTimer timer(COLSTAT_OVERLAP);
 	if (!collisionWorld || !thing || tmthing == thing)
 		return false;
 
 	UpdateCollisionModel(tmthing);
 	UpdateCollisionModel(thing);
-	tmthing->collisionModel->setWorldPos(pos);
+	PlaceCollider(tmthing->collisionModel, pos);
 
 	ContactPointsCallback cb;
 
-	AddCollisionObject(thing);
-	AddCollisionObject(tmthing);
 	collisionWorld->contactPairTest(tmthing->collisionModel->collider, thing->collisionModel->collider, cb);
-	RemoveCollisionObject(tmthing);
-	RemoveCollisionObject(thing);
 
-	tmthing->collisionModel->setWorldPos(tmthing->Pos());
+	UpdateCollisionModel(tmthing);
 
 	for (auto &point : cb.points)
 	{
@@ -1092,6 +1274,7 @@ bool FLevelLocals::Overlaps(AActor *tmthing, AActor *thing, const DVector3 &pos,
 
 bool FLevelLocals::CanGrowTo(AActor *tmthing, AActor *thing, double fromHeight, double toHeight)
 {
+	FColStatTimer timer(COLSTAT_OVERLAP);
 	const double rise = toHeight - fromHeight;
 	if (rise <= 0 || !collisionWorld || !thing || tmthing == thing || !thing->collisionModel)
 		return true;
@@ -1127,7 +1310,6 @@ bool FLevelLocals::CanGrowTo(AActor *tmthing, AActor *thing, double fromHeight, 
 		const btCollisionObject *target = thing->collisionModel->collider;
 		static const double      rings[] = {0., 0.5, 0.85};
 
-		AddCollisionObject(thing);
 		for (double ring : rings)
 		{
 			int count = ring == 0. ? 1 : 8;
@@ -1142,12 +1324,11 @@ bool FLevelLocals::CanGrowTo(AActor *tmthing, AActor *thing, double fromHeight, 
 					continue;
 				btVector3 rayFrom(xy.X, xy.Y, fromZ), rayTo(xy.X, xy.Y, toZ);
 				btCollisionWorld::ClosestRayResultCallback cb(rayFrom, rayTo);
-				collisionWorld->rayTest(rayFrom, rayTo, cb);
-				if (cb.hasHit() && cb.m_collisionObject == target)
+				RayAgainst(rayFrom, rayTo, target, cb);
+				if (cb.hasHit())
 					fits = false;
 			}
 		}
-		RemoveCollisionObject(thing);
 	}
 	return fits;
 }
@@ -1166,14 +1347,20 @@ bool FLevelLocals::CanGrowTo(AActor *tmthing, AActor *thing, double fromHeight, 
 
 void FLevelLocals::GetCollisionBox(AActor *thing, DVector3 &mins, DVector3 &maxs)
 {
+	FColStatTimer timer(COLSTAT_BOX);
 	mins = DVector3(thing->X() - thing->radius, thing->Y() - thing->radius, thing->Z());
 	maxs = DVector3(thing->X() + thing->radius, thing->Y() + thing->radius, thing->Top());
 	if (thing->collisionModelName == NAME_None || !collisionWorld)
 		return;
 
 	UpdateCollisionModel(thing);
-	btVector3 mn, mx;
-	thing->collisionModel->getCollisionShape()->getAabb(thing->collisionModel->collider->getWorldTransform(), mn, mx);
+	AdvancedCollisionModel *model = thing->collisionModel;
+	if (!model->aabbValid)
+	{
+		model->getCollisionShape()->getAabb(model->collider->getWorldTransform(), model->aabbMin, model->aabbMax);
+		model->aabbValid = true;
+	}
+	const btVector3 &mn = model->aabbMin, &mx = model->aabbMax;
 	mins = DVector3(min(mins.X, (double)mn.x()), min(mins.Y, (double)mn.y()), min(mins.Z, (double)mn.z()));
 	maxs = DVector3(max(maxs.X, (double)mx.x()), max(maxs.Y, (double)mx.y()), max(maxs.Z, (double)mx.z()));
 }
@@ -1334,6 +1521,7 @@ btConvexHullShape *ConvexHullCollisionModel::GetShared(FName filename, ObjModelI
 
 void AActor::initCollisions()
 {
+	FColStatTimer timer(COLSTAT_INIT);
 	if (collisionModelName != NULL && collisionModelName != "")
 	{
 		ObjModelInfo info;

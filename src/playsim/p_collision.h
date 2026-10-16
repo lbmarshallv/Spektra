@@ -5,8 +5,43 @@
 class AdvancedCollisionModel
 {
   public:
-	btCollisionObject *collider;
-	AActor            *owner;
+	btCollisionObject *collider  = nullptr;
+	AActor            *owner     = nullptr;
+	bool               ownsShape = true; // false for shapes shared by every actor using the same model
+
+	// FLevelLocals::UpdateCollisionModel only recomputes the transform (and the bounding box GetCollisionBox
+	// uses) when the owner has moved, turned or changed size since. Anything that places the collider
+	// elsewhere for a test must clear transformValid.
+	bool      transformValid = false;
+	bool      aabbValid      = false;
+	DVector3  placedPos;
+	DRotator  placedAngles;
+	double    placedRadius = 0, placedHeight = 0;
+	btVector3 aabbMin, aabbMax;
+
+	// Missiles: this tic's path, swept once against each collider near it (see MissilePathClear).
+	struct PathEntry
+	{
+		const btCollisionObject *obj;
+		DVector3                 pos;       // where obj's owner was when the path was swept
+		DRotator                 angles;
+		btScalar                 firstFrac; // nothing along the path can touch obj before this fraction
+	};
+	int               pathTime = -1;
+	DVector3          pathVel;
+	btVector3         pathFrom, pathDir; // pathDir: horizontal unit vector
+	btScalar          pathLen = 0, pathZTol = 0;
+	TArray<PathEntry> pathEntries;
+
+	virtual ~AdvancedCollisionModel()
+	{
+		if (collider)
+		{
+			if (ownsShape)
+				delete collider->getCollisionShape();
+			delete collider;
+		}
+	}
 
 	virtual DVector3 toWorldPoint(btVector3 b)
 	{
@@ -205,6 +240,7 @@ class ConvexHullCollisionModel : public AdvancedCollisionModel
 	ConvexHullCollisionModel(FName filename, ObjModelInfo &info)
 	{
 		btConvexHullShape *bs = GetShared(filename, info);
+		ownsShape = false;
 		collider = new btCollisionObject();
 		collider->setCollisionShape(bs);
 		collider->setUserPointer(this);
@@ -226,9 +262,10 @@ class MeshCollisionModel : public AdvancedCollisionModel
 
 	 MeshCollisionModel(FName filename, ObjModelInfo &info)
 	{
-		data     = &GetShared(filename);
-		info     = data->info;
-		collider = new btCollisionObject();
+		data      = &GetShared(filename);
+		info      = data->info;
+		ownsShape = false;
+		collider  = new btCollisionObject();
 		collider->setCollisionShape(data->shape);
 		collider->setUserPointer(this);
 
@@ -460,3 +497,37 @@ struct AllHitsConvexResultCallback : public btCollisionWorld::ConvexResultCallba
 		return !hits.empty();
 	}
 };
+
+//==========================================================================
+//
+// 'stat collision' timing (see p_collision.cpp)
+//
+//==========================================================================
+
+enum EColStat
+{
+	COLSTAT_MISSILEMOVE, // P_TryMove for missiles, everything included
+	COLSTAT_MOVES,       // GetCollisionPoints: is a move blocked by an actor
+	COLSTAT_GROUND,      // GetSupport: what an actor stands on
+	COLSTAT_OVERLAP,     // Overlaps, CanCollide, CanGrowTo
+	COLSTAT_TRACE,       // TraceCollisionHit: traces (sight checks, hitscans, aiming)
+	COLSTAT_MONSTERMOVE, // ActorMovementTest: P_Move's pre-check
+	COLSTAT_BOX,         // GetCollisionBox
+	COLSTAT_INIT,        // creating actors' collision models
+	COLSTAT_MISSILEPATH, // MissilePathClear: a missile's path for the tic, swept once per collider
+	COLSTAT_SKIPPED,     // missile steps that needed no sweep against a collider (count only)
+	COLSTAT_FASTSTEPS,   // P_FastMissileSteps: merging a fast missile's steps
+	NUM_COLSTATS
+};
+
+void ColStatBegin(int which);
+void ColStatEnd(int which);
+void ColStatCount(int which);
+
+struct FColStatTimer
+{
+	int which;
+	FColStatTimer(int w) : which(w) { ColStatBegin(w); }
+	~FColStatTimer() { ColStatEnd(which); }
+};
+

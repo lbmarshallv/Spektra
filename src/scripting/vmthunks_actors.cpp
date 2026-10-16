@@ -1137,6 +1137,21 @@ DEFINE_ACTION_FUNCTION_NATIVE(AActor, TryMove, TryMove)
 	ACTION_RETURN_BOOL(TryMove(self, x, y, dropoff, missilecheck, tm));
 }
 
+static int FastMissileSteps(AActor *self, double fx, double fy, double fz, int maxsteps)
+{
+	return P_FastMissileSteps(self, DVector3(fx, fy, fz), maxsteps);
+}
+
+DEFINE_ACTION_FUNCTION_NATIVE(AActor, FastMissileSteps, FastMissileSteps)
+{
+	PARAM_SELF_PROLOGUE(AActor);
+	PARAM_FLOAT(fx);
+	PARAM_FLOAT(fy);
+	PARAM_FLOAT(fz);
+	PARAM_INT(maxsteps);
+	ACTION_RETURN_INT(FastMissileSteps(self, fx, fy, fz, maxsteps));
+}
+
 static int CheckHeadroom(AActor *self, double fromHeight, double toHeight)
 {
 	return P_CheckHeadroom(self, fromHeight, toHeight);

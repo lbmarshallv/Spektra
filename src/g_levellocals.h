@@ -900,12 +900,7 @@ public:
 	btCollisionWorld  *GetCollisionWorld(){
 		return collisionWorld;
 	};
-	void              AddCollisionObject(btCollisionObject *obj);
-	void              AddCollisionObject(AActor *thing);
-	void              AddCollisionObject(AdvancedCollisionModel *model);
 
-	void RemoveCollisionObject(btCollisionObject *obj);
-	void RemoveCollisionObject(AActor *thing);
 
 
 	void UpdateCollisionModel(AActor *thing);
@@ -914,6 +909,7 @@ public:
 	bool CanCollide(AActor *tmthing, AActor *thing);
 	bool             CanCollide(AActor *tmthing, AActor *thing, DVector3 &newPos);
 	TArray<DVector3> GetCollisionPoints(AActor *tmthing, AActor *thing, DVector3 &newPos, bool moving = false, bool asOrigin = false);
+	bool MissileStepClear(AActor *missile, AActor *thing, const DVector3 &newPos);
 	AllHitsConvexResultCallback ActorMovementTest(AActor *tmthing, TArray<AActor *> things,
 	                                                                DVector3 &newPos, bool asOrigin = false);
 	double                                        GetTop(AActor *tmthing, AActor *thing);
@@ -932,7 +928,6 @@ public:
 	bool             IsStepSizedFace(AActor *tmthing, AActor *thing, const DVector3 &contact, const DVector3 &normal);
 	btCollisionWorld::AllHitsRayResultCallback TraceCollisionHit(DVector3 &from, DVector3 &to, TArray<AActor *> things);
 
-	TArray<AdvancedCollisionModel*> collisionModels;
 };
 
 extern FLevelLocals level;

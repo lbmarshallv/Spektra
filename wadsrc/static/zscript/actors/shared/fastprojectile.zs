@@ -112,16 +112,21 @@ class FastProjectile : Actor
 			Vector3 frac = Vel / count;
 			int changexy = frac.X != 0 || frac.Y != 0;
 			int ripcount = count / 8;
-			for (int i = 0; i < count; i++)
+			for (int i = 0; i < count; )
 			{
+				// Steps where nothing could be hit are taken together (see P_FastMissileSteps).
+				// Never past the next Effect() call, so trails come out where they always did.
+				int steps = changexy ? FastMissileSteps(frac, min(count - i, ripcount)) : 1;
+				i += steps;
 				if (changexy)
 				{
-					if (--ripcount <= 0)
+					ripcount -= steps;
+					if (ripcount <= 0)
 					{
 						tm.ClearLastRipped();	// [RH] Do rip damage each step, like Hexen
 					}
 
-					if (!TryMove (Pos.XY + frac.XY, true, false, tm))
+					if (!TryMove (Pos.XY + frac.XY * steps, true, false, tm))
 					{ // Blocked move
 						if (!bSkyExplode)
 						{
@@ -151,7 +156,7 @@ class FastProjectile : Actor
 						return;
 					}
 				}
-				AddZ(frac.Z);
+				AddZ(frac.Z * steps);
 				UpdateWaterLevel ();
 				oldz = pos.Z;
 				if (oldz <= floorz)

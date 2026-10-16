@@ -6293,6 +6293,11 @@ void AActor::OnDestroy ()
 	UnlinkFromWorld (nullptr);
 	flags |= MF_NOSECTOR|MF_NOBLOCKMAP;
 
+	// Every actor gets a collision model when it's spawned (projectiles, puffs and trails included),
+	// so free it here, or firing a weapon leaks memory with every shot.
+	delete collisionModel;
+	collisionModel = nullptr;
+
 	if (ViewPos != nullptr)
 	{
 		ViewPos->Destroy();
