@@ -424,6 +424,28 @@ void AActor::Serialize(FSerializer &arc)
 
 //==========================================================================
 //
+// AActor :: MakeClusterProxy
+//
+// The foliage cluster draws this actor, so the renderer never needs to
+// see it: unlink it from the sectors' render lists (LinkToWorld keeps it
+// out from then on, including after savegame loads, since perfFlags is
+// serialized). It stays in the blockmap and the sector thing lists, so
+// collision is unaffected.
+//
+//==========================================================================
+
+void AActor::MakeClusterProxy()
+{
+	perfFlags |= PERF_CLUSTERPROXY;
+	if (touching_rendersectors != nullptr)
+	{
+		P_DelSeclist(touching_rendersectors, &sector_t::touching_renderthings);
+		touching_rendersectors = nullptr;
+	}
+}
+
+//==========================================================================
+//
 // This must be done after the world is set up.
 //
 //==========================================================================
@@ -7171,7 +7193,7 @@ AActor *FLevelLocals::SpawnMapThing (FMapThing *mthing, int position)
 		sz = ONFLOORZ;
 
 	mobj = AActor::StaticSpawn (this, i, DVector3(mthing->pos.XY(), sz), NO_REPLACE, true);
-	if (clusterProxy) mobj->perfFlags |= PERF_CLUSTERPROXY;
+	if (clusterProxy) mobj->MakeClusterProxy();
 
 	if (sz == ONFLOORZ)
 	{

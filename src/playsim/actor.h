@@ -1193,6 +1193,7 @@ public:
 	// Renderer only: picks the level of detail for the given (r_lod-scaled) view distance.
 	// Returns nullptr for the actor's normal model. Updates LODLevel for hysteresis.
 	const LODmodel *SelectLOD(double distance, double hysteresis);
+	void MakeClusterProxy();	// flags a solid foliage actor as a collision-only proxy and drops it from the render lists
 
 // info for drawing
 	AActor			*snext, **sprev;	// links in sector (if needed)

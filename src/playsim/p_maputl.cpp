@@ -469,7 +469,8 @@ void AActor::LinkToWorld(FLinkContext *ctx, bool spawningmapthing, sector_t *sec
 			touching_sectorlist = P_CreateSecNodeList(this, radius, ctx != nullptr ? ctx->sector_list : nullptr, &sector_t::touching_thinglist);	// Attach to thing
 		}
 
-		if (renderradius >= 0) touching_rendersectors = P_CreateSecNodeList(this, RenderRadius(), ctx != nullptr ? ctx->render_list : nullptr, &sector_t::touching_renderthings);
+		// Foliage cluster proxies are drawn by the cluster, so they stay out of the render lists entirely.
+		if (renderradius >= 0 && !(perfFlags & PERF_CLUSTERPROXY)) touching_rendersectors = P_CreateSecNodeList(this, RenderRadius(), ctx != nullptr ? ctx->render_list : nullptr, &sector_t::touching_renderthings);
 		else
 		{
 			touching_rendersectors = nullptr;

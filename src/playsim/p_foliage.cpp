@@ -363,7 +363,7 @@ AActor *FFoliageSystem::SpawnScripted(FLevelLocals *Level, PClassActor *cls, con
 
 	AActor *mo = AActor::StaticSpawn(Level, cls, r.pos, NO_REPLACE);
 	if (mo == nullptr) return nullptr;
-	if (result == ADD_Proxy) mo->perfFlags |= PERF_CLUSTERPROXY;
+	if (result == ADD_Proxy) mo->MakeClusterProxy();
 	mo->Angles.Yaw = DAngle::fromDeg(r.yaw);
 	mo->Angles.Pitch = DAngle::fromDeg(r.pitch);
 	mo->Angles.Roll = DAngle::fromDeg(r.roll);

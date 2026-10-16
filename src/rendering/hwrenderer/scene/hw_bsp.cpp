@@ -38,6 +38,7 @@
 
 #include "p_visualthinker.h"
 #include "p_foliage.h"
+#include "hw_hidethings.h"
 
 #ifdef ARCH_IA32
 #include <immintrin.h>
@@ -241,6 +242,7 @@ static bool IsManuallyCulled(FRenderViewpoint vp, subsector_t* sub)
 EXTERN_CVAR(Bool, gl_render_segs)
 
 CVAR(Bool, gl_render_things, true, 0)
+EXTERN_CVAR(Bool, gl_render_foliage)
 CVAR(Bool, gl_render_walls, true, 0)
 CVAR(Bool, gl_render_flats, true, 0)
 
@@ -650,6 +652,7 @@ void HWDrawInfo::RenderThings(subsector_t * sub, sector_t * sector)
 		auto thing = p->m_thing;
 		if (thing->validcount == validcount) continue;
 		thing->validcount = validcount;
+		if (HideThings::HideActive && HideThings::IsHidden(thing->GetClass())) continue;
 
 		if(Viewpoint.bDoOob && thing->Sector->isSecret() && thing->Sector->wasSecret() && !r_radarclipper) continue; // This covers things that are touching non-secret sectors
 		FIntCVar *cvar = thing->GetInfo()->distancecheck;
@@ -697,6 +700,7 @@ void HWDrawInfo::RenderThings(subsector_t * sub, sector_t * sector)
 	for (msecnode_t *node = sec->sectorportal_thinglist; node; node = node->m_snext)
 	{
 		AActor *thing = node->m_thing;
+		if (HideThings::HideActive && HideThings::IsHidden(thing->GetClass())) continue;
 		FIntCVar *cvar = thing->GetInfo()->distancecheck;
 		if (cvar != nullptr && *cvar >= 0)
 		{
@@ -733,6 +737,7 @@ void HWDrawInfo::RenderParticles(subsector_t *sub, sector_t *front)
 		DVisualThinker *sp = sub->sprites[i];
 		if (!sp || sp->ObjectFlags & OF_EuthanizeMe)
 			continue;
+		if (HideThings::HideActive && HideThings::IsHidden(sp->GetClass())) continue;
 		if (r_distance_cull_type > 0)
 		{
 			double dist = (sp->PT.Pos - (Viewpoint.bDoOob ? Viewpoint.OffPos : Viewpoint.Pos)).LengthSquared();
@@ -750,7 +755,7 @@ void HWDrawInfo::RenderParticles(subsector_t *sub, sector_t *front)
 		HWSprite sprite;
 		sprite.ProcessParticle(this, &sp->PT, front, sp);
 	}
-	for (int i = Level->ParticlesInSubsec[sub->Index()]; i != NO_PARTICLE; i = Level->Particles[i].snext)
+	for (int i = HideThings::HideParticles ? NO_PARTICLE : Level->ParticlesInSubsec[sub->Index()]; i != NO_PARTICLE; i = Level->Particles[i].snext)
 	{
 		if (r_distance_cull_type > 0)
 		{
@@ -916,7 +921,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 	}
 
 	// Foliage clusters: just note the subsector; DrawFoliage processes its plants in one pass.
-	if (gl_render_things && Level->Foliage != nullptr && Level->Foliage->SubsectorHasFoliage(sub->Index()))
+	if (gl_render_things && gl_render_foliage && Level->Foliage != nullptr && Level->Foliage->SubsectorHasFoliage(sub->Index()))
 	{
 		FoliageSubsectors.Push(sub->Index());
 	}

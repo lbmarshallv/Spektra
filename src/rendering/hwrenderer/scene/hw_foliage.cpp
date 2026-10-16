@@ -57,7 +57,7 @@ EXTERN_CVAR(Int, r_distance_cull_type)
 EXTERN_CVAR(Bool, r_foliageclusters)
 EXTERN_CVAR(Float, gl_mask_sprite_threshold)
 EXTERN_CVAR(Float, gl_mask_threshold)
-CVARD(Bool, r_drawfoliage, true, 0, "Draw foliage clusters (debugging aid)")
+CVARD(Bool, gl_render_foliage, true, 0, "Draw foliage clusters (like gl_render_things, but only for foliage; other actors stay visible)")
 CVARD(Float, r_foliagerangescale, 1.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Scales every foliage class's FoliageLightRange and FoliageTranslucentRange. 0 = no dynamic lights or translucency on foliage.")
 CVARD(Float, r_foliagealphathreshold, 0.1f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Near translucent foliage: pixels with less alpha than this are skipped entirely, so they don't hide things drawn behind them later.")
 
@@ -245,6 +245,7 @@ static TArray<FFoliageLightKey> lightGroups;
 static TArray<int> sectorLightGroup;
 static TArray<uint32_t> sectorLightStamp;
 static uint32_t lightStamp;
+static TMap<uint64_t, int> sliceLightGroup;	// (sector, 3D floor light slice) -> light group, per frame
 static TArray<FFoliageGroup> groups;
 static unsigned numGroups;
 static TMap<uint64_t, unsigned> groupMap;
@@ -272,9 +273,19 @@ static void ResetLightGroups(FLevelLocals *Level)
 		lightStamp = 1;
 	}
 	lightGroups.Clear();
+	sliceLightGroup.Clear();
 }
 
-static int GetLightGroup(HWDrawInfo *di, sector_t *sec)
+static int FindOrAddLightGroup(const FFoliageLightKey &key)
+{
+	for (unsigned i = 0; i < lightGroups.Size(); i++)
+	{
+		if (!memcmp(&lightGroups[i], &key, sizeof(key))) return i;
+	}
+	return lightGroups.Push(key);
+}
+
+static int GetSectorLightGroup(HWDrawInfo *di, sector_t *sec)
 {
 	const unsigned index = sec->Index();
 	if (sectorLightStamp[index] == lightStamp) return sectorLightGroup[index];
@@ -296,19 +307,56 @@ static int GetLightGroup(HWDrawInfo *di, sector_t *sec)
 	key.objectColor = white.Modulate(sec->SpecialColors[sector_t::sprites]).d;
 	key.addColor = sec->AdditiveColors[sector_t::sprites].d | 0xff000000;
 
-	int group = -1;
-	for (unsigned i = 0; i < lightGroups.Size(); i++)
-	{
-		if (!memcmp(&lightGroups[i], &key, sizeof(key)))
-		{
-			group = i;
-			break;
-		}
-	}
-	if (group < 0) group = lightGroups.Push(key);
-
+	const int group = FindOrAddLightGroup(key);
 	sectorLightStamp[index] = lightStamp;
 	sectorLightGroup[index] = group;
+	return group;
+}
+
+//==========================================================================
+//
+// Sector lighting for one plant. Under (or between) 3D floors that cast
+// light, the plant takes the light and colormap of the light slice its
+// base is in, like a sprite or model there. A plant that crosses a slice
+// boundary uses the slice at its base (it isn't split like actors are).
+//
+//==========================================================================
+
+static int GetLightGroup(HWDrawInfo *di, const FFoliageInstance &inst)
+{
+	sector_t *sec = inst.sector;
+	auto &list = sec->e->XFloor.lightlist;
+	if (list.Size() == 0 || di->isFullbrightScene()) return GetSectorLightGroup(di, sec);
+
+	const DVector2 xy(inst.pos.X, inst.pos.Y);
+	const double z = inst.pos.Z + 1.;
+	unsigned slice = 0;
+	while (slice + 1 < list.Size() && z < list[slice + 1].plane.ZatPoint(xy)) slice++;
+	if (slice == 0 && list[0].caster == nullptr) return GetSectorLightGroup(di, sec);	// above every light-casting 3D floor
+
+	const uint64_t cacheKey = (uint64_t(sec->Index()) << 16) | slice;
+	if (int *cached = sliceLightGroup.CheckKey(cacheKey)) return *cached;
+
+	lightlist_t &light = list[slice];
+	const int baseLight = RescaleLightLevel(sec->GetSpriteLight());
+	const int thisLight = light.caster != nullptr ? RescaleLightLevel(*light.p_lightlevel) : baseLight;
+
+	FFoliageLightKey key;
+	memset(&key, 0, sizeof(key));
+	key.lightlevel = thisLight;
+	key.foglevel = thisLight;
+	FColormap cm;
+	cm.Clear();
+	cm.CopyFog(sec->Colormap);
+	CopyFrom3DLight(cm, &light);
+	if (di->Level->flags3 & LEVEL3_NOCOLOREDSPRITELIGHTING) cm.Decolorize();
+	key.colormap = cm;
+	PalEntry white = 0xffffffff;
+	key.objectColor = white.Modulate(sec->SpecialColors[sector_t::sprites]).d;
+	key.addColor = sec->AdditiveColors[sector_t::sprites].d | 0xff000000;
+
+	const int group = FindOrAddLightGroup(key);
+	sliceLightGroup[cacheKey] = group;
 	return group;
 }
 
@@ -547,7 +595,7 @@ static int LODModelForLevel(int type, int level)
 void HWDrawInfo::DrawFoliage(FRenderState &state)
 {
 	FFoliageSystem *foliage = Level->Foliage;
-	if (foliage == nullptr || FoliageSubsectors.Size() == 0 || !r_drawfoliage) return;
+	if (foliage == nullptr || FoliageSubsectors.Size() == 0 || !gl_render_foliage) return;
 
 	foliageStats.time.Clock();
 	foliageStats.visibleSubsectors += FoliageSubsectors.Size();
@@ -699,7 +747,7 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 				}
 			}
 
-			FFoliageGroup &g = FindGroup(inst.type, level, GetLightGroup(this, inst.sector), lightIndex, LODModelForLevel(inst.type, level));
+			FFoliageGroup &g = FindGroup(inst.type, level, GetLightGroup(this, inst), lightIndex, LODModelForLevel(inst.type, level));
 			g.matrices.Push(inst.matrix);
 			g.matrices.Push(inst.normalMatrix);
 		}
@@ -747,7 +795,7 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 {
 	FFoliageSystem *foliage = Level->Foliage;
-	if (foliage == nullptr || FoliageTranslucent.Size() == 0 || !r_drawfoliage) return;
+	if (foliage == nullptr || FoliageTranslucent.Size() == 0 || !gl_render_foliage) return;
 
 	foliageStats.time.Clock();
 	foliageStats.translucent += FoliageTranslucent.Size();
@@ -769,7 +817,7 @@ void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 	{
 		const FFoliageTranslucentItem &first = FoliageTranslucent[i];
 		const FFoliageInstance &inst0 = foliage->Instances[first.instance];
-		const int lightGroup = GetLightGroup(this, inst0.sector);
+		const int lightGroup = GetLightGroup(this, inst0);
 
 		// extend the run while plants can share a draw
 		runMatrices.Clear();
@@ -778,7 +826,7 @@ void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 		{
 			const FFoliageTranslucentItem &item = FoliageTranslucent[j];
 			const FFoliageInstance &inst = foliage->Instances[item.instance];
-			if (inst.type != inst0.type || item.level != first.level || item.fade != first.fade || item.lightIndex != first.lightIndex || GetLightGroup(this, inst.sector) != lightGroup) break;
+			if (inst.type != inst0.type || item.level != first.level || item.fade != first.fade || item.lightIndex != first.lightIndex || GetLightGroup(this, inst) != lightGroup) break;
 			runMatrices.Push(inst.matrix);
 			runMatrices.Push(inst.normalMatrix);
 			j++;
@@ -857,8 +905,8 @@ CCMD(dumpfoliage)
 			}
 		}
 	}
-	Printf("r_foliageclusters %s (applies at map load), r_drawfoliage %s, renderer instancing %s\n",
-		*r_foliageclusters ? "on" : "off", *r_drawfoliage ? "on" : "off", foliageStats.instancing ? "on" : "off");
+	Printf("r_foliageclusters %s (applies at map load), gl_render_foliage %s, renderer instancing %s\n",
+		*r_foliageclusters ? "on" : "off", *gl_render_foliage ? "on" : "off", foliageStats.instancing ? "on" : "off");
 	Printf("r_foliagerangescale %g, r_foliagealphathreshold %g\n", *r_foliagerangescale, *r_foliagealphathreshold);
 	if (foliage == nullptr || (foliage->Types.Size() == 0 && foliage->Rejections.Size() == 0))
 	{
