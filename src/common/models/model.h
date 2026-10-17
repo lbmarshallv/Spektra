@@ -146,6 +146,8 @@ public:
 
 	void SetVertexBuffer(int type, IModelVertexBuffer *buffer) { mVBuf[type] = buffer; }
 	IModelVertexBuffer *GetVertexBuffer(int type) const { return mVBuf[type]; }
+	// Object-space bounds of the built vertex data, if any renderer has built it and the model isn't skinned.
+	bool GetCullingBounds(FVector3 &mins, FVector3 &maxs) const;
 	void DestroyVertexBuffer();
 
 	bool hasSurfaces = false;

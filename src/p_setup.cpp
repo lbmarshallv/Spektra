@@ -335,8 +335,12 @@ void FLevelLocals::ClearLevelData(bool fullgc)
 	SpotState = nullptr;
 	delete Foliage;
 	Foliage = nullptr;
+	DeleteBspZBounds(BspZBounds);
+	BspZBounds = nullptr;
 	DeleteTerrainBatches(TerrainBatches);
 	TerrainBatches = nullptr;
+	DeleteWallBatches(WallBatches);
+	WallBatches = nullptr;
 	ACSThinker = nullptr;
 	ClientSideACSThinker = nullptr;
 	FraggleScriptThinker = nullptr;

@@ -79,4 +79,12 @@ public:
 
 	virtual unsigned int *LockIndexBuffer(unsigned int size) = 0;
 	virtual void UnlockIndexBuffer() = 0;
+
+	// Object-space bounds of every vertex written to the buffer (all frames together), for
+	// frustum culling. Only valid once the buffer has been filled. 'skinned' means some vertices
+	// have bone weights, so an animated pose can leave these bounds.
+	float boundsMin[3] = { 0, 0, 0 };
+	float boundsMax[3] = { 0, 0, 0 };
+	bool boundsValid = false;
+	bool skinned = false;
 };

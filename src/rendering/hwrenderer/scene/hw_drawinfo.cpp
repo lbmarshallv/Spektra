@@ -54,6 +54,11 @@ CVAR(Float, gl_mask_sprite_threshold, 0.5f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 CVAR(Bool, gl_coronas, true, CVAR_ARCHIVE);
 
+// Use the real view frustum to decide how much of the yaw circle the clipper may skip.
+CVAR(Bool, gl_frustum_exact, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Extra degrees added on each side, so models and sprites whose own subsector is just outside the view don't pop.
+CVAR(Float, gl_frustum_margin, 5.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
 sector_t * hw_FakeFlat(sector_t * sec, sector_t * dest, area_t in_area, bool back);
 
 //==========================================================================
@@ -398,6 +403,16 @@ angle_t HWDrawInfo::FrustumAngle()
 	{
 		return OoBFrustumAngle(&Viewpoint);
 	}
+	else if (gl_frustum_exact && Frustum.valid)
+	{
+		// The widest yaw anything in view can have. Negative means the view contains a vertical
+		// ray (looking far enough up or down), and then no yaw can be ruled out.
+		const double deviation = Frustum.MaxYawDeviation(Viewpoint.Angles.Yaw.Radians());
+		if (deviation < 0) return 0xffffffff;
+		const double halfangle = deviation + clamp<double>(gl_frustum_margin, 0., 90.);
+		if (halfangle >= 179.) return 0xffffffff;
+		return DAngle::fromDeg(halfangle).BAMs();
+	}
 	else
 	{
 		float tilt = fabs(Viewpoint.HWAngles.Pitch.Degrees());
@@ -492,6 +507,7 @@ void HWDrawInfo::CreateScene(bool drawpsprites)
 	angle_t a1 = FrustumAngle(); // horizontally clip the back of the viewport
 	mClipper->SafeAddClipRangeRealAngles(vp.Angles.Yaw.BAMs() + a1, vp.Angles.Yaw.BAMs() - a1);
 	Viewpoint.FrustAngle = a1;
+	if (outer == nullptr) frustumStats.yawHalfAngle = a1 >= ANGLE_180 ? 360. : DAngle::fromBam(a1).Degrees();
 	if (Viewpoint.bDoOob) // No need for vertical clipper if viewpoint not allowed out of bounds
 	{
 		double a2 = 20.0 + 0.5*Viewpoint.FieldOfView.Degrees(); // FrustumPitch for vertical clipping
@@ -566,6 +582,7 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	drawlists[GLDL_PLAINWALLS].DrawWalls(this, state, false);
 	drawlists[GLDL_PLAINFLATS].DrawFlats(this, state, false);
 	DrawTerrainBatches(state);
+	DrawWallBatches(state);
 
 
 	// Part 2: masked geometry. This is set up so that only pixels with alpha>gl_mask_threshold will show

@@ -28,7 +28,10 @@
 #include "hw_drawlist.h"
 #include "hw_frustum.h"
 
+struct FBspZBounds;	// hw_bsp.cpp
+struct HWHorizon;	// hw_horizon.h
 struct FTerrainBatches;	// hw_terrainbatch.cpp
+struct FWallBatches;	// hw_wallbatch.cpp
 
 enum EDrawMode
 {
@@ -185,7 +188,15 @@ struct HWDrawInfo
 	HWViewpointUniforms VPUniforms;	// per-viewpoint uniform state
 	VSMatrix ProjectionMatrix2;
 	HWFrustum Frustum;	// set by SetupView
+	FBspZBounds *zBounds = nullptr;	// set by RenderBSP when BSP frustum culling is active for this view
+	HWHorizon *horizon = nullptr;	// set by RenderBSP when horizon culling is active (main view only)
+	bool clipOnly = false;	// AddLine only feeds the clipper (subsector hidden behind the horizon)
 	FTerrainBatches *terrainBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor floors
+	FWallBatches *wallBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor walls
+	bool thingsOnly = false;
+	int horizonHiddenCount = 0;	// subsectors hidden by the horizon in this view (decides whether it keeps running)	// walking a subtree hidden behind the horizon: actors, particles and foliage only
+	float bspZPad = 0;
+	bool frustum3D = false;	// test BSP subtrees and subsectors against the 3D frustum in this view
 	TArray<HWPortal *> Portals;
 	TArray<HWDecal *> Decals[2];	// the second slot is for mirrors which get rendered in a separate pass.
 	TArray<HUDSprite> hudsprites;	// These may just be stored by value.
@@ -279,10 +290,18 @@ public:
 
 	HWPortal * FindPortal(const void * src);
 	void RenderBSPNode(void *node);
+	bool ChildInFrustum(void *child, const float *bbox);
 	void SetupTerrainBatches();
 	void DrawTerrainBatches(FRenderState &state);
 	bool FloorBatched(const sector_t *sec) const;
 	bool SegBatched(const seg_t *seg) const;
+	void SetupWallBatches();
+	void DrawWallBatches(FRenderState &state);
+	bool SideBatched(const side_t *side) const;
+	bool WallPartBatched(const seg_t *seg, int type) const;
+	bool HorizonHides(void *child, const float *bbox);
+	bool HorizonChildHidden(void *child, const float *bbox);
+	void HorizonAdd(subsector_t *sub);
 	void RenderOrthoNoFog();
 	void RenderBSP(void *node, bool drawpsprites);
 
@@ -424,6 +443,25 @@ void SetColor(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, in
 void SetShaderLight(FRenderState& state, FLevelLocals* Level, float level, float olight);
 void SetFog(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, int lightlevel, int rellight, bool fullbright, const FColormap* cmap, bool isadditive);
 void ResetFoliageStats();
+
+// Per-frame counts for the 'stat frustum' display (gl_frustum_exact / gl_frustum_cull).
+struct FFrustumCullStats
+{
+	int nodes;			// BSP subtrees skipped because they are outside the view frustum
+	int subsectors;		// single subsectors skipped for the same reason
+	int horizonSubsectors;	// subsectors whose walls and flats are hidden behind hills / under ceilings
+	int seamlessLines;	// two-sided lines skipped because both sides meet exactly (no wall, no clipping)
+	int horizonNodes;		// whole subtrees hidden the same way (walked for actors only)
+	bool horizonResting;	// skipped this frame: it wasn't hiding enough lately
+	int models;			// actor models outside the view frustum
+	int sprites;		// actor sprites outside the view frustum
+	int plants;			// foliage outside the view frustum
+	int unbounded;		// models that could not be tested (skinned, or not built yet)
+	double yawHalfAngle;	// main view: half-width of the yaw range the clipper keeps, in degrees (360 = everything)
+};
+extern FFrustumCullStats frustumStats;
+void ResetFrustumStats();
+void UpdateBspZBounds(FLevelLocals *Level);
 void UpdateTerrainBatches(FLevelLocals *Level);
 void ResetTerrainStats();
 
@@ -435,3 +473,17 @@ struct FTerrainStats
 	int segs;		// seamless lines between batched floors skipped by the walk
 };
 extern FTerrainStats terrainStats;
+
+// Per-frame counts for 'stat wallbatch' (hw_wallbatch.cpp).
+struct FWallBatchStats
+{
+	int chunks;		// wall chunks drawn as batches (main view)
+	int draws;		// draw calls for them
+	int lines;		// lines whose walls are all batched, skipped by the walk
+	int sides;		// sides with batched walls
+	int evicted;	// sides taken out of their batches since the level was loaded (changed)
+	int evictedSector, evictedSide, evictedDither;	// why: a sector next to them changed / the side changed / dithered transparency
+};
+extern FWallBatchStats wallBatchStats;
+void UpdateWallBatches(FLevelLocals *Level);
+void ResetWallBatchStats();

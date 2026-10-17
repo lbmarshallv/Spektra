@@ -110,7 +110,8 @@ void BSPWalkCircle(FLevelLocals *Level, float x, float y, float radiusSquared, c
 		BSPNodeWalkCircle(Level->HeadNode(), x, y, radiusSquared, callback);
 }
 
-void RenderModel(FModelRenderer* renderer, float x, float y, float z, FSpriteModelFrame* smf, AActor* actor, double ticFrac, int lodModelID = -1);
+// objectToWorld: the matrix from FSpriteModelFrame::ObjectToWorldMatrix if the caller already has it for this frame.
+void RenderModel(FModelRenderer* renderer, float x, float y, float z, FSpriteModelFrame* smf, AActor* actor, double ticFrac, int lodModelID = -1, const VSMatrix *objectToWorld = nullptr);
 void RenderHUDModel(FModelRenderer* renderer, DPSprite* psp, FVector3 translation, FVector3 rotation, FVector3 rotation_pivot, FSpriteModelFrame *smf, double ticFrac);
 
 struct CalcModelFrameInfo

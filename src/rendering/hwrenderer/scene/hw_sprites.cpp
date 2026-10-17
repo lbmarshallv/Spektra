@@ -15,6 +15,7 @@
 **
 */
 
+#include <float.h>
 #include "colorspace.h"
 #include "p_local.h"
 #include "p_effect.h"
@@ -62,6 +63,78 @@ const float LARGE_VALUE = 1e19f;
 const float MY_SQRT2    = 1.41421356237309504880; // sqrt(2)
 
 EXTERN_CVAR(Bool, r_debug_disable_vis_filter)
+
+// Skip actor models and sprites that lie entirely outside the view frustum.
+CVAR(Bool, gl_frustum_cull, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+FFrustumCullStats frustumStats;
+
+extern cycle_t horizonTime;
+
+void ResetFrustumStats()
+{
+	horizonTime.Reset();
+	const double yaw = frustumStats.yawHalfAngle;
+	frustumStats = {};
+	frustumStats.yawHalfAngle = yaw;
+}
+
+ADD_STAT(frustum)
+{
+	FString range, out;
+	if (frustumStats.yawHalfAngle >= 180.) range = "all 360 deg";
+	else range.Format("+/-%.1f deg", frustumStats.yawHalfAngle);
+	out.Format("Frustum: clipper keeps %s, BSP culled %d subtrees + %d subsectors\n"
+		"Horizon: %s%d subtrees + %d subsectors hidden, %.3f ms; %d seamless lines skipped\n"
+		"culled %d models, %d sprites, %d plants (%d models untestable)",
+		range.GetChars(), frustumStats.nodes, frustumStats.subsectors, frustumStats.horizonResting ? "(resting) " : "", frustumStats.horizonNodes, frustumStats.horizonSubsectors, horizonTime.TimeMS(), frustumStats.seamlessLines,
+		frustumStats.models, frustumStats.sprites, frustumStats.plants, frustumStats.unbounded);
+	return out;
+}
+
+//==========================================================================
+//
+// Is any model this actor would draw inside the view frustum?
+// Mirrors the model selection of RenderFrameModels; anything that can't be
+// measured counts as visible.
+//
+//==========================================================================
+
+static bool ModelInFrustum(HWDrawInfo *di, AActor *thing, FSpriteModelFrame *smf, int lodModelID, float x, float y, float z, VSMatrix &objectToWorld, bool &hasMatrix)
+{
+	hasMatrix = false;
+	DActorModelData *data = thing->modelData.ForceGet();
+	unsigned count = smf->modelsAmount;
+	if (data && data->models.Size() > count) count = data->models.Size();
+
+	FVector3 mins(FLT_MAX, FLT_MAX, FLT_MAX), maxs(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	bool any = false;
+	for (unsigned i = 0; i < count; i++)
+	{
+		int id = -1;
+		if (data && data->models.Size() > i && data->models[i].modelID >= 0) id = data->models[i].modelID;
+		else if (data && data->models.Size() > i && data->models[i].modelID == -2) continue;	// slot removed
+		else if (i < smf->modelsAmount) id = smf->modelIDs[i];
+		if (i == 0 && lodModelID >= 0) id = lodModelID;
+		if (id < 0 || (unsigned)id >= Models.Size()) continue;
+
+		FVector3 mn, mx;
+		if (!Models[id]->GetCullingBounds(mn, mx))
+		{
+			frustumStats.unbounded++;
+			return true;
+		}
+		mins = FVector3(min(mins.X, mn.X), min(mins.Y, mn.Y), min(mins.Z, mn.Z));
+		maxs = FVector3(max(maxs.X, mx.X), max(maxs.Y, mx.Y), max(maxs.Z, mx.Z));
+		any = true;
+	}
+	if (!any) return true;
+
+	// Same placement as RenderModel uses when it draws this actor; kept so the draw doesn't build it again.
+	objectToWorld = smf->ObjectToWorldMatrix(thing, x, y, z, Net_ModifyObjectFrac(thing, di->Viewpoint.TicFrac));
+	hasMatrix = !(thing->flags9 & MF9_DECOUPLEDANIMATIONS);	// the draw runs AnimateBones first, which may move the actor
+	return di->Frustum.ObjectBoxVisible(objectToWorld, mins, maxs, 2.);
+}
 EXTERN_CVAR(Float, transsouls)
 EXTERN_CVAR(Float, r_actorspriteshadowalpha)
 EXTERN_CVAR(Float, r_actorspriteshadowfadeheight)
@@ -318,7 +391,7 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 			}
 
 			FHWModelRenderer renderer(di, state, dynlightindex);
-			RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac), lodModelID);
+			RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac), lodModelID, hasModelMatrix ? &modelMatrix : nullptr);
 			state.SetVertexBuffer(screen->mVertexData);
 		}
 	}
@@ -995,6 +1068,14 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 	{
 		return;
 	}
+
+	const bool frustumCull = gl_frustum_cull && di->Frustum.valid && !vp.bDoOob;
+	hasModelMatrix = false;
+	if (frustumCull && modelframe && !ModelInFrustum(di, thing, modelframe, lodModelID, x, y, z, modelMatrix, hasModelMatrix))
+	{
+		frustumStats.models++;
+		return;
+	}
 	if (!modelframe)
 	{
 		bool mirror = false;
@@ -1205,6 +1286,20 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		y1 = y2 = y;
 		z1 = z2 = z;
 		texture = nullptr;
+	}
+
+	if (frustumCull && !modelframe)
+	{
+		// The quad is still to be rotated (billboarding, roll, pitch), possibly about a point other
+		// than its centre, so test a sphere twice the size of the one around its unrotated box.
+		const double cx = (x1 + x2) * 0.5, cy = (y1 + y2) * 0.5, cz = (z1 + z2) * 0.5;
+		const double hx = fabs(x2 - x1) * 0.5, hy = fabs(y2 - y1) * 0.5, hz = fabs(z2 - z1) * 0.5;
+		const double radius = 2. * sqrt(hx * hx + hy * hy + hz * hz) + thing->radius + 8.;
+		if (!di->Frustum.SphereVisible(cx, cy, cz, radius))
+		{
+			frustumStats.sprites++;
+			return;
+		}
 	}
 
 	depth = (float)((x - vp.Pos.X) * vp.TanCos + (y - vp.Pos.Y) * vp.TanSin);
@@ -1513,6 +1608,7 @@ void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *s
 
 	trans = particle->alpha;
 	OverrideShader = (particle->flags & SPF_ALLOWSHADERS) ? -1 : 0;
+	hasModelMatrix = false;
 	modelframe = nullptr;
 	texture = nullptr;
 	topclip = LARGE_VALUE;

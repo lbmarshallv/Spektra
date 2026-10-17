@@ -20,6 +20,7 @@
 #include "renderstyle.h"
 #include "textures.h"
 #include "r_data/colormaps.h"
+#include "matrix.h"
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244)
@@ -379,6 +380,8 @@ public:
 	FSpriteModelFrame * modelframe;
 	int modelframeflags;
 	int lodModelID;		// level-of-detail replacement for model index 0, -1 = none
+	bool hasModelMatrix;	// modelMatrix was computed this frame for the frustum test and is reused for drawing
+	VSMatrix modelMatrix;
 	FRenderStyle RenderStyle;
 	int OverrideShader;
 

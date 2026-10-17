@@ -61,6 +61,20 @@ FModel::~FModel()
 	DestroyVertexBuffer();
 }
 
+bool FModel::GetCullingBounds(FVector3 &mins, FVector3 &maxs) const
+{
+	for (int i = 0; i < NumModelRendererTypes; i++)
+	{
+		const IModelVertexBuffer *vb = mVBuf[i];
+		if (vb == nullptr || !vb->boundsValid) continue;
+		if (vb->skinned) return false;
+		mins = FVector3(vb->boundsMin[0], vb->boundsMin[1], vb->boundsMin[2]);
+		maxs = FVector3(vb->boundsMax[0], vb->boundsMax[1], vb->boundsMax[2]);
+		return true;
+	}
+	return false;
+}
+
 void FModel::DestroyVertexBuffer()
 {
 	for (int i = 0; i < NumModelRendererTypes; i++)

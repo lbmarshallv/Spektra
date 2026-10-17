@@ -19,6 +19,7 @@
 
 #include "hwrenderer/data/buffers.h"
 #include "i_modelvertexbuffer.h"
+#include "tarray.h"
 
 class FModelRenderer;
 
@@ -26,6 +27,11 @@ class FModelVertexBuffer : public IModelVertexBuffer
 {
 	IVertexBuffer *mVertexBuffer;
 	IIndexBuffer *mIndexBuffer;
+
+	// Models write their vertices here instead of straight into the (possibly write-combined)
+	// GPU mapping, so the bounds can be measured when the buffer is unlocked.
+	TArray<FModelVertex> mStaging;
+	FModelVertex *mMapped = nullptr;
 
 public:
 

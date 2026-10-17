@@ -40,6 +40,7 @@ struct HWWallDispatcher
 	HWDrawInfo* di;
 	HWMeshHelper* mh;
 	ELightMode lightmode;
+	bool noBatch = false;	// this wall must be drawn normally even if a wall batch has it (distance-culled lines)
 
 	HWWallDispatcher(HWDrawInfo* info)
 	{

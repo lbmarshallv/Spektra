@@ -40,6 +40,10 @@
 #include "p_foliage.h"
 #include "hw_hidethings.h"
 #include "r_sky.h"
+#include "p_3dfloors.h"
+#include "hw_horizon.h"
+#include <float.h>
+#include <utility>
 
 #ifdef ARCH_IA32
 #include <immintrin.h>
@@ -51,6 +55,563 @@ EXTERN_CVAR(Float, r_actorspriteshadowdist)
 EXTERN_CVAR(Bool, r_radarclipper)
 EXTERN_CVAR(Bool, r_dithertransparency)
 EXTERN_CVAR(Color, gl_cullcolor)
+
+// Skip BSP subtrees and subsectors that are entirely outside the 3D view frustum.
+CVAR(Bool, gl_frustum_cull_bsp, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Extra height added above and below every subsector's range, for things (models, sprites) that stick out of their sector.
+CVAR(Float, gl_frustum_bsp_zpad, 64.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Only test BSP subtrees against the 3D frustum when the view is pitched at least this far up or down (degrees).
+CVAR(Float, gl_frustum_bsp_pitch, 30.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Skip walls and flats hidden behind hills, buildings and low ceilings (occlusion horizon, main view only).
+CVAR(Bool, gl_horizon_cull, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Only ground and ceilings within this distance of the eye are recorded as occluders (everything is still tested).
+CVAR(Float, gl_horizon_range, 6144.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+EXTERN_CVAR(Bool, gl_no_skyclear)
+
+cycle_t horizonTime;
+
+//==========================================================================
+//
+// Height ranges of the BSP, for testing nodes and subsectors against the
+// view frustum. The 2D bounding boxes come from the nodes; the heights are
+// recomputed from the sectors' current planes once per frame, so moving
+// floors and ceilings are always covered.
+//
+// A subsector's range covers everything that is drawn for it: its own
+// sector, the render sector, the back sectors of its walls (upper, lower
+// and middle parts reach their heights), Boom fake planes and 3D floors.
+// Skies and plane portals make that side unbounded, because sky walls and
+// portals reach far past the plane. Horizon lines make the whole subsector
+// unbounded.
+//
+//==========================================================================
+
+static constexpr float ZB_UNBOUNDED = 1e6f;
+
+// Per-seg flags: can this edge of its subsector hide things behind it (for the horizon)?
+enum
+{
+	SEGOCC_FLOOR = 1,	// a step up, or a ridge of sloped terrain
+	SEGOCC_CEILING = 2,	// solid ceiling edge
+};
+
+struct FBspZBounds
+{
+	const node_t *nodesData = nullptr;
+	unsigned numNodes = 0, numSubsectors = 0, numSectors = 0, numSegs = 0;
+	bool updated = false;		// heights are current (UpdateBspZBounds ran with culling on)
+	bool built = false;
+
+	TArray<int> postorder;		// node indices, children before parents
+	TArray<int> nodeParent;		// -1 for the root
+	TArray<int> subParent;		// node owning each subsector
+	TArray<int> subStart;		// subsector i uses sectors subSectors[subStart[i] .. subStart[i+1]-1]
+	TArray<int> subSectors;
+	TArray<int> secSubStart;	// sector i is used by subsectors secSubs[secSubStart[i] .. secSubStart[i+1]-1]
+	TArray<int> secSubs;
+	TArray<int> depStart;		// sector i is a heightsec or 3D-floor source for sectors deps[depStart[i] ..]
+	TArray<int> deps;
+	TArray<uint8_t> subUnbounded;
+	TArray<uint8_t> segOccluder;	// SEGOCC_* per seg
+	TArray<float> sectorZ;		// [2*i] lowest, [2*i+1] highest, per sector / subsector / node
+	TArray<float> subZ;
+	TArray<float> nodeZ;
+	// The same without the sky allowance: sky planes count at their own height. Sky walls reach far past
+	// that, but they only show the sky, which is drawn behind everything anyway. Used by the horizon test,
+	// which never hides actors, so these need no padding for them either.
+	TArray<float> sectorZGeom;
+	TArray<float> subZGeom;
+	TArray<float> nodeZGeom;
+
+	// What a sector's range was computed from; compared every frame to find the sectors that changed.
+	struct Signature
+	{
+		double floorD, ceilD, floorNZ, ceilNZ;
+		FTextureID floorTex, ceilTex;
+		unsigned portals[2];
+		sector_t *heightsec;
+		unsigned ffloors;
+		bool operator!=(const Signature &o) const
+		{
+			return floorD != o.floorD || ceilD != o.ceilD || floorNZ != o.floorNZ || ceilNZ != o.ceilNZ || floorTex != o.floorTex || ceilTex != o.ceilTex ||
+				portals[0] != o.portals[0] || portals[1] != o.portals[1] || heightsec != o.heightsec || ffloors != o.ffloors;
+		}
+	};
+	TArray<Signature> signatures;
+	TArray<int> dirtySectors;
+	TArray<uint8_t> sectorDirty;
+
+	bool Matches(FLevelLocals *Level) const
+	{
+		return built && nodesData == Level->nodes.Data() && numNodes == Level->nodes.Size()
+			&& numSubsectors == Level->subsectors.Size() && numSectors == Level->sectors.Size() && numSegs == Level->segs.Size();
+	}
+
+	void Build(FLevelLocals *Level);
+	void Update(FLevelLocals *Level);
+	void ComputeSector(FLevelLocals *Level, unsigned i);
+	void ComputeSubsector(FLevelLocals *Level, unsigned i);
+	void ComputeNode(FLevelLocals *Level, int n);
+	static Signature GetSignature(sector_t *sec);
+};
+
+void DeleteBspZBounds(FBspZBounds *bounds)
+{
+	delete bounds;
+}
+
+static void AddPlaneRange(const secplane_t &plane, sector_t *where, double &lo, double &hi)
+{
+	if (!plane.isSlope())
+	{
+		const double z = plane.ZatPoint(where->centerspot);
+		lo = min(lo, z);
+		hi = max(hi, z);
+		return;
+	}
+	for (line_t *ln : where->Lines)
+	{
+		const double z1 = plane.ZatPoint(ln->v1), z2 = plane.ZatPoint(ln->v2);
+		lo = min(lo, min(z1, z2));
+		hi = max(hi, max(z1, z2));
+	}
+}
+
+static bool PlaneUnbounded(sector_t *sec, int plane)
+{
+	return sec->GetTexture(plane) == skyflatnum || sec->Portals[plane] != 0;
+}
+
+FBspZBounds::Signature FBspZBounds::GetSignature(sector_t *sec)
+{
+	Signature sig;
+	sig.floorD = sec->floorplane.fD();
+	sig.ceilD = sec->ceilingplane.fD();
+	sig.floorNZ = sec->floorplane.Normal().Z;
+	sig.ceilNZ = sec->ceilingplane.Normal().Z;
+	sig.floorTex = sec->GetTexture(sector_t::floor);
+	sig.ceilTex = sec->GetTexture(sector_t::ceiling);
+	sig.portals[0] = sec->Portals[0];
+	sig.portals[1] = sec->Portals[1];
+	sig.heightsec = sec->GetHeightSec();
+	sig.ffloors = sec->e->XFloor.ffloors.Size();
+	return sig;
+}
+
+void FBspZBounds::ComputeSector(FLevelLocals *Level, unsigned i)
+{
+	sector_t *sec = &Level->sectors[i];
+	double lo = DBL_MAX, hi = -DBL_MAX;
+	AddPlaneRange(sec->floorplane, sec, lo, hi);
+	AddPlaneRange(sec->ceilingplane, sec, lo, hi);
+
+	sector_t *hs = sec->GetHeightSec();
+	if (hs != nullptr)
+	{
+		AddPlaneRange(hs->floorplane, sec, lo, hi);
+		AddPlaneRange(hs->ceilingplane, sec, lo, hi);
+	}
+	for (F3DFloor *ff : sec->e->XFloor.ffloors)
+	{
+		if (ff->top.plane) AddPlaneRange(*ff->top.plane, sec, lo, hi);
+		if (ff->bottom.plane) AddPlaneRange(*ff->bottom.plane, sec, lo, hi);
+	}
+
+	lo = max(lo, -(double)ZB_UNBOUNDED);
+	hi = min(hi, (double)ZB_UNBOUNDED);
+	const bool portalFloor = sec->Portals[sector_t::floor] != 0 || (hs && hs->Portals[sector_t::floor] != 0);
+	const bool portalCeiling = sec->Portals[sector_t::ceiling] != 0 || (hs && hs->Portals[sector_t::ceiling] != 0);
+	sectorZGeom[i * 2] = portalFloor ? -ZB_UNBOUNDED : (float)lo;
+	sectorZGeom[i * 2 + 1] = portalCeiling ? ZB_UNBOUNDED : (float)hi;
+
+	if (PlaneUnbounded(sec, sector_t::floor) || (hs && PlaneUnbounded(hs, sector_t::floor))) lo = -ZB_UNBOUNDED;
+	if (PlaneUnbounded(sec, sector_t::ceiling) || (hs && PlaneUnbounded(hs, sector_t::ceiling))) hi = ZB_UNBOUNDED;
+	sectorZ[i * 2] = (float)lo;
+	sectorZ[i * 2 + 1] = (float)hi;
+}
+
+void FBspZBounds::ComputeSubsector(FLevelLocals *Level, unsigned i)
+{
+	float lo = FLT_MAX, hi = -FLT_MAX, glo = FLT_MAX, ghi = -FLT_MAX;
+	if (subUnbounded[i])
+	{
+		lo = glo = -ZB_UNBOUNDED;
+		hi = ghi = ZB_UNBOUNDED;
+	}
+	else for (int j = subStart[i]; j < subStart[i + 1]; j++)
+	{
+		const int s = subSectors[j];
+		lo = min(lo, sectorZ[s * 2]);
+		hi = max(hi, sectorZ[s * 2 + 1]);
+		glo = min(glo, sectorZGeom[s * 2]);
+		ghi = max(ghi, sectorZGeom[s * 2 + 1]);
+	}
+	// Render hacks draw planes taken from elsewhere: never hide them.
+	if (Level->subsectors[i].hacked)
+	{
+		glo = -ZB_UNBOUNDED;
+		ghi = ZB_UNBOUNDED;
+	}
+	subZ[i * 2] = lo;
+	subZ[i * 2 + 1] = hi;
+	subZGeom[i * 2] = glo;
+	subZGeom[i * 2 + 1] = ghi;
+}
+
+void FBspZBounds::ComputeNode(FLevelLocals *Level, int n)
+{
+	node_t &node = Level->nodes[n];
+	float lo = FLT_MAX, hi = -FLT_MAX, glo = FLT_MAX, ghi = -FLT_MAX;
+	for (void *child : node.children)
+	{
+		const bool isSub = (size_t)child & 1;
+		const int index = isSub ? ((subsector_t *)((uint8_t *)child - 1))->Index() : ((node_t *)child)->Index();
+		const float *z = isSub ? &subZ[index * 2] : &nodeZ[index * 2];
+		const float *g = isSub ? &subZGeom[index * 2] : &nodeZGeom[index * 2];
+		lo = min(lo, z[0]);
+		hi = max(hi, z[1]);
+		glo = min(glo, g[0]);
+		ghi = max(ghi, g[1]);
+	}
+	nodeZ[n * 2] = lo;
+	nodeZ[n * 2 + 1] = hi;
+	nodeZGeom[n * 2] = glo;
+	nodeZGeom[n * 2 + 1] = ghi;
+}
+
+// Floor height of a sector at a point, for classifying edges.
+static double FloorAt(sector_t *sec, const DVector2 &p) { return sec->floorplane.ZatPoint(p); }
+
+void FBspZBounds::Build(FLevelLocals *Level)
+{
+	nodesData = Level->nodes.Data();
+	numNodes = Level->nodes.Size();
+	numSubsectors = Level->subsectors.Size();
+	numSectors = Level->sectors.Size();
+	numSegs = Level->segs.Size();
+	built = true;
+
+	// children-first order of all nodes, and every node's and subsector's parent
+	postorder.Clear();
+	nodeParent.Resize(numNodes);
+	subParent.Resize(numSubsectors);
+	for (auto &p : nodeParent) p = -1;
+	for (auto &p : subParent) p = -1;
+	if (numNodes > 0)
+	{
+		TArray<std::pair<node_t *, int>> stack;
+		stack.Push({ (node_t *)Level->HeadNode(), 0 });
+		while (stack.Size() > 0)
+		{
+			auto &top = stack.Last();
+			if (top.second < 2)
+			{
+				node_t *parent = top.first;
+				void *child = parent->children[top.second++];
+				if (!((size_t)child & 1))
+				{
+					nodeParent[((node_t *)child)->Index()] = parent->Index();
+					stack.Push({ (node_t *)child, 0 });
+				}
+				else subParent[((subsector_t *)((uint8_t *)child - 1))->Index()] = parent->Index();
+			}
+			else
+			{
+				postorder.Push(top.first->Index());
+				stack.Pop();
+			}
+		}
+	}
+
+	subStart.Resize(numSubsectors + 1);
+	subSectors.Clear();
+	subUnbounded.Resize(numSubsectors);
+	for (unsigned i = 0; i < numSubsectors; i++)
+	{
+		subsector_t &sub = Level->subsectors[i];
+		subStart[i] = subSectors.Size();
+		subUnbounded[i] = 0;
+		auto add = [&](sector_t *sec)
+		{
+			if (sec == nullptr) return;
+			const int index = sec->Index();
+			for (unsigned j = subStart[i]; j < subSectors.Size(); j++) if (subSectors[j] == index) return;
+			subSectors.Push(index);
+		};
+		add(sub.sector);
+		add(sub.render_sector);
+		for (uint32_t j = 0; j < sub.numlines; j++)
+		{
+			seg_t &seg = sub.firstline[j];
+			add(seg.backsector);
+			if (seg.linedef && seg.linedef->special == Line_Horizon) subUnbounded[i] = 1;
+		}
+		if (subSectors.Size() == (unsigned)subStart[i]) subUnbounded[i] = 1;	// no sector: don't guess
+	}
+	subStart[numSubsectors] = subSectors.Size();
+
+	// inverse: sector -> subsectors whose range includes it
+	secSubStart.Resize(numSectors + 1);
+	for (auto &c : secSubStart) c = 0;
+	for (int s : subSectors) secSubStart[s + 1]++;
+	for (unsigned i = 0; i < numSectors; i++) secSubStart[i + 1] += secSubStart[i];
+	secSubs.Resize(subSectors.Size());
+	{
+		TArray<int> fill;
+		fill.Resize(numSectors);
+		for (unsigned i = 0; i < numSectors; i++) fill[i] = secSubStart[i];
+		for (unsigned i = 0; i < numSubsectors; i++)
+			for (int j = subStart[i]; j < subStart[i + 1]; j++) secSubs[fill[subSectors[j]]++] = i;
+	}
+
+	// sectors whose planes feed other sectors' ranges (Boom fake floors, 3D floors)
+	{
+		TArray<std::pair<int, int>> pairs;	// (source, user)
+		for (unsigned i = 0; i < numSectors; i++)
+		{
+			sector_t *sec = &Level->sectors[i];
+			if (sector_t *hs = sec->GetHeightSec()) pairs.Push({ hs->Index(), (int)i });
+			for (F3DFloor *ff : sec->e->XFloor.ffloors) if (ff->model) pairs.Push({ ff->model->Index(), (int)i });
+		}
+		depStart.Resize(numSectors + 1);
+		for (auto &c : depStart) c = 0;
+		for (auto &pr : pairs) depStart[pr.first + 1]++;
+		for (unsigned i = 0; i < numSectors; i++) depStart[i + 1] += depStart[i];
+		deps.Resize(pairs.Size());
+		TArray<int> fill;
+		fill.Resize(numSectors);
+		for (unsigned i = 0; i < numSectors; i++) fill[i] = depStart[i];
+		for (auto &pr : pairs) deps[fill[pr.first]++] = pr.second;
+	}
+
+	// Which edges can hide anything for the horizon. Leaving an edge out only means less gets hidden, never
+	// that something visible is hidden, so this only needs to keep the ones that matter:
+	// - floor: a step up from the other side (a building, a cliff), or a ridge where sloped ground falls away
+	//   on both sides. Along any line of sight the steepest view over continuous ground is at a ridge or a
+	//   step; flat ground and valleys never are.
+	// - ceiling: every edge under a solid ceiling (rare outdoors, cheap indoors).
+	segOccluder.Resize(numSegs);
+	for (unsigned i = 0; i < numSegs; i++)
+	{
+		seg_t &seg = Level->segs[i];
+		uint8_t flags = 0;
+		sector_t *front = seg.frontsector, *back = seg.backsector;
+		if (front && back && seg.v1 && seg.v2 && front != back)
+		{
+			const DVector2 a = seg.v1->fPos(), b = seg.v2->fPos();
+			const double ff1 = FloorAt(front, a), ff2 = FloorAt(front, b), bf1 = FloorAt(back, a), bf2 = FloorAt(back, b);
+			if (ff1 > bf1 + 0.5 || ff2 > bf2 + 0.5) flags |= SEGOCC_FLOOR;	// this side is higher
+			else if (fabs(ff1 - bf1) <= 0.5 && fabs(ff2 - bf2) <= 0.5)
+			{
+				// continuous ground: a ridge if each side's plane, extended over the other, lies above it
+				const double overBack = FloorAt(front, back->centerspot) - FloorAt(back, back->centerspot);
+				const double overFront = FloorAt(back, front->centerspot) - FloorAt(front, front->centerspot);
+				if (overBack > 0.5 || overFront > 0.5) flags |= SEGOCC_FLOOR;
+			}
+			if (front->GetTexture(sector_t::ceiling) != skyflatnum && front->Portals[sector_t::ceiling] == 0) flags |= SEGOCC_CEILING;
+		}
+		segOccluder[i] = flags;
+	}
+
+	sectorZ.Resize(numSectors * 2);
+	subZ.Resize(numSubsectors * 2);
+	sectorZGeom.Resize(numSectors * 2);
+	subZGeom.Resize(numSubsectors * 2);
+	nodeZGeom.Resize(numNodes * 2);
+	nodeZ.Resize(numNodes * 2);
+	// anything the walk can't reach stays unbounded
+	for (unsigned i = 0; i < numNodes * 2; i++) nodeZ[i] = nodeZGeom[i] = (i & 1) ? ZB_UNBOUNDED : -ZB_UNBOUNDED;
+
+	// everything once
+	signatures.Resize(numSectors);
+	sectorDirty.Resize(numSectors);
+	for (unsigned i = 0; i < numSectors; i++)
+	{
+		signatures[i] = GetSignature(&Level->sectors[i]);
+		sectorDirty[i] = 0;
+		ComputeSector(Level, i);
+	}
+	for (unsigned i = 0; i < numSubsectors; i++) ComputeSubsector(Level, i);
+	for (int n : postorder) ComputeNode(Level, n);
+}
+
+// Per frame: only sectors that changed (and the sectors using them for fake floors or 3D floors) are
+// recomputed, then the subsectors showing them and the BSP nodes above those.
+void FBspZBounds::Update(FLevelLocals *Level)
+{
+	dirtySectors.Clear();
+	auto markDirty = [&](int s)
+	{
+		if (!sectorDirty[s]) { sectorDirty[s] = 1; dirtySectors.Push(s); }
+	};
+	for (unsigned i = 0; i < numSectors; i++)
+	{
+		const Signature sig = GetSignature(&Level->sectors[i]);
+		if (sig != signatures[i])
+		{
+			signatures[i] = sig;
+			markDirty(i);
+			for (int j = depStart[i]; j < depStart[i + 1]; j++) markDirty(deps[j]);
+		}
+	}
+	if (dirtySectors.Size() == 0) return;
+
+	for (int s : dirtySectors) ComputeSector(Level, s);
+	for (int s : dirtySectors)
+	{
+		sectorDirty[s] = 0;
+		for (int j = secSubStart[s]; j < secSubStart[s + 1]; j++)
+		{
+			const int sub = secSubs[j];
+			ComputeSubsector(Level, sub);
+			for (int n = subParent[sub]; n >= 0; n = nodeParent[n]) ComputeNode(Level, n);
+		}
+	}
+}
+
+void UpdateBspZBounds(FLevelLocals *Level)
+{
+	FBspZBounds *zb = Level->BspZBounds;
+	if ((!gl_frustum_cull_bsp && !gl_horizon_cull) || Level->subsectors.Size() == 0)
+	{
+		if (zb) zb->updated = false;
+		return;
+	}
+	if (zb == nullptr) zb = Level->BspZBounds = new FBspZBounds;
+	if (!zb->Matches(Level)) zb->Build(Level);
+	else if (!zb->updated) zb->Build(Level);	// was switched off: anything may have changed meanwhile
+	else zb->Update(Level);
+	zb->updated = true;
+}
+
+//==========================================================================
+//
+// Is any part of this BSP child (node or subsector) inside the view frustum?
+// bbox is the child's 2D box (node_t::bbox[side] or the subsector's).
+//
+//==========================================================================
+
+bool HWDrawInfo::ChildInFrustum(void *child, const float *bbox)
+{
+	const float *z = ((size_t)child & 1)
+		? &zBounds->subZ[((subsector_t *)((uint8_t *)child - 1))->Index() * 2]
+		: &zBounds->nodeZ[((node_t *)child)->Index() * 2];
+	return Frustum.MapBoxVisible(bbox[BOXLEFT] - 1., bbox[BOXRIGHT] + 1., bbox[BOXBOTTOM] - 1., bbox[BOXTOP] + 1.,
+		z[0] - bspZPad, z[1] + bspZPad);
+}
+
+//==========================================================================
+//
+// Occlusion horizon (hw_horizon.h): hides the walls and flats of
+// subsectors behind hills and under low ceilings. Main view only.
+//
+//==========================================================================
+
+static HWHorizon mainHorizon;
+
+static bool PlaneSolid(sector_t *sec, int plane)
+{
+	return sec->GetTexture(plane) != skyflatnum && sec->Portals[plane] == 0;
+}
+
+// Is every line of sight to the walls and flats of this BSP child (subsector or whole subtree) blocked by
+// the ground and ceilings walked so far? bbox is the child's 2D box.
+bool HWDrawInfo::HorizonHides(void *child, const float *bbox)
+{
+	const float *z = ((size_t)child & 1)
+		? &zBounds->subZGeom[((subsector_t *)((uint8_t *)child - 1))->Index() * 2]
+		: &zBounds->nodeZGeom[((node_t *)child)->Index() * 2];
+	if (z[0] <= -ZB_UNBOUNDED || z[1] >= ZB_UNBOUNDED) return false;
+	return horizon->BoxHidden(bbox[BOXLEFT] - 1., bbox[BOXRIGHT] + 1., bbox[BOXBOTTOM] - 1., bbox[BOXTOP] + 1., z[0] - 1., z[1] + 1.);
+}
+
+// Node-level version of the test, timed and counted. Subsectors are left to DoSubsector, which also has to
+// feed the clipper and the horizon.
+bool HWDrawInfo::HorizonChildHidden(void *child, const float *bbox)
+{
+	if ((size_t)child & 1) return false;
+	horizonTime.Clock();
+	const bool hidden = HorizonHides(child, bbox);
+	horizonTime.Unclock();
+	if (hidden) frustumStats.horizonNodes++;
+	return hidden;
+}
+
+// The horizon costs time every frame it runs, and only pays when something is behind a hill or a
+// building. When it hides almost nothing for a while, it sits out and only checks again now and then.
+CVAR(Int, gl_horizon_minhidden, 32, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)	// subsectors per frame that make it worth running
+static int horizonIdleFrames = 0;		// consecutive frames it hid less than that
+static int horizonSkipFrames = 0;		// frames left to sit out
+static constexpr int HORIZON_IDLE_LIMIT = 20;
+static constexpr int HORIZON_RETRY_INTERVAL = 15;
+
+static bool HorizonWorthRunning()
+{
+	if (gl_horizon_minhidden <= 0) return true;
+	if (horizonSkipFrames > 0)
+	{
+		horizonSkipFrames--;
+		frustumStats.horizonResting = true;
+		return false;
+	}
+	return true;
+}
+
+static void HorizonFeedback(int hidden)
+{
+	if (hidden >= gl_horizon_minhidden)
+	{
+		horizonIdleFrames = 0;
+		return;
+	}
+	if (++horizonIdleFrames >= HORIZON_IDLE_LIMIT)
+	{
+		horizonSkipFrames = HORIZON_RETRY_INTERVAL;	// try again after this, one frame at a time
+		horizonIdleFrames = HORIZON_IDLE_LIMIT - 1;
+	}
+}
+
+// Record this subsector's floor and ceiling as solid for everything behind it.
+void HWDrawInfo::HorizonAdd(subsector_t *sub)
+{
+	sector_t *sec = sub->sector;
+	// Render hacks (self-referencing sectors, Boom fake planes, faked render sectors) don't have solid planes.
+	if (sub->hacked || sub->render_sector != sec || sec->GetHeightSec() != nullptr) return;
+	const bool solidFloor = PlaneSolid(sec, sector_t::floor);
+	const bool solidCeiling = PlaneSolid(sec, sector_t::ceiling);
+	if (!solidFloor && !solidCeiling) return;
+
+	// Far away ground hides little and costs as much as near ground, so only nearby ground is recorded.
+	const double ex = horizon->ex, ey = horizon->ey, ez = horizon->ez;
+	const double nx = ex < sub->bbox.Left() ? sub->bbox.Left() - ex : (ex > sub->bbox.Right() ? ex - sub->bbox.Right() : 0);
+	const double ny = ey < sub->bbox.Bottom() ? sub->bbox.Bottom() - ey : (ey > sub->bbox.Top() ? ey - sub->bbox.Top() : 0);
+	const double range = gl_horizon_range;
+	if (range > 0 && nx * nx + ny * ny > range * range) return;
+
+	const double cx = (sub->bbox.Left() + sub->bbox.Right()) * 0.5, cy = (sub->bbox.Bottom() + sub->bbox.Top()) * 0.5;
+	for (uint32_t i = 0; i < sub->numlines; i++)
+	{
+		seg_t *seg = &sub->firstline[i];
+		if (seg->v1 == nullptr || seg->v2 == nullptr) continue;
+		// Only edges that can hide anything: steps, terrain ridges, solid ceilings (see FBspZBounds::Build).
+		const uint8_t occ = zBounds->segOccluder[seg->Index()];
+		if (!occ) continue;
+		const double x1 = seg->v1->fX(), y1 = seg->v1->fY(), x2 = seg->v2->fX(), y2 = seg->v2->fY();
+		const double fz = min(sec->floorplane.ZatPoint(seg->v1), sec->floorplane.ZatPoint(seg->v2));
+		const double cz = max(sec->ceilingplane.ZatPoint(seg->v1), sec->ceilingplane.ZatPoint(seg->v2));
+
+		// Every line of sight through the subsector crosses one near and one far edge. Only the one
+		// that gives the tighter limit is needed: the far edge for ground below the eye, the near one
+		// for ground above it (and the other way round for ceilings).
+		const double lx = x2 - x1, ly = y2 - y1;
+		const double sideEye = lx * (horizon->ey - y1) - ly * (horizon->ex - x1);
+		const double sideCentre = lx * (cy - y1) - ly * (cx - x1);
+		const bool nearEdge = (sideEye > 0) != (sideCentre > 0);
+		const bool useFloor = solidFloor && (occ & SEGOCC_FLOOR) && (nearEdge ? fz >= ez : fz < ez);
+		const bool useCeiling = solidCeiling && (occ & SEGOCC_CEILING) && (nearEdge ? cz <= ez : cz > ez);
+		horizon->AddEdge(x1, y1, x2, y2, fz, cz, useFloor, useCeiling);
+	}
+}
 
 thread_local bool isWorkerThread;
 ctpl::thread_pool renderPool(1);
@@ -183,6 +744,7 @@ void HWDrawInfo::WorkerThread()
 			}
 			else back = nullptr;
 
+			disp.noBatch = job->isculled;
 			wall.Process(&disp, job->seg, front, back, job->isculled);
 			rendered_lines++;
 			SetupWall.Unclock();
@@ -321,10 +883,12 @@ bool HWDrawInfo::IsDistanceCulled(seg_t *line)
 //
 // A two-sided line whose floors and ceilings meet exactly on both sides
 // (the edges between triangles of a terrain mesh, for example) has no
-// wall to draw and never blocks the view. Used by the terrain batches
-// (hw_terrainbatch.cpp) to find lines the walk can skip.
+// wall to draw and never blocks the view, so all the per-line work below
+// can be skipped. Checked every time, so moving planes are handled.
 //
 //==========================================================================
+
+CVAR(Bool, gl_seamless_lines, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 bool IsSeamlessLine(seg_t *seg)
 {
@@ -447,6 +1011,18 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 		if (seg->frontsector->Colormap.FadeColor != 0) Level->cullcolor = seg->frontsector->Colormap.FadeColor; // Write can't be multithreaded
 	}
 
+	// Seamless: nothing to draw and nothing to clip.
+	if (gl_seamless_lines && !ispoly && IsSeamlessLine(seg))
+	{
+		frustumStats.seamlessLines++;
+		if (!clipOnly)
+		{
+			seg->linedef->flags |= ML_MAPPED;
+			seg->linedef->validcount = validcount;
+		}
+		return;
+	}
+
 	// [XA] NOTE: ideally it'd be nice to collapse these checks into one,
 	// but it's possible to add & remove WALLF_BLOCKRENDERING via zscript
 	// so auto-setting it on 1s lines may result in a crash if someone
@@ -492,6 +1068,10 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 		backsector = currentsector;
 	}
 
+	// Hidden behind the horizon: the wall has done its job as an occluder for the clipper above, but isn't drawn.
+	// The line isn't marked as processed, so its other side can still draw it if that one is visible.
+	if (clipOnly) return;
+
 	seg->linedef->flags |= ML_MAPPED;
 
 	if (ispoly || seg->linedef->validcount!=validcount)
@@ -500,7 +1080,12 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 		if (gl_render_walls)
 		{
-			if (multithread)
+			if (!isculled && wallBatches && SideBatched(seg->sidedef))
+			{
+				// Everything this side draws is in a wall batch.
+				wallBatchStats.lines++;
+			}
+			else if (multithread)
 			{
 				jobQueue.AddJob(RenderJob::WallJob, seg->Subsector, seg, isculled);
 			}
@@ -508,6 +1093,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 			{
 				HWWall wall;
 				HWWallDispatcher disp(this);
+				disp.noBatch = isculled;
 				SetupWall.Clock();
 				wall.sub = seg->Subsector;
 				wall.Process(&disp, seg, currentsector, backsector, isculled);
@@ -858,6 +1444,28 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 	}
 	if (mClipper->IsBlocked()) return;	// if we are inside a stacked sector portal which hasn't unclipped anything yet.
 
+	// Entirely outside the 3D view frustum. Polyobjects move, and subsectors marked 'seen' through a portal
+	// must still unclip (above), so those are left alone.
+	if (frustum3D && sub->polys == nullptr && !(ss_renderflags[sub->Index()] & SSRF_SEEN))
+	{
+		const float box[4] = { (float)sub->bbox.Top(), (float)sub->bbox.Bottom(), (float)sub->bbox.Left(), (float)sub->bbox.Right() };
+		if (!ChildInFrustum((uint8_t *)sub + 1, box))
+		{
+			frustumStats.subsectors++;
+			return;
+		}
+	}
+
+	// Inside a subtree hidden behind the horizon only actors, particles and foliage are wanted.
+	if (thingsOnly)
+	{
+		horizonHiddenCount++;
+		const bool hasParticles = sub->sprites.Size() > 0 || Level->ParticlesInSubsec[sub->Index()] != NO_PARTICLE;
+		const bool hasFoliage = Level->Foliage != nullptr && Level->Foliage->SubsectorHasFoliage(sub->Index());
+		const bool hasThings = sector->validcount != validcount && (sector->touching_renderthings || sector->sectorportal_thinglist);
+		if (!gl_render_things || (!hasParticles && !hasFoliage && !hasThings)) return;
+	}
+
 	fakesector=hw_FakeFlat(sector, in_area, false);
 	if(doOob && sector->isSecret() && sector->wasSecret() && !r_radarclipper) return;
 
@@ -942,6 +1550,26 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		}
 	}
 
+	// Behind a hill or under a low ceiling: skip the walls and flats, but keep the actors, particles and
+	// foliage, which have their own culling and can stick up above the ground in front.
+	bool horizonHidden = thingsOnly;
+	if (horizon != nullptr && !thingsOnly)
+	{
+		horizonTime.Clock();
+		if (sub->polys == nullptr && !(ss_renderflags[sub->Index()] & SSRF_SEEN))
+		{
+			const float box[4] = { (float)sub->bbox.Top(), (float)sub->bbox.Bottom(), (float)sub->bbox.Left(), (float)sub->bbox.Right() };
+			if (HorizonHides((uint8_t *)sub + 1, box))
+			{
+				horizonHidden = true;
+				frustumStats.horizonSubsectors++;
+				horizonHiddenCount++;
+			}
+		}
+		HorizonAdd(sub);
+		horizonTime.Unclock();
+	}
+
 	if (sector->validcount != validcount)
 	{
 		CheckUpdate(screen->mVertexData, sector);
@@ -968,7 +1596,15 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		FoliageSubsectors.Push(sub->Index());
 	}
 
-	AddLines(sub, fakesector);
+	// A hidden subsector's solid walls still block everything behind them in the clipper, so add them
+	// to it without building the walls.
+	// (A whole hidden subtree skips this too: what's behind it gets its own horizon test.)
+	if (!thingsOnly)
+	{
+		clipOnly = horizonHidden;
+		AddLines(sub, fakesector);
+		clipOnly = false;
+	}
 
 	// BSP is traversed by subsector.
 	// A sector might have been split into several
@@ -1009,7 +1645,7 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		}
 	}
 
-	if (gl_render_flats)
+	if (gl_render_flats && !horizonHidden)
 	{
 		// Subsectors with only 2 lines cannot have any area
 		if (sub->numlines>2 || (sub->hacked&1))
@@ -1108,15 +1744,27 @@ void HWDrawInfo::RenderBSPNode (void *node)
 		DoSubsector (&Level->subsectors[0]);
 		return;
 	}
+	// A subtree hidden behind the horizon is walked for its actors only; restore the mode on the way out.
+	struct ThingsOnlyScope { bool &flag; bool saved; ~ThingsOnlyScope() { flag = saved; } } thingsOnlyScope{ thingsOnly, thingsOnly };
+
 	while (!((size_t)node & 1))  // Keep going until found a subsector
 	{
 		node_t *bsp = (node_t *)node;
 
 		// Decide which side the view point is on.
 		int side = R_PointOnSide(viewx, viewy, bsp);
+		// Nodes seen through a portal must be walked to unclip them, so the frustum test leaves them alone.
+		const bool cull3D = frustum3D && !(no_renderflags[bsp->Index()] & SSRF_SEEN);
 
 		// Recursively divide front space (toward the viewer).
-		RenderBSPNode (bsp->children[side]);
+		if (!cull3D || ChildInFrustum(bsp->children[side], bsp->bbox[side]))
+		{
+			const bool wasThingsOnly = thingsOnly;
+			if (horizon && !thingsOnly && HorizonChildHidden(bsp->children[side], bsp->bbox[side])) thingsOnly = true;
+			RenderBSPNode (bsp->children[side]);
+			thingsOnly = wasThingsOnly;
+		}
+		else frustumStats.nodes++;
 
 		// Possibly divide back space (away from the viewer).
 		side ^= 1;
@@ -1135,6 +1783,12 @@ void HWDrawInfo::RenderBSPNode (void *node)
 					return;
 			}
 		}
+		if (cull3D && !ChildInFrustum(bsp->children[side], bsp->bbox[side]))
+		{
+			frustumStats.nodes++;
+			return;
+		}
+		if (horizon && !thingsOnly && HorizonChildHidden(bsp->children[side], bsp->bbox[side])) thingsOnly = true;
 
 		node = bsp->children[side];
 	}
@@ -1188,6 +1842,38 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 
 	validcount++;	// used for processing sidedefs only once by the renderer.
 	SetupTerrainBatches();
+	SetupWallBatches();
+
+	// Height ranges for the 3D frustum test and the horizon: need this frame's ranges and a perspective view.
+	zBounds = nullptr;
+	frustum3D = false;
+	FBspZBounds *zb = Level->BspZBounds;
+	if (Frustum.valid && !Viewpoint.bDoOob && zb && zb->updated && zb->Matches(Level) && Level->nodes.Size() > 0)
+	{
+		zBounds = zb;
+		bspZPad = (float)clamp<double>(gl_frustum_bsp_zpad, 0., 4096.);
+		// Looking roughly level, the yaw clipper already rejects what's behind and the 3D test finds nothing
+		// more, so it only runs once the view is pitched far enough up or down.
+		frustum3D = gl_frustum_cull_bsp && fabs(Viewpoint.HWAngles.Pitch.Degrees()) >= gl_frustum_bsp_pitch;
+	}
+
+	// The horizon needs the height ranges, the main view (no mirrors or portals), the sky drawn behind
+	// everything, and an eye that is really inside its sector's open space.
+	horizon = nullptr;
+	thingsOnly = clipOnly = false;
+	horizonHiddenCount = 0;
+	if (gl_horizon_cull && zBounds && outer == nullptr && mCurrentPortal == nullptr && !gl_no_skyclear && Viewpoint.sector && HorizonWorthRunning())
+	{
+		sector_t *vs = Viewpoint.sector;
+		const DVector3 &eye = Viewpoint.Pos;
+		const bool aboveFloor = !PlaneSolid(vs, sector_t::floor) || eye.Z >= vs->floorplane.ZatPoint(eye.XY());
+		const bool belowCeiling = !PlaneSolid(vs, sector_t::ceiling) || eye.Z <= vs->ceilingplane.ZatPoint(eye.XY());
+		if (aboveFloor && belowCeiling)
+		{
+			horizon = &mainHorizon;
+			horizon->Clear(eye.X, eye.Y, eye.Z);
+		}
+	}
 
 	multithread = gl_multithread;
 	if (multithread)
@@ -1211,6 +1897,8 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 		else RenderBSPNode(node);
 		Bsp.Unclock();
 	}
+
+	if (horizon) HorizonFeedback(horizonHiddenCount);
 
 	// Make rendered targets set dither transparency flags on level geometry for next pass
 	// Can't do this inside DoSubsector() because both Trace() and P_CheckSight() affect 'validcount' global variable

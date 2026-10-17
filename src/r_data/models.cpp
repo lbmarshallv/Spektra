@@ -50,14 +50,14 @@ extern TDeletingArray<FVoxelDef *> VoxelDefs;
 
 void RenderFrameModels(FModelRenderer* renderer, FLevelLocals* Level, const FSpriteModelFrame *smf, const FState* curState, int curTics, double tic, FTranslationID translation, AActor* actor, int lodModelID = -1);
 
-void RenderModel(FModelRenderer *renderer, float x, float y, float z, FSpriteModelFrame *smf, AActor *actor, double ticFrac, int lodModelID)
+void RenderModel(FModelRenderer *renderer, float x, float y, float z, FSpriteModelFrame *smf, AActor *actor, double ticFrac, int lodModelID, const VSMatrix *objectToWorld)
 {
 	int smf_flags = smf->getFlags(actor->modelData);
 	FTranslationID translation = NO_TRANSLATION;
 	if (!(smf_flags & MDL_IGNORETRANSLATION))
 		translation = actor->Translation;
 
-	VSMatrix objectToWorldMatrix = smf->ObjectToWorldMatrix(actor, x, y, z, ticFrac);
+	VSMatrix objectToWorldMatrix = objectToWorld ? *objectToWorld : smf->ObjectToWorldMatrix(actor, x, y, z, ticFrac);
 
 	const DVector2 scale = actor->InterpolatedScale(ticFrac);
 	float scaleFactorX = scale.X * smf->xscale;

@@ -16,6 +16,8 @@
 */
 
 
+#include <float.h>
+#include <cmath>
 #include "v_video.h"
 #include "cmdlib.h"
 #include "hw_modelvertexbuffer.h"
@@ -64,7 +66,11 @@ FModelVertexBuffer::~FModelVertexBuffer()
 
 FModelVertex *FModelVertexBuffer::LockVertexBuffer(unsigned int size)
 {
-	return static_cast<FModelVertex*>(mVertexBuffer->Lock(size * sizeof(FModelVertex)));
+	mMapped = static_cast<FModelVertex*>(mVertexBuffer->Lock(size * sizeof(FModelVertex)));
+	if (mMapped == nullptr || size == 0) return mMapped;
+	mStaging.Resize(size);
+	memset((void*)mStaging.Data(), 0, size * sizeof(FModelVertex));
+	return mStaging.Data();
 }
 
 //===========================================================================
@@ -75,6 +81,34 @@ FModelVertex *FModelVertexBuffer::LockVertexBuffer(unsigned int size)
 
 void FModelVertexBuffer::UnlockVertexBuffer()
 {
+	if (mMapped != nullptr && mStaging.Size() > 0)
+	{
+		memcpy((void*)mMapped, mStaging.Data(), mStaging.Size() * sizeof(FModelVertex));
+
+		float mins[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+		float maxs[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		bool any = false, weighted = false;
+		for (const FModelVertex &v : mStaging)
+		{
+			if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z)) continue;
+			const float p[3] = { v.x, v.y, v.z };
+			for (int i = 0; i < 3; i++)
+			{
+				if (p[i] < mins[i]) mins[i] = p[i];
+				if (p[i] > maxs[i]) maxs[i] = p[i];
+			}
+			any = true;
+			if (v.boneweight[0] | v.boneweight[1] | v.boneweight[2] | v.boneweight[3]) weighted = true;
+		}
+		if (any)
+		{
+			for (int i = 0; i < 3; i++) { boundsMin[i] = mins[i]; boundsMax[i] = maxs[i]; }
+			skinned = weighted;
+			boundsValid = true;
+		}
+		mStaging.Reset();
+	}
+	mMapped = nullptr;
 	mVertexBuffer->Unlock();
 }
 

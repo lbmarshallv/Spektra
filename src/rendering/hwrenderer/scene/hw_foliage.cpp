@@ -54,6 +54,7 @@
 EXTERN_CVAR(Float, r_lod)
 EXTERN_CVAR(Float, r_lod_hysteresis)
 EXTERN_CVAR(Int, r_distance_cull_type)
+EXTERN_CVAR(Bool, gl_frustum_cull)
 EXTERN_CVAR(Bool, r_foliageclusters)
 EXTERN_CVAR(Float, gl_mask_sprite_threshold)
 EXTERN_CVAR(Float, gl_mask_threshold)
@@ -228,7 +229,37 @@ struct FFoliageTypeFrameInfo
 	double fadeStart;	// FoliageTranslucentRange (scaled)
 	double fadeEnd;
 	double fadeEndSq;	// -1 = never translucent
+	bool cullable;		// bounds below are known: every model the plant can draw has been built and isn't skinned
+	FVector3 cullMins, cullMaxs;	// object space, all submodels and LOD models together
 };
+
+// Object-space bounds covering every model a foliage type can draw, at any level of detail.
+static bool GetFoliageTypeBounds(const FFoliageType &type, const FFoliageTypeFrameInfo &ti, FVector3 &mins, FVector3 &maxs)
+{
+	bool any = false;
+	auto add = [&](int id)
+	{
+		if (id < 0 || (unsigned)id >= Models.Size()) return true;
+		FVector3 mn, mx;
+		if (!Models[id]->GetCullingBounds(mn, mx)) return false;
+		if (!any) { mins = mn; maxs = mx; any = true; }
+		else
+		{
+			mins = FVector3(min(mins.X, mn.X), min(mins.Y, mn.Y), min(mins.Z, mn.Z));
+			maxs = FVector3(max(maxs.X, mx.X), max(maxs.Y, mx.Y), max(maxs.Z, mx.Z));
+		}
+		return true;
+	};
+	for (unsigned i = 0; i < type.smf->modelsAmount; i++)
+	{
+		if (!add(type.smf->modelIDs[i])) return false;
+	}
+	for (int l = 0; l < ti.numLevels; l++)
+	{
+		if (ti.levels[l]->type == LOD_Model && !add(ti.levels[l]->modelID)) return false;
+	}
+	return any;
+}
 
 // A distinct set of dynamic lights touching one or more plants, uploaded once per frame and view.
 struct FFoliageLightSet
@@ -640,7 +671,9 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 		ti.fadeStart = ai->FoliageFadeStart * rangescale;
 		ti.fadeEnd = ai->FoliageFadeEnd * rangescale;
 		ti.fadeEndSq = (foliage->Types[t].translucent && ti.fadeEnd > 0) ? ti.fadeEnd * ti.fadeEnd : -1.;
+		ti.cullable = GetFoliageTypeBounds(foliage->Types[t], ti, ti.cullMins, ti.cullMaxs);
 	}
+	const bool frustumCull = gl_frustum_cull && Frustum.valid && !Viewpoint.bDoOob;
 
 	const DVector3 &viewpos = Viewpoint.bDoOob ? Viewpoint.OffPos : Viewpoint.Pos;
 	const double lodscale = clamp<double>(r_lod, 0., 1000.);
@@ -685,6 +718,12 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 			if ((culldistsq > 0 && distsq >= culldistsq) || (ti.maxDistSq >= 0 && distsq >= ti.maxDistSq))
 			{
 				foliageStats.culledByDistance++;
+				continue;
+			}
+
+			if (frustumCull && ti.cullable && !Frustum.ObjectBoxVisible(inst.matrix, ti.cullMins, ti.cullMaxs, 2.))
+			{
+				frustumStats.plants++;
 				continue;
 			}
 
