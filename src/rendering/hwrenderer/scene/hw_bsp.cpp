@@ -39,6 +39,7 @@
 #include "p_visualthinker.h"
 #include "p_foliage.h"
 #include "hw_hidethings.h"
+#include "r_sky.h"
 
 #ifdef ARCH_IA32
 #include <immintrin.h>
@@ -316,6 +317,41 @@ bool HWDrawInfo::IsDistanceCulled(seg_t *line)
 	return false;
 }
 
+//==========================================================================
+//
+// A two-sided line whose floors and ceilings meet exactly on both sides
+// (the edges between triangles of a terrain mesh, for example) has no
+// wall to draw and never blocks the view. Used by the terrain batches
+// (hw_terrainbatch.cpp) to find lines the walk can skip.
+//
+//==========================================================================
+
+bool IsSeamlessLine(seg_t *seg)
+{
+	line_t *line = seg->linedef;
+	sector_t *front = seg->frontsector, *back = seg->backsector;
+	if (line == nullptr || back == nullptr || front == nullptr || front == back) return false;
+	if (line->special != 0 || line->isVisualPortal() || line->sidedef[0] == nullptr || line->sidedef[1] == nullptr) return false;
+	for (side_t *side : line->sidedef)
+	{
+		if ((side->Flags & (WALLF_POLYOBJ | WALLF_BLOCKRENDERING)) || side->GetTexture(side_t::mid).isValid()) return false;
+	}
+	if (front->GetHeightSec() || back->GetHeightSec()) return false;
+	if (front->e->XFloor.ffloors.Size() || back->e->XFloor.ffloors.Size()) return false;
+	if (front->e->XFloor.attached.Size() || back->e->XFloor.attached.Size()) return false;
+	if (front->Portals[sector_t::floor] != back->Portals[sector_t::floor] || front->Portals[sector_t::ceiling] != back->Portals[sector_t::ceiling]) return false;
+	if ((front->GetTexture(sector_t::floor) == skyflatnum) != (back->GetTexture(sector_t::floor) == skyflatnum)) return false;
+	if ((front->GetTexture(sector_t::ceiling) == skyflatnum) != (back->GetTexture(sector_t::ceiling) == skyflatnum)) return false;
+
+	const double eps = 1. / 256.;
+	for (vertex_t *v : { seg->v1, seg->v2 })
+	{
+		if (fabs(front->floorplane.ZatPoint(v) - back->floorplane.ZatPoint(v)) > eps) return false;
+		if (fabs(front->ceilingplane.ZatPoint(v) - back->ceilingplane.ZatPoint(v)) > eps) return false;
+	}
+	return true;
+}
+
 void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 {
 	const bool doOob = Viewpoint.bDoOob;
@@ -590,6 +626,12 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 			if (seg->linedef == nullptr)
 			{
 				if (!(sub->flags & SSECMF_DRAWN)) AddLine (seg, mClipPortal != nullptr);
+			}
+			else if (terrainBatches && SegBatched(seg))
+			{
+				// Between two batched floors with nothing in between: no wall, no clipping, no work.
+				terrainStats.segs++;
+				sub->flags |= SSECMF_DRAWN;
 			}
 			else if (!(seg->sidedef->Flags & WALLF_POLYOBJ))
 			{
@@ -1145,6 +1187,7 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 	}
 
 	validcount++;	// used for processing sidedefs only once by the renderer.
+	SetupTerrainBatches();
 
 	multithread = gl_multithread;
 	if (multithread)

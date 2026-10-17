@@ -140,6 +140,7 @@ void HWDrawInfo::StartScene(FRenderViewpoint &parentvp, HWViewpointUniforms *uni
 	Viewpoint = parentvp;
 	lightmode = getRealLightmode(Level, true);
 	linecullmode = Level->linecullmode;
+	Frustum.valid = false;	// until SetupView
 
 	if (uniforms)
 	{
@@ -446,6 +447,7 @@ void HWDrawInfo::SetupView(FRenderState &state, float vx, float vy, float vz, bo
 	SetViewMatrix(vp.HWAngles, vx, vy, vz, mirror, planemirror);
 	SetCameraPos(vp.Pos);
 	VPUniforms.CalcDependencies();
+	Frustum.Init(VPUniforms.ProjectionMatrix, VPUniforms.ViewMatrix);
 	vpIndex = screen->mViewpoints->SetViewpoint(state, &VPUniforms);
 }
 
@@ -563,6 +565,7 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	state.EnableBrightmap(true);
 	drawlists[GLDL_PLAINWALLS].DrawWalls(this, state, false);
 	drawlists[GLDL_PLAINFLATS].DrawFlats(this, state, false);
+	DrawTerrainBatches(state);
 
 
 	// Part 2: masked geometry. This is set up so that only pixels with alpha>gl_mask_threshold will show

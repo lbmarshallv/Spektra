@@ -106,6 +106,9 @@ typedef TMap<FName, int> FDialogueMap;				// maps actor class names to dialogue 
 typedef TMap<int, FUDMFKeys> FUDMFKeyMap;
 class DIntermissionController;
 
+struct FTerrainBatches;
+void DeleteTerrainBatches(FTerrainBatches *batches);	// hw_terrainbatch.cpp
+
 struct FLevelLocals
 {
 	void *level;
@@ -799,6 +802,7 @@ public:
 	TObjPtr<DSpotState *> SpotState = MakeObjPtr<DSpotState*>(nullptr);
 
 	struct FFoliageSystem *Foliage = nullptr;	// static foliage clusters (p_foliage.h), rebuilt from the map on every load
+	struct FTerrainBatches *TerrainBatches = nullptr;	// renderer: batched outdoor floors (hw_terrainbatch.cpp)
 
 	//==========================================================================
 	//

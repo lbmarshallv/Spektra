@@ -1925,6 +1925,7 @@ FLevelLocals::~FLevelLocals()
 	if (aabbTree) delete aabbTree;
 	if (collisionWorld) delete collisionWorld;
 	delete Foliage;
+	DeleteTerrainBatches(TerrainBatches);
 }
 
 //==========================================================================

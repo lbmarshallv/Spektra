@@ -546,6 +546,9 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sector_t * frontsector, int which)
 			alpha = 1.0f - frontsector->GetReflect(sector_t::floor);
 		}
 
+		// Drawn by a terrain batch in this view (hw_terrainbatch.cpp).
+		if (!hacktype && di->FloorBatched(sector)) alpha = 0.f;
+
 		if (alpha != 0.f && frontsector->GetTexture(sector_t::floor) != skyflatnum)
 		{
 			iboindex = frontsector->iboindex[sector_t::floor];

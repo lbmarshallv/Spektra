@@ -711,6 +711,7 @@ set( FASTMATH_SOURCES
 	rendering/hwrenderer/scene/hw_skyportal.cpp
 	rendering/hwrenderer/scene/hw_sprites.cpp
 	rendering/hwrenderer/scene/hw_foliage.cpp
+	rendering/hwrenderer/scene/hw_terrainbatch.cpp
 	rendering/hwrenderer/scene/hw_hidethings.cpp
 	rendering/hwrenderer/scene/hw_spritelight.cpp
 	rendering/hwrenderer/scene/hw_walls.cpp

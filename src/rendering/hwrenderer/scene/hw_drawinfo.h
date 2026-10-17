@@ -26,6 +26,9 @@
 #include "v_video.h"
 #include "hw_weapon.h"
 #include "hw_drawlist.h"
+#include "hw_frustum.h"
+
+struct FTerrainBatches;	// hw_terrainbatch.cpp
 
 enum EDrawMode
 {
@@ -181,6 +184,8 @@ struct HWDrawInfo
 	FRenderViewpoint Viewpoint;
 	HWViewpointUniforms VPUniforms;	// per-viewpoint uniform state
 	VSMatrix ProjectionMatrix2;
+	HWFrustum Frustum;	// set by SetupView
+	FTerrainBatches *terrainBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor floors
 	TArray<HWPortal *> Portals;
 	TArray<HWDecal *> Decals[2];	// the second slot is for mirrors which get rendered in a separate pass.
 	TArray<HUDSprite> hudsprites;	// These may just be stored by value.
@@ -274,6 +279,10 @@ public:
 
 	HWPortal * FindPortal(const void * src);
 	void RenderBSPNode(void *node);
+	void SetupTerrainBatches();
+	void DrawTerrainBatches(FRenderState &state);
+	bool FloorBatched(const sector_t *sec) const;
+	bool SegBatched(const seg_t *seg) const;
 	void RenderOrthoNoFog();
 	void RenderBSP(void *node, bool drawpsprites);
 
@@ -415,3 +424,14 @@ void SetColor(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, in
 void SetShaderLight(FRenderState& state, FLevelLocals* Level, float level, float olight);
 void SetFog(FRenderState& state, FLevelLocals* Level, ELightMode lightmode, int lightlevel, int rellight, bool fullbright, const FColormap* cmap, bool isadditive);
 void ResetFoliageStats();
+void UpdateTerrainBatches(FLevelLocals *Level);
+void ResetTerrainStats();
+
+// Per-frame counts for 'stat terrain' (hw_terrainbatch.cpp).
+struct FTerrainStats
+{
+	int chunks;		// terrain chunks drawn as batches (main view)
+	int draws;		// draw calls for them
+	int segs;		// seamless lines between batched floors skipped by the walk
+};
+extern FTerrainStats terrainStats;
