@@ -119,7 +119,7 @@ void AddLightToList(FDynLightData &dld, int group, FDynamicLight * light, bool f
 	float spotDirX = 0.0f;
 	float spotDirY = 0.0f;
 	float spotDirZ = 0.0f;
-	if (light->IsSpot())
+	if (light->IsSpot() && light->pSpotInnerAngle && light->pSpotOuterAngle)
 	{
 		lightType = 1.0f;
 		spotInnerAngle = (float)light->pSpotInnerAngle->Cos();
