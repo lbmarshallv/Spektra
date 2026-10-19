@@ -110,8 +110,8 @@ struct FBspZBounds;
 void DeleteBspZBounds(FBspZBounds *bounds);	// hw_bsp.cpp
 struct FTerrainBatches;
 void DeleteTerrainBatches(FTerrainBatches *batches);	// hw_terrainbatch.cpp
-struct FWallBatches;
-void DeleteWallBatches(FWallBatches *batches);	// hw_wallbatch.cpp
+struct FWorldLOD;
+void DeleteWorldLOD(FWorldLOD *lod);	// hw_worldlod.cpp
 
 struct FLevelLocals
 {
@@ -808,7 +808,7 @@ public:
 	struct FFoliageSystem *Foliage = nullptr;	// static foliage clusters (p_foliage.h), rebuilt from the map on every load
 	struct FBspZBounds *BspZBounds = nullptr;	// renderer: height ranges of BSP nodes for frustum culling (hw_bsp.cpp)
 	struct FTerrainBatches *TerrainBatches = nullptr;	// renderer: batched outdoor floors (hw_terrainbatch.cpp)
-	struct FWallBatches *WallBatches = nullptr;	// renderer: batched outdoor walls (hw_wallbatch.cpp)
+	struct FWorldLOD *WorldLOD = nullptr;	// renderer: static model of the outdoor level past the line cull distance (hw_worldlod.cpp)
 
 	//==========================================================================
 	//

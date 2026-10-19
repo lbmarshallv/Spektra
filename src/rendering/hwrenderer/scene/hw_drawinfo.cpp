@@ -176,7 +176,7 @@ void HWDrawInfo::StartScene(FRenderViewpoint &parentvp, HWViewpointUniforms *uni
 		VPUniforms.mClipLine.X = -10000000.0f;
 		VPUniforms.mShadowmapFilter = gl_shadowmap_filter;
 		VPUniforms.mLightBlendMode = (level.info ? (int)level.info->lightblendmode : 0);
-		if (r_distance_cull_type > 1)
+		if (r_distance_cull_type == 2)	// distance fog only for type 2; type 3 leaves the map's fog alone
 		{
 			double rel = (0.5*sqrt(Viewpoint.culldistsq)/VPUniforms.mThickFogDistance) - 1.0;
 			VPUniforms.mThickFogDistance += (fabs(rel) > 0.25 ? 0.1 : 0.01)*(0.5*sqrt(Viewpoint.culldistsq) - VPUniforms.mThickFogDistance);
@@ -189,7 +189,7 @@ void HWDrawInfo::StartScene(FRenderViewpoint &parentvp, HWViewpointUniforms *uni
 		{
 			VPUniforms.mThickFogDistance = Level->thickfogdistance;
 		}
-		VPUniforms.mThickFogMultiplier =  (r_distance_cull_type > 1 ? 30.0 : Level->thickfogmultiplier);
+		VPUniforms.mThickFogMultiplier =  (r_distance_cull_type == 2 ? 30.0 : Level->thickfogmultiplier);
 	}
 	mClipper->SetViewpoint(Viewpoint);
 	vClipper->SetViewpoint(Viewpoint);
@@ -582,13 +582,14 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	drawlists[GLDL_PLAINWALLS].DrawWalls(this, state, false);
 	drawlists[GLDL_PLAINFLATS].DrawFlats(this, state, false);
 	DrawTerrainBatches(state);
-	DrawWallBatches(state);
+	DrawWorldLOD(state, 0);
 
 
 	// Part 2: masked geometry. This is set up so that only pixels with alpha>gl_mask_threshold will show
 	state.AlphaFunc(Alpha_GEqual, gl_mask_threshold);
 	drawlists[GLDL_MASKEDWALLS].DrawWalls(this, state, false);
 	drawlists[GLDL_MASKEDFLATS].DrawFlats(this, state, false);
+	DrawWorldLOD(state, 1);
 
 	// Part 3: masked geometry with polygon offset. This list is empty most of the time so only waste time on it when in use.
 	if (drawlists[GLDL_MASKEDWALLSOFS].Size() > 0)

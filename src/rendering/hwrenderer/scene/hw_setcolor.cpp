@@ -95,7 +95,7 @@ void SetFog(FRenderState &state, FLevelLocals* Level, ELightMode lightmode, int 
 	PalEntry fogcolor;
 	float fogdensity;
 
-	if (r_distance_cull_type > 1) // even if fullbright is true
+	if (r_distance_cull_type == 2) // even if fullbright is true (distance fog: type 2 only, type 3 leaves the map's fog alone)
 	{
 		fogdensity = clamp<int> ((int)(19200.0 / Level->culldist), 1, 255); // Let minimum be 1 to set the correct flags
 		if (cmap != nullptr && cmap->FadeColor != 0)
@@ -130,7 +130,7 @@ void SetFog(FRenderState &state, FLevelLocals* Level, ELightMode lightmode, int 
 
 
 	// no fog in enhanced vision modes!
-	if ((fogdensity == 0 || gl_fogmode == 0) && r_distance_cull_type < 2)
+	if ((fogdensity == 0 || gl_fogmode == 0) && r_distance_cull_type != 2)
 	{
 		state.EnableFog(false);
 		state.SetFog(0, 0);

@@ -277,7 +277,7 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 		if (!modelframe)
 		{
 			// non-black fog with subtractive style needs special treatment
-			if (!Colormap.FadeColor.isBlack() || r_distance_cull_type > 1)
+			if (!Colormap.FadeColor.isBlack() || r_distance_cull_type == 2)
 			{
 				foglayer = true;
 				// Due to the two-layer approach we need to force an alpha test that lets everything pass

@@ -591,24 +591,6 @@ void HWWall::PutWall(HWWallDispatcher *di, bool translucent)
 		flags |= HWF_TRANSLUCENT;
 	}
 
-	// Drawn by a wall batch (hw_wallbatch.cpp): only its decals still need this wall.
-	if (ddi && !translucent && !di->noBatch && lightlist == nullptr && ddi->wallBatches && ddi->WallPartBatched(seg, type))
-	{
-		if (seg->sidedef->AttachedDecals)
-		{
-			if (ddi->Level->HasDynamicLights && !ddi->isFullbrightScene() && texture != nullptr)
-			{
-				SetupLights(ddi, lightdata);
-			}
-			ProcessDecals(ddi);
-		}
-		lightlist = nullptr;
-		vertcount = 0;
-		dynlightindex = -1;
-		flags &= ~HWF_TRANSLUCENT;
-		return;
-	}
-
 	if (di->di)
 	{
 		if (translucent)
@@ -2283,6 +2265,7 @@ void HWWall::Process(HWWallDispatcher *di, seg_t *seg, sector_t * frontsector, s
 
 	if (isculled)
 	{
+		if (SkyBackdrop(di, frontsector)) return;	// the world LOD shows past it (hw_worldlod.cpp)
 		if (frontsector->GetTexture(sector_t::ceiling) == skyflatnum)
 		{
 			SkyNormal(di, frontsector, v1, v2);

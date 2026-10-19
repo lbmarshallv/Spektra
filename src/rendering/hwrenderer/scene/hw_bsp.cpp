@@ -744,7 +744,6 @@ void HWDrawInfo::WorkerThread()
 			}
 			else back = nullptr;
 
-			disp.noBatch = job->isculled;
 			wall.Process(&disp, job->seg, front, back, job->isculled);
 			rendered_lines++;
 			SetupWall.Unclock();
@@ -1080,12 +1079,7 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 
 		if (gl_render_walls)
 		{
-			if (!isculled && wallBatches && SideBatched(seg->sidedef))
-			{
-				// Everything this side draws is in a wall batch.
-				wallBatchStats.lines++;
-			}
-			else if (multithread)
+			if (multithread)
 			{
 				jobQueue.AddJob(RenderJob::WallJob, seg->Subsector, seg, isculled);
 			}
@@ -1093,7 +1087,6 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 			{
 				HWWall wall;
 				HWWallDispatcher disp(this);
-				disp.noBatch = isculled;
 				SetupWall.Clock();
 				wall.sub = seg->Subsector;
 				wall.Process(&disp, seg, currentsector, backsector, isculled);
@@ -1206,6 +1199,10 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 	{
 		int count = sub->numlines;
 		seg_t * seg = sub->firstline;
+		// With the line distance cull on, batched segs past the distance must still go through AddLine: a
+		// distance-culled line closes its angle range in the clipper, and that is what stops the BSP walk at the
+		// cull distance. Skipping them let the walk run on through all the open terrain beyond.
+		const bool lineCull = r_distance_cull_type > 0 && !isNoLineCullMode();
 
 		while (count--)
 		{
@@ -1213,7 +1210,7 @@ void HWDrawInfo::AddLines(subsector_t * sub, sector_t * sector)
 			{
 				if (!(sub->flags & SSECMF_DRAWN)) AddLine (seg, mClipPortal != nullptr);
 			}
-			else if (terrainBatches && SegBatched(seg))
+			else if (terrainBatches && SegBatched(seg) && !(lineCull && IsDistanceCulled(seg)))
 			{
 				// Between two batched floors with nothing in between: no wall, no clipping, no work.
 				terrainStats.segs++;
@@ -1842,7 +1839,7 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 
 	validcount++;	// used for processing sidedefs only once by the renderer.
 	SetupTerrainBatches();
-	SetupWallBatches();
+	SetupWorldLOD();
 
 	// Height ranges for the 3D frustum test and the horizon: need this frame's ranges and a perspective view.
 	zBounds = nullptr;

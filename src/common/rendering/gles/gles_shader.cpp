@@ -305,6 +305,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump_, const char *
 		uniform vec4 uSplitBottomPlane;
 
 		uniform vec4 uDetailParms;
+		uniform vec4 uLodCutoff;
 		// Lighting + Fog
 		uniform vec4 uLightAttr;
 		#define uLightLevel uLightAttr.a
@@ -598,6 +599,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump_, const char *
 	shaderData->muSplitBottomPlane.Init(shaderData->hShader, "uSplitBottomPlane");
 	shaderData->muSplitTopPlane.Init(shaderData->hShader, "uSplitTopPlane");
 	shaderData->muDetailParms.Init(shaderData->hShader, "uDetailParms");
+	shaderData->muLodCutoff.Init(shaderData->hShader, "uLodCutoff");
 	shaderData->muInterpolationFactor.Init(shaderData->hShader, "uInterpolationFactor");
 	shaderData->muAlphaThreshold.Init(shaderData->hShader, "uAlphaThreshold");
 	shaderData->muSpecularMaterial.Init(shaderData->hShader, "uSpecularMaterial");

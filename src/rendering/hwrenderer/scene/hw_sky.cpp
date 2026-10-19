@@ -108,7 +108,7 @@ void HWSkyInfo::init(HWDrawInfo *di, sector_t* sec, int skypos, int sky1, PalEnt
 			x_offset[0] = di->Level->hw_sky1pos;
 		}
 	}
-	if (r_distance_cull_type > 1)
+	if (r_distance_cull_type == 2)	// distance fog: type 2 only
 	{
 		fadecolor = FadeColor > 0 ? FadeColor : PalEntry(gl_cullcolor);
 	}
@@ -253,6 +253,31 @@ void HWWall::SkyNormal(HWWallDispatcher *di, sector_t * fs,vertex_t * v1,vertex_
 	ztop[1]=zfloor[1];
 	zbottom[0]=zbottom[1]=-32768.0f;
 	SkyPlane(di, fs, sector_t::floor, true);
+}
+
+//==========================================================================
+//
+//  World LOD (hw_worldlod.cpp): a line culled by distance in front of an
+//  outdoor sector shows the sky from top to bottom, at the far plane, so that
+//  the world LOD drawn past the cull distance is seen in front of it.
+//  False when that can't be done here (another view, or a skybox).
+//
+//==========================================================================
+
+bool HWWall::SkyBackdrop(HWWallDispatcher *di, sector_t *fs)
+{
+	if (di->di == nullptr || di->di->worldLOD == nullptr || !HWSectorOutdoor(fs)) return false;
+	FSectorPortal *sportal = fs->ValidatePortal(sector_t::ceiling);
+	if (sportal != nullptr && !(sportal->mFlags & PORTSF_INSKYBOX) && !(gl_noskyboxes && sportal->mType == PORTS_SKYVIEWPOINT)) return false;
+
+	ztop[0] = ztop[1] = 32768.0f;
+	zbottom[0] = zbottom[1] = -32768.0f;
+	HWSkyInfo skyinfo;
+	skyinfo.init(di->di, fs, sector_t::ceiling, fs->skytransfer, Colormap.FadeColor);
+	skyinfo.backdrop = true;
+	sky = &skyinfo;
+	PutPortal(di, PORTALTYPE_SKY, -1);
+	return true;
 }
 
 //==========================================================================

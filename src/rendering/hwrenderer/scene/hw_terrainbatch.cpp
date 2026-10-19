@@ -12,9 +12,15 @@
 ** the flat, and it skips seamless lines between two batched floors
 ** without any per-line work.
 **
-** Each frame every batched floor is compared with what was baked. If one
-** changed (a moving floor, a light change, a texture change), its whole
-** batch falls back to normal rendering until it matches again.
+** Each frame every batched floor is compared with what was baked. A floor
+** that changed (it moved, or its texture or placement changed) is taken out
+** of its batch for good: its triangles collapse, the buffer is uploaded again,
+** and the BSP draws it the normal way from then on.
+**
+** Light and colour (light level, fog, flat colours) are not baked: each batch
+** takes them from one of its floors every frame. So a time-of-day script that
+** changes all outdoor sectors alike keeps the batches. A batch whose floors'
+** light or colour drift apart falls back to normal rendering until they agree.
 **
 **---------------------------------------------------------------------------
 **
@@ -27,6 +33,7 @@
 
 #include <float.h>
 #include <algorithm>
+#include <limits.h>
 #include "g_levellocals.h"
 #include "r_defs.h"
 #include "r_sky.h"
@@ -47,6 +54,8 @@
 #include "flatvertices.h"
 #include "hw_clock.h"
 #include "stats.h"
+#include "p_spec.h"
+#include "a_scroll.h"
 
 CVAR(Bool, gl_terrain_batch, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Int, gl_terrain_chunksize, 4096, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
@@ -113,11 +122,14 @@ struct FTerrainGroup
 	int chunk;
 	unsigned firstVertex, numVertices;
 	unsigned firstSector, numSectors;	// in FTerrainBatches::groupSectors
-	bool valid;							// every floor still matches what was baked (this frame)
+	unsigned liveFloors;				// floors not taken out
+	unsigned rep;						// the floor (of firstSector..) whose light the group is drawn with
+	bool valid;							// its floors' light and colours agree (this frame)
 };
 
 struct FTerrainChunk
 {
+	uint64_t key;						// map cell (see HWCellKey)
 	float x1, x2, y1, y2, z1, z2;
 	TArray<int> groups;
 	TArray<FSection *> sections;		// for finding the dynamic lights touching the chunk
@@ -126,16 +138,37 @@ struct FTerrainChunk
 	int portalGroup = 0;
 };
 
-// Everything the floor's appearance depends on, as it was when baked. Compared byte for byte every frame.
+// Light and colours of a floor, as they reach the flat.
+struct FFloorLight
+{
+	int lightlevel;
+	FColormap colormap;
+	PalEntry flatColor, addColor;
+
+	void FromSector(const sector_t *sec)
+	{
+		memset((void*)this, 0, sizeof(*this));
+		lightlevel = sec->GetFloorLight();
+		memcpy((void*)&colormap, &sec->Colormap, sizeof(colormap));
+		flatColor = sec->SpecialColors[sector_t::floor];
+		addColor = sec->AdditiveColors[sector_t::floor];
+	}
+	bool SameColors(const FFloorLight &o) const
+	{
+		return !memcmp((const void*)&colormap, (const void*)&o.colormap, sizeof(colormap)) && flatColor == o.flatColor && addColor == o.addColor;
+	}
+};
+
+// Everything the floor's shape and texturing depends on, as it was when baked. Compared byte for byte every frame.
 struct FBakedFloor
 {
 	int sector;
 	DVector3 normal;
 	double d;
-	sector_t::splane plane;	// texture, placement, light offset, alpha, glow, texture effects, ...
-	int lightlevel;
-	FColormap colormap;
-	PalEntry flatColor, addColor;
+	sector_t::splane plane;	// texture, placement, alpha, glow, texture effects, ... (light offset zeroed: light is not baked)
+	FFloorLight light;		// as baked: the group's floors must change alike
+	unsigned firstVertex, numVertices;
+	bool evicted;			// changed since the build: taken out for good
 
 	void FromSector(int index, sector_t *sec)
 	{
@@ -144,10 +177,8 @@ struct FBakedFloor
 		normal = sec->floorplane.Normal();
 		d = sec->floorplane.fD();
 		memcpy((void*)&plane, &sec->planes[sector_t::floor], sizeof(plane));
-		lightlevel = sec->lightlevel;
-		colormap = sec->Colormap;
-		flatColor = sec->SpecialColors[sector_t::floor];
-		addColor = sec->AdditiveColors[sector_t::floor];
+		plane.Light = 0;
+		light.FromSector(sec);
 	}
 };
 
@@ -165,10 +196,37 @@ struct FTerrainBatches
 	TArray<int> sectorGroup;			// per sector: its group, -1 if not batched
 	TArray<uint8_t> sectorBatched;		// per sector: drawn by a batch this frame
 	TArray<uint8_t> segSeamless;		// per seg: seamless line between two batched floors (when both are batched)
+	TArray<FModelVertex> vertices;		// CPU copy, for taking floors out
+	bool dirty = false;
 	FModelVertexBuffer *vb = nullptr;
 	int frame = 0;
+	int checkedTic = INT_MIN;			// game tic of the last Update (floors and light only change on tics)
 
 	~FTerrainBatches() { delete vb; }
+
+	void Upload()
+	{
+		delete vb;	// the backends delete GPU buffers only once the frames using them are done
+		vb = new FModelVertexBuffer(false, true);
+		FModelVertex *out = vb->LockVertexBuffer(vertices.Size());
+		memcpy(out, vertices.Data(), vertices.Size() * sizeof(FModelVertex));
+		vb->UnlockVertexBuffer();
+		dirty = false;
+	}
+
+	void Evict(FTerrainGroup &g, FBakedFloor &b)
+	{
+		b.evicted = true;
+		g.liveFloors--;
+		const FModelVertex &first = vertices[b.firstVertex];
+		const float x = first.x, y = first.y, z = first.z;
+		for (unsigned k = 0; k < b.numVertices; k++)
+		{
+			auto &mv = vertices[b.firstVertex + k];
+			mv.x = x; mv.y = y; mv.z = z;
+		}
+		dirty = true;
+	}
 
 	bool Matches(FLevelLocals *Level) const
 	{
@@ -206,13 +264,14 @@ static bool FloorBatchable(sector_t *sec)
 	return true;
 }
 
-// Does the floor still look exactly like it was baked? (Cheap: this runs for every batched floor every frame.)
+// Is the floor still shaped and textured like it was baked? (Cheap: this runs for every batched floor every frame.)
 static bool FloorUnchanged(sector_t *sec, const FBakedFloor &b)
 {
 	if (sec->floorplane.fD() != b.d || sec->floorplane.Normal() != b.normal) return false;
-	if (memcmp(&sec->planes[sector_t::floor], &b.plane, sizeof(b.plane))) return false;
-	if (sec->lightlevel != b.lightlevel || sec->SpecialColors[sector_t::floor] != b.flatColor || sec->AdditiveColors[sector_t::floor] != b.addColor) return false;
-	if (memcmp(&sec->Colormap, &b.colormap, sizeof(b.colormap))) return false;
+	sector_t::splane plane;
+	memcpy((void*)&plane, &sec->planes[sector_t::floor], sizeof(plane));
+	plane.Light = 0;
+	if (memcmp((const void*)&plane, (const void*)&b.plane, sizeof(b.plane))) return false;
 	if (sec->Portals[sector_t::floor] != 0 || sec->GetReflect(sector_t::floor) != 0 || sec->floorplane.dithertransflag) return false;
 	if (sec->GetHeightSec() || sec->e->XFloor.ffloors.Size()) return false;
 	return true;
@@ -223,6 +282,19 @@ static bool FloorUnchanged(sector_t *sec, const FBakedFloor &b)
 // Build: copies the floors' triangles out of the flat vertex data.
 //
 //==========================================================================
+
+// Floors moved by scroller thinkers: kept out of the batches so they animate (a scrolling floor would
+// otherwise be taken out of its batch on the first tic).
+static void ScrolledFloors(FLevelLocals *Level, TArray<uint8_t> &out)
+{
+	out.Resize(Level->sectors.Size());
+	for (auto &b : out) b = 0;
+	auto it = Level->GetThinkerIterator<DScroller>(NAME_None, STAT_SCROLLER);
+	while (DScroller *s = it.Next())
+	{
+		if (s->IsType(EScroll::sc_floor) && s->GetSector()) out[s->GetSector()->Index()] = 1;
+	}
+}
 
 void FTerrainBatches::Build(FLevelLocals *Level)
 {
@@ -250,18 +322,19 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 	struct Entry { int sector, chunk, material; };
 	TArray<Entry> entries;
 	TMap<uint64_t, int> chunkMap;
+	TArray<uint8_t> scrolled;
+	ScrolledFloors(Level, scrolled);
 	for (unsigned i = 0; i < numSectors; i++)
 	{
 		sector_t *sec = &Level->sectors[i];
-		if (!FloorBatchable(sec)) continue;
+		if (!FloorBatchable(sec) || scrolled[i]) continue;
 		auto sections = Level->sections.SectionsForSector(sec);
 		if (sections.Size() == 0) continue;
 		bool skip = false;
 		for (auto &section : sections) if (section.flags & FSection::DONTRENDERFLOOR) skip = true;
 		if (skip) continue;
 
-		const int cx = (int)floor(sec->centerspot.X / chunkSize), cy = (int)floor(sec->centerspot.Y / chunkSize);
-		const uint64_t ckey = (uint64_t(uint32_t(cx)) << 32) | uint32_t(cy);
+		const uint64_t ckey = HWCellKey(sec->centerspot.X, sec->centerspot.Y, chunkSize);
 		int chunk;
 		if (int *found = chunkMap.CheckKey(ckey)) chunk = *found;
 		else
@@ -271,6 +344,7 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 			c.x1 = c.y1 = c.z1 = FLT_MAX;
 			c.x2 = c.y2 = c.z2 = -FLT_MAX;
 			c.portalGroup = sec->PortalGroup;
+			c.key = ckey;
 			chunkMap[ckey] = chunk;
 		}
 
@@ -297,8 +371,8 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 		for (auto &section : Level->sections.SectionsForSector(e.sector)) totalVerts += section.vertexcount;
 	}
 
-	vb = new FModelVertexBuffer(false, true);
-	FModelVertex *out = vb->LockVertexBuffer(totalVerts);
+	vertices.Resize(totalVerts);
+	FModelVertex *out = vertices.Data();
 	unsigned v = 0;
 	int curGroup = -1;
 	for (auto &e : entries)
@@ -313,6 +387,8 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 			g.numVertices = 0;
 			g.firstSector = groupSectors.Size();
 			g.numSectors = 0;
+			g.liveFloors = 0;
+			g.rep = 0;
 			g.valid = true;
 			chunks[e.chunk].groups.Push(curGroup);
 		}
@@ -321,6 +397,7 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 		sector_t *sec = &Level->sectors[e.sector];
 		const secplane_t &plane = sec->floorplane;
 		const DVector3 n = plane.Normal();
+		const unsigned floorFirst = v;
 
 		for (auto &section : Level->sections.SectionsForSector(sec))
 		{
@@ -346,11 +423,14 @@ void FTerrainBatches::Build(FLevelLocals *Level)
 		}
 		FBakedFloor baked;
 		baked.FromSector(e.sector, sec);
+		baked.firstVertex = floorFirst;
+		baked.numVertices = v - floorFirst;
 		groupSectors.Push(baked);
 		g.numSectors++;
+		g.liveFloors++;
 		sectorGroup[e.sector] = curGroup;
 	}
-	vb->UnlockVertexBuffer();
+	Upload();
 
 	// Seamless lines between two batched floors: skipped by the BSP walk while both batches are valid.
 	for (unsigned i = 0; i < numSegs; i++)
@@ -375,14 +455,42 @@ void FTerrainBatches::Update(FLevelLocals *Level)
 	frame++;
 	for (auto &g : groups)
 	{
-		g.valid = true;
+		// Floors that changed leave the batch for good.
+		for (unsigned i = 0; i < g.numSectors; i++)
+		{
+			FBakedFloor &b = groupSectors[g.firstSector + i];
+			if (!b.evicted && !FloorUnchanged(&Level->sectors[b.sector], b)) Evict(g, b);
+		}
+
+		g.valid = g.liveFloors > 0;
+		if (g.valid)
+		{
+			// Drawn with the first remaining floor's light: the others must have changed alike.
+			g.rep = 0;
+			while (groupSectors[g.firstSector + g.rep].evicted) g.rep++;
+			const FBakedFloor &r = groupSectors[g.firstSector + g.rep];
+			FFloorLight rnow;
+			rnow.FromSector(&Level->sectors[r.sector]);
+			const int rdelta = rnow.lightlevel - r.light.lightlevel;
+			const bool rsame = rnow.SameColors(r.light);
+			for (unsigned i = g.rep + 1; i < g.numSectors; i++)
+			{
+				const FBakedFloor &b = groupSectors[g.firstSector + i];
+				if (b.evicted) continue;
+				FFloorLight now;
+				now.FromSector(&Level->sectors[b.sector]);
+				bool ok = now.lightlevel - b.light.lightlevel == rdelta;
+				if (ok) ok = b.light.SameColors(r.light) ? now.SameColors(rnow) : (rsame && now.SameColors(b.light));
+				if (!ok) { g.valid = false; break; }
+			}
+		}
 		for (unsigned i = 0; i < g.numSectors; i++)
 		{
 			const FBakedFloor &b = groupSectors[g.firstSector + i];
-			if (!FloorUnchanged(&Level->sectors[b.sector], b)) { g.valid = false; break; }
+			sectorBatched[b.sector] = g.valid && !b.evicted;
 		}
-		for (unsigned i = 0; i < g.numSectors; i++) sectorBatched[groupSectors[g.firstSector + i].sector] = g.valid;
 	}
+	if (dirty) Upload();
 }
 
 void UpdateTerrainBatches(FLevelLocals *Level)
@@ -394,8 +502,23 @@ void UpdateTerrainBatches(FLevelLocals *Level)
 		return;
 	}
 	if (tb == nullptr) tb = Level->TerrainBatches = new FTerrainBatches;
-	if (!tb->Matches(Level)) tb->Build(Level);
-	if (tb->built) tb->Update(Level);
+	if (!tb->Matches(Level))
+	{
+		// Wait for the level's scripts to have run a couple of tics: floors are grouped by their light, and light set
+		// up by a script on its first tic (a day/night cycle, darker shadow sectors) has to be in place first, or floors
+		// lit differently from then on share batches that can never be drawn.
+		if (Level->maptime < 2) return;
+		tb->Build(Level);
+		tb->checkedTic = INT_MIN;
+	}
+	if (!tb->built) return;
+	// Once per game tic: nothing it checks changes between tics.
+	if (tb->checkedTic != Level->maptime)
+	{
+		tb->checkedTic = Level->maptime;
+		tb->Update(Level);
+	}
+	else tb->frame++;
 }
 
 // Called from the flat and line processing: is this floor drawn by a batch in this view?
@@ -437,7 +560,7 @@ void HWDrawInfo::DrawTerrainBatches(FRenderState &state)
 	if (tb == nullptr || tb->vb == nullptr) return;
 
 	const DVector3 &eye = Viewpoint.Pos;
-	const double culldistsq = (r_distance_cull_type > 0) ? Viewpoint.culldistsq : 0.;
+	const double culldistsq = r_distance_cull_type > 0 ? Viewpoint.culldistsq : 0.;
 	const bool lights = Level->HasDynamicLights && !isFullbrightScene();
 
 	visibleGroups.Clear();
@@ -449,7 +572,7 @@ void HWDrawInfo::DrawTerrainBatches(FRenderState &state)
 		{
 			const double dx = eye.X < c.x1 ? c.x1 - eye.X : (eye.X > c.x2 ? eye.X - c.x2 : 0);
 			const double dy = eye.Y < c.y1 ? c.y1 - eye.Y : (eye.Y > c.y2 ? eye.Y - c.y2 : 0);
-			if (dx * dx + dy * dy >= culldistsq) continue;
+			if (dx * dx + dy * dy >= culldistsq) continue;	// past the line cull distance
 		}
 		bool any = false;
 		for (int g : c.groups) if (tb->groups[g].valid) { visibleGroups.Push(g); any = true; }
@@ -499,6 +622,7 @@ void HWDrawInfo::DrawTerrainBatches(FRenderState &state)
 
 	int curMaterial = -1;
 	bool textureMatrix = false;
+	FGameTexture *texture = nullptr;
 	for (int gi : visibleGroups)
 	{
 		const FTerrainGroup &g = tb->groups[gi];
@@ -506,18 +630,7 @@ void HWDrawInfo::DrawTerrainBatches(FRenderState &state)
 		{
 			curMaterial = g.material;
 			const FTerrainMaterial &m = tb->materials[g.material];
-			FGameTexture *texture = TexMan.GetGameTexture(m.texture, true);
-			int lightlevel = m.lightlevel;
-			FColormap cm = m.colormap;
-			if (texture->isFullbright())
-			{
-				cm.MakeWhite();
-				lightlevel = 255;
-			}
-			SetColor(state, Level, lightmode, lightlevel, rel, fullbright, cm, 1.f);
-			SetFog(state, Level, lightmode, lightlevel, rel, fullbright, &cm, false);
-			state.SetObjectColor(m.flatColor | 0xff000000);
-			state.SetAddColor(m.addColor | 0xff000000);
+			texture = TexMan.GetGameTexture(m.texture, true);
 			state.ApplyTextureManipulation(&tb->materials[g.material].fx);
 			state.SetMaterial(texture, UF_Texture, 0, CLAMP_NONE, NO_TRANSLATION, -1, nullptr);
 
@@ -527,6 +640,22 @@ void HWDrawInfo::DrawTerrainBatches(FRenderState &state)
 			plane.Angle = m.angle;
 			textureMatrix = hw_SetPlaneTextureRotation(&plane, texture, state.mTextureMatrix);
 			state.EnableTextureMatrix(textureMatrix);
+		}
+
+		// Light and colours as HWFlat::ProcessSector computes them, from the group's first remaining floor.
+		{
+			sector_t *sec = &Level->sectors[tb->groupSectors[g.firstSector + g.rep].sector];
+			int lightlevel = RescaleLightLevel(sec->GetFloorLight());
+			FColormap cm = sec->Colormap;
+			if (texture->isFullbright())
+			{
+				cm.MakeWhite();
+				lightlevel = 255;
+			}
+			SetColor(state, Level, lightmode, lightlevel, rel, fullbright, cm, 1.f);
+			SetFog(state, Level, lightmode, lightlevel, rel, fullbright, &cm, false);
+			state.SetObjectColor(sec->SpecialColors[sector_t::floor] | 0xff000000);
+			state.SetAddColor(sec->AdditiveColors[sector_t::floor] | 0xff000000);
 		}
 		state.SetLightIndex(lights ? tb->chunks[g.chunk].lightIndex : -1);
 		state.Draw(DT_Triangles, g.firstVertex, g.numVertices);

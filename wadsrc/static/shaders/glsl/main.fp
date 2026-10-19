@@ -839,6 +839,14 @@ void main()
 	if (ClipDistanceA.x < 0 || ClipDistanceA.y < 0 || ClipDistanceA.z < 0 || ClipDistanceA.w < 0 || ClipDistanceB.x < 0) discard;
 #endif
 
+	// World LOD (hw_worldlod.cpp): each part of the static model of the level is only shown in its ring of distances.
+	if (uLodCutoff.z > 0.0 || uLodCutoff.w > 0.0)
+	{
+		vec2 lodd = pixelpos.xz - uLodCutoff.xy;
+		float lodd2 = dot(lodd, lodd);
+		if (lodd2 < uLodCutoff.z || (uLodCutoff.w > 0.0 && lodd2 >= uLodCutoff.w)) discard;
+	}
+
 #ifndef LEGACY_USER_SHADER
 	Material material;
 

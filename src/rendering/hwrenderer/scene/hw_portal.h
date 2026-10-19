@@ -37,6 +37,7 @@ struct HWSkyInfo
 	bool mirrored;
 	bool doublesky;
 	bool sky2;
+	bool backdrop;		// world LOD: drawn at the far plane, behind everything (hw_worldlod.cpp)
 	PalEntry fadecolor;
 
 	bool operator==(const HWSkyInfo & inf)
@@ -75,6 +76,7 @@ class HWPortal
 {
 	friend struct FPortalSceneState;
 
+protected:
 	enum
 	{
 		STP_Stencil,
@@ -82,6 +84,8 @@ class HWPortal
 		STP_DepthRestore,
 		STP_AllInOne
 	};
+
+private:
 
 	ActorRenderFlags savedvisibility;
 	TArray<unsigned int> mPrimIndices;
@@ -402,6 +406,7 @@ protected:
 	virtual bool IsSky() { return true; }
 	virtual bool NeedDepthBuffer() { return false; }
 	virtual const char *GetName();
+	void DrawPortalStencil(FRenderState &state, int pass) override;
 
 public:
 

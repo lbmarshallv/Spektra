@@ -218,7 +218,8 @@ struct StreamData
 
 	FVector4 uDetailParms;
 	FVector4 uNpotEmulation;
-	FVector4 padding1, padding2, padding3;
+	FVector4 uLodCutoff;	// world LOD: x, y (map), squared inner and outer distance; pixels outside that ring are discarded (0: no limit)
+	FVector4 padding2, padding3;
 };
 
 class FRenderState
@@ -323,6 +324,7 @@ public:
 		mStreamData.uSplitBottomPlane = { 0.0f, 0.0f, 0.0f, 0.0f };
 		mStreamData.uDynLightColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 		mStreamData.uDetailParms = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uLodCutoff = { 0.0f, 0.0f, 0.0f, 0.0f };
 #ifdef NPOT_EMULATION
 		mStreamData.uNpotEmulation = { 0,0,0,0 };
 #endif
@@ -495,6 +497,13 @@ public:
 	{
 		mStreamData.uSplitTopPlane = tp;
 		mStreamData.uSplitBottomPlane = bp;
+	}
+
+	// World LOD (hw_worldlod.cpp): discard pixels nearer than sqrt(innersq) or at least sqrt(outersq) map units from (x, y),
+	// measured flat. 0: no limit on that side.
+	void SetLodCutoff(float x, float y, float innersq, float outersq)
+	{
+		mStreamData.uLodCutoff = { x, y, innersq, outersq };
 	}
 
 	void SetDetailParms(float xscale, float yscale, float bias)

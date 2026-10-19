@@ -149,7 +149,7 @@ CUSTOM_CVARD(Bool, r_cull_fps, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Boolean
 		r_distance_cull_type = 3;
 	}
 }
-CUSTOM_CVARD(Color, gl_cullcolor, Color::str("#888888"), CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Fog color when r_distance_cull_type > 1. Does not override map fade colors. Hardware renderer only.")
+CUSTOM_CVARD(Color, gl_cullcolor, Color::str("#888888"), CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Fog color when r_distance_cull_type is 2. Does not override map fade colors. Hardware renderer only.")
 {
 	primaryLevel->cullcolor = gl_cullcolor;
 }
@@ -1286,7 +1286,7 @@ void R_SetupFrame(FRenderViewpoint& viewPoint, const FViewWindow& viewWindow, AA
 	}
 	else
 	{
-		if (r_distance_cull_type < 2)
+		if (r_distance_cull_type != 2)	// cull colour clear: type 2 only
 		{
 			screen->SetClearColor(GPalette.BlackIndex);
 		}

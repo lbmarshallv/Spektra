@@ -339,8 +339,8 @@ void FLevelLocals::ClearLevelData(bool fullgc)
 	BspZBounds = nullptr;
 	DeleteTerrainBatches(TerrainBatches);
 	TerrainBatches = nullptr;
-	DeleteWallBatches(WallBatches);
-	WallBatches = nullptr;
+	DeleteWorldLOD(WorldLOD);
+	WorldLOD = nullptr;
 	ACSThinker = nullptr;
 	ClientSideACSThinker = nullptr;
 	FraggleScriptThinker = nullptr;

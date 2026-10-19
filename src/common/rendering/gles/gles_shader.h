@@ -343,6 +343,7 @@ public: class ShaderVariantData
 		FUniform4f muSplitBottomPlane;
 		FUniform4f muSplitTopPlane;
 		FUniform4f muDetailParms;
+		FUniform4f muLodCutoff;
 		FBufferedUniform1f muInterpolationFactor;
 		FBufferedUniform1f muAlphaThreshold;
 		FBufferedUniform2f muSpecularMaterial;

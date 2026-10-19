@@ -31,7 +31,17 @@
 struct FBspZBounds;	// hw_bsp.cpp
 struct HWHorizon;	// hw_horizon.h
 struct FTerrainBatches;	// hw_terrainbatch.cpp
-struct FWallBatches;	// hw_wallbatch.cpp
+struct FWorldLOD;	// hw_worldlod.cpp
+
+// Outdoor: sky ceiling, or a closed sector next to one (hw_worldlod.cpp).
+bool HWSectorOutdoor(const sector_t *sec);
+
+// Map cell of a point, for the terrain batches and the world LOD (cells of 'size' map units).
+inline uint64_t HWCellKey(double x, double y, int size)
+{
+	const int cx = (int)floor(x / size), cy = (int)floor(y / size);
+	return (uint64_t(uint32_t(cx)) << 32) | uint32_t(cy);
+}
 
 enum EDrawMode
 {
@@ -192,7 +202,7 @@ struct HWDrawInfo
 	HWHorizon *horizon = nullptr;	// set by RenderBSP when horizon culling is active (main view only)
 	bool clipOnly = false;	// AddLine only feeds the clipper (subsector hidden behind the horizon)
 	FTerrainBatches *terrainBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor floors
-	FWallBatches *wallBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor walls
+	FWorldLOD *worldLOD = nullptr;	// set by RenderBSP when the world LOD is drawn past the line cull distance (main view)
 	bool thingsOnly = false;
 	int horizonHiddenCount = 0;	// subsectors hidden by the horizon in this view (decides whether it keeps running)	// walking a subtree hidden behind the horizon: actors, particles and foliage only
 	float bspZPad = 0;
@@ -295,10 +305,8 @@ public:
 	void DrawTerrainBatches(FRenderState &state);
 	bool FloorBatched(const sector_t *sec) const;
 	bool SegBatched(const seg_t *seg) const;
-	void SetupWallBatches();
-	void DrawWallBatches(FRenderState &state);
-	bool SideBatched(const side_t *side) const;
-	bool WallPartBatched(const seg_t *seg, int type) const;
+	void SetupWorldLOD();
+	void DrawWorldLOD(FRenderState &state, int pass);	// 0 opaque, 1 masked
 	bool HorizonHides(void *child, const float *bbox);
 	bool HorizonChildHidden(void *child, const float *bbox);
 	void HorizonAdd(subsector_t *sub);
@@ -474,16 +482,6 @@ struct FTerrainStats
 };
 extern FTerrainStats terrainStats;
 
-// Per-frame counts for 'stat wallbatch' (hw_wallbatch.cpp).
-struct FWallBatchStats
-{
-	int chunks;		// wall chunks drawn as batches (main view)
-	int draws;		// draw calls for them
-	int lines;		// lines whose walls are all batched, skipped by the walk
-	int sides;		// sides with batched walls
-	int evicted;	// sides taken out of their batches since the level was loaded (changed)
-	int evictedSector, evictedSide, evictedDither;	// why: a sector next to them changed / the side changed / dithered transparency
-};
-extern FWallBatchStats wallBatchStats;
-void UpdateWallBatches(FLevelLocals *Level);
-void ResetWallBatchStats();
+
+void UpdateWorldLOD(FLevelLocals *Level);	// hw_worldlod.cpp
+void ResetWorldLODStats();

@@ -1927,7 +1927,7 @@ FLevelLocals::~FLevelLocals()
 	delete Foliage;
 	DeleteBspZBounds(BspZBounds);
 	DeleteTerrainBatches(TerrainBatches);
-	DeleteWallBatches(WallBatches);
+	DeleteWorldLOD(WorldLOD);
 }
 
 //==========================================================================

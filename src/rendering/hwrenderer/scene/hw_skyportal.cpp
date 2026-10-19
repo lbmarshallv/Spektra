@@ -28,7 +28,7 @@
 
 EXTERN_CVAR(Int, r_distance_cull_type)
 EXTERN_CVAR(Color, gl_cullcolor)
-CUSTOM_CVARD(Int, gl_cull_skyfog, 255, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Sky Fog (1-255) to use when r_distance_cull_type > 1. Overlays over skymist layer. Hardware renderer only.")
+CUSTOM_CVARD(Int, gl_cull_skyfog, 255, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Sky Fog (1-255) to use when r_distance_cull_type is 2. Overlays over skymist layer. Hardware renderer only.")
 {
 	if (self < 1)
 		self = 1;
@@ -41,6 +41,29 @@ CUSTOM_CVARD(Int, gl_cull_skyfog, 255, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Sky Fo
 //
 //
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//
+// The world LOD's sky backdrop (culled lines facing outdoor sectors, see
+// HWWall::SkyBackdrop) is drawn at the far plane: the sky only shows where
+// nothing else is, and the world LOD in front of it stays visible.
+//
+//-----------------------------------------------------------------------------
+
+void HWSkyPortal::DrawPortalStencil(FRenderState &state, int pass)
+{
+	if (!origin->backdrop)
+	{
+		HWPortal::DrawPortalStencil(state, pass);
+		return;
+	}
+	const bool create = pass == STP_Stencil || pass == STP_AllInOne;
+	state.SetDepthRange(1, 1);
+	if (create) state.SetDepthFunc(DF_LEqual);
+	HWPortal::DrawPortalStencil(state, pass);
+	if (create) state.SetDepthFunc(DF_Less);
+	state.SetDepthRange(0, 1);
+}
+
 void HWSkyPortal::DrawContents(HWDrawInfo *di, FRenderState &state)
 {
 	bool drawBoth = false;
@@ -88,10 +111,10 @@ void HWSkyPortal::DrawContents(HWDrawInfo *di, FRenderState &state)
 		}
 	}
 
-	if ((di->Level->skyfog>0 && (origin->fadecolor & 0xffffff) != 0) || (r_distance_cull_type > 1))
+	if ((di->Level->skyfog>0 && (origin->fadecolor & 0xffffff) != 0) || (r_distance_cull_type == 2))	// distance fog: type 2 only
 	{
 		PalEntry FadeColor = origin->fadecolor;
-		if (r_distance_cull_type < 2) FadeColor.a = clamp<int>(di->Level->skyfog, 0, 255);
+		if (r_distance_cull_type != 2) FadeColor.a = clamp<int>(di->Level->skyfog, 0, 255);
 		else FadeColor.a = gl_cull_skyfog;
 
 		if (di->Level->flags3 & LEVEL3_SKYMIST && origin->texture[2])
@@ -101,7 +124,7 @@ void HWSkyPortal::DrawContents(HWDrawInfo *di, FRenderState &state)
 			float myoffset = (myscale - 1.0)*0.857*misth; // [DVR] Why so many magic numbers when it comes to sky??
 			vertexBuffer->RenderDome(state, origin->texture[2], origin->x_offset[2], myoffset, false, FSkyVertexBuffer::SKYMODE_FOGLAYER, !!(di->Level->flags & LEVEL_FORCETILEDSKY), 1.0, (myscale == 0.0 ? 0 : 240.0/misth/myscale), FadeColor);
 		}
-		else if (!di->isFullbrightScene() || r_distance_cull_type > 1)
+		else if (!di->isFullbrightScene() || r_distance_cull_type == 2)
 		{
 			state.EnableTexture(false);
 			state.SetObjectColor(FadeColor);

@@ -317,13 +317,13 @@ sector_t* RenderView(player_t* player)
 	ResetFoliageStats();
 	ResetFrustumStats();
 	ResetTerrainStats();
-	ResetWallBatchStats();
+	ResetWorldLODStats();
 	for (auto Level : AllLevels())
 	{
 		if (Level->Foliage) Level->Foliage->RebuildIfDirty(Level);	// plants spawned by script since the last frame
 		UpdateBspZBounds(Level);	// moving floors and ceilings since the last frame
 		UpdateTerrainBatches(Level);	// batched outdoor floors that changed since they were built fall back to normal rendering
-		UpdateWallBatches(Level);	// batched outdoor walls (built on first use; changed walls are taken out in RenderBSP)
+		UpdateWorldLOD(Level);	// static model of the outdoor level, snapshotted on the first frame
 	}
 	hw_postprocess.SetTonemapMode(level.info ? level.info->tonemap : ETonemapMode::None);
 
