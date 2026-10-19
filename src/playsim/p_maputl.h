@@ -442,7 +442,7 @@ class FThingPathTraverse
   protected:
 	TArray<intercept_t> intercepts;
 	TArray<AActor *>    ignoreThese;
-	AActor             *caller;
+	AActor             *caller = nullptr;
 
 	FLevelLocals *Level;
 	divline_t     trace;

@@ -837,6 +837,71 @@ sightcounts[2]++;
 =====================
 */
 
+//==========================================================================
+//
+// P_ModelsBlockSight
+//
+// Sight through actors with collision models (COLSTATICSOLID scenery such
+// as houses and doors). Like the line check, t1 looks from 3/4 of its height
+// and sees t2 if any part of it is unobstructed: rays to the middle, near
+// the top and near the bottom of t2 are tried. (This used to be one ray from
+// t1's feet to t2's feet, which ran along floors and door sills, so an actor
+// standing on a model's floor, like a house's, could see nothing outside.)
+//
+//==========================================================================
+
+static bool P_ModelsBlockSight(AActor *t1, AActor *t2)
+{
+	FLevelLocals *Level  = t1->Level;
+	DVector3      eye    = t1->Pos().plusZ(t1->Height * 0.75);
+	DVector3      target = t2->PosRelative(t1);
+
+	FThingPathTraverse it(Level, eye, target.plusZ(t2->Height * 0.5), PT_STATSOL, 0.,
+	                      ActorFlags::FromInt(0xffffffff), t1);
+	TArray<AActor *> things;
+	for (AActor *thing : it.things)
+	{
+		if (thing != t1 && thing != t2)
+			things.Push(thing);
+	}
+	if (things.Size() == 0)
+		return false;
+
+	AActor *blocker = nullptr;
+	double  nearest = 2;
+	for (double part : {0.5, 0.9, 0.1})
+	{
+		DVector3 to = target.plusZ(t2->Height * part);
+		auto     r  = Level->TraceCollisionHit(eye, to, things);
+		if (!r.hasHit())
+			return false;
+		for (int i = 0; i < r.m_collisionObjects.size(); i++)
+		{
+			auto model = static_cast<const AdvancedCollisionModel *>(r.m_collisionObjects[i]->getUserPointer());
+			if (model && r.m_hitFractions[i] < nearest)
+			{
+				nearest = r.m_hitFractions[i];
+				blocker = model->owner;
+			}
+		}
+	}
+
+	if (P_ColDebug(t1) || P_ColDebug(t2))
+	{
+		static AActor *lastBlocker = nullptr;
+		static int     lastTime    = -1000;
+		if (blocker != lastBlocker || Level->maptime - lastTime >= TICRATE)
+		{
+			Printf("[col] sight %s -> %s blocked by %s at %.0f%% of the way\n", t1->GetClass()->TypeName.GetChars(),
+			       t2->GetClass()->TypeName.GetChars(), blocker ? blocker->GetClass()->TypeName.GetChars() : "?",
+			       nearest * 100);
+			lastBlocker = blocker;
+			lastTime    = Level->maptime;
+		}
+	}
+	return true;
+}
+
 int P_CheckSight (AActor *t1, AActor *t2, int flags)
 {
 	SightCycles.Clock();
@@ -946,9 +1011,8 @@ sightcounts[0]++;
 	}
 
 done:
-	FThingPathTraverse it2(t1->Level, t1->Pos(), t2->Pos(), PT_STATSOL, 0.);
-	if (it2.Next())
-		return false;
+	if (res && P_ModelsBlockSight(t1, t2))
+		res = false;
 	SightCycles.Unclock();
 	return res;
 }
