@@ -3198,6 +3198,14 @@ void MapLoader::LoadLevel(MapData *map, const char *lumpname, int position)
 
 	LoadReject(map, false);
 	GroupLines(false);
+
+	// UDMF lodonly: background scenery drawn only by the hardware renderer's world LOD. Players and monsters can't
+	// cross into it (projectiles and hitscans still can). Map data only, so the same on every machine.
+	for (auto &line : Level->lines)
+	{
+		auto lodOnly = [](const sector_t *s) { return s && (s->MoreFlags & (SECMF_LODONLY | SECMF_NOLOD)) == SECMF_LODONLY; };
+		if (line.frontsector && line.backsector && lodOnly(line.frontsector) != lodOnly(line.backsector)) line.flags |= ML_BLOCKING;
+	}
 	FloodZones();
 	SetRenderSector();
 	FixMinisegReferences();

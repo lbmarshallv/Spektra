@@ -36,6 +36,11 @@ struct FWorldLOD;	// hw_worldlod.cpp
 // Outdoor: sky ceiling, or a closed sector next to one (hw_worldlod.cpp).
 bool HWSectorOutdoor(const sector_t *sec);
 
+// UDMF lodonly (and not nolod): drawn only by the world LOD model (hw_worldlod.cpp). These test the map flag only;
+// the renderer checks HWDrawInfo::lodOnly (gl_worldlod_lodonly, world LOD active in this view) first.
+inline bool HWSectorLodOnly(const sector_t *sec) { return sec && (sec->MoreFlags & (SECMF_LODONLY | SECMF_NOLOD)) == SECMF_LODONLY; }
+inline bool HWLineLodOnly(const line_t *line) { return HWSectorLodOnly(line->frontsector) || HWSectorLodOnly(line->backsector); }
+
 // Map cell of a point, for the terrain batches and the world LOD (cells of 'size' map units).
 inline uint64_t HWCellKey(double x, double y, int size)
 {
@@ -203,6 +208,8 @@ struct HWDrawInfo
 	bool clipOnly = false;	// AddLine only feeds the clipper (subsector hidden behind the horizon)
 	FTerrainBatches *terrainBatches = nullptr;	// set by RenderBSP when this view draws batched outdoor floors
 	FWorldLOD *worldLOD = nullptr;	// set by RenderBSP when the world LOD is drawn past the line cull distance (main view)
+	bool lodOnly = false;			// this view: lodonly sectors are drawn by the world LOD, and the BSP walk skips them
+	bool worldLODBackdrop = false;	// this view: one sky backdrop around the camera replaces the culled lines' own
 	bool thingsOnly = false;
 	int horizonHiddenCount = 0;	// subsectors hidden by the horizon in this view (decides whether it keeps running)	// walking a subtree hidden behind the horizon: actors, particles and foliage only
 	float bspZPad = 0;
@@ -306,6 +313,8 @@ public:
 	bool FloorBatched(const sector_t *sec) const;
 	bool SegBatched(const seg_t *seg) const;
 	void SetupWorldLOD();
+	bool LodOnlyChild(void *child) const;	// BSP child entirely in lodonly sectors (skipped by the walk)
+	void AddWorldLODBackdrop();
 	void DrawWorldLOD(FRenderState &state, int pass);	// 0 opaque, 1 masked
 	bool HorizonHides(void *child, const float *bbox);
 	bool HorizonChildHidden(void *child, const float *bbox);

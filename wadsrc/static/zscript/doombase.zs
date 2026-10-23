@@ -641,6 +641,7 @@ struct LevelLocals native
 
 	native void ChangeSky(TextureID sky1, TextureID sky2 );
 	native void ChangeSkyMist(TextureID skymist, bool usemist = true, float skymistyscale = 1.0);
+	native void RebuildWorldLOD();	// takes a new snapshot of the world LOD model next frame (whole map)
 	native void SetSkyFog(int fogdensity);
 	native void SetThickFog(float distance, float multiplier);
 	native void ForceLightning(int mode = 0, sound tempSound = "");

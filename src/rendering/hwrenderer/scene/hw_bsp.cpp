@@ -1071,6 +1071,14 @@ void HWDrawInfo::AddLine (seg_t *seg, bool portalclip)
 	// The line isn't marked as processed, so its other side can still draw it if that one is visible.
 	if (clipOnly) return;
 
+	// lodonly (hw_worldlod.cpp): the world LOD model draws this line's walls at any distance. The line has clipped
+	// above like any other, and that is all the walk does with it.
+	if (lodOnly && !ispoly && HWLineLodOnly(seg->linedef))
+	{
+		seg->linedef->validcount = validcount;
+		return;
+	}
+
 	seg->linedef->flags |= ML_MAPPED;
 
 	if (ispoly || seg->linedef->validcount!=validcount)
@@ -1642,7 +1650,8 @@ void HWDrawInfo::DoSubsector(subsector_t * sub)
 		}
 	}
 
-	if (gl_render_flats && !horizonHidden)
+	// lodonly sectors: the world LOD model draws their planes (hw_worldlod.cpp).
+	if (gl_render_flats && !horizonHidden && !(lodOnly && HWSectorLodOnly(sub->render_sector)))
 	{
 		// Subsectors with only 2 lines cannot have any area
 		if (sub->numlines>2 || (sub->hacked&1))
@@ -1754,7 +1763,9 @@ void HWDrawInfo::RenderBSPNode (void *node)
 		const bool cull3D = frustum3D && !(no_renderflags[bsp->Index()] & SSRF_SEEN);
 
 		// Recursively divide front space (toward the viewer).
-		if (!cull3D || ChildInFrustum(bsp->children[side], bsp->bbox[side]))
+		// Entirely lodonly: drawn by the world LOD model, nothing for the walk to do (hw_worldlod.cpp).
+		if (LodOnlyChild(bsp->children[side])) {}
+		else if (!cull3D || ChildInFrustum(bsp->children[side], bsp->bbox[side]))
 		{
 			const bool wasThingsOnly = thingsOnly;
 			if (horizon && !thingsOnly && HorizonChildHidden(bsp->children[side], bsp->bbox[side])) thingsOnly = true;
@@ -1785,6 +1796,7 @@ void HWDrawInfo::RenderBSPNode (void *node)
 			frustumStats.nodes++;
 			return;
 		}
+		if (LodOnlyChild(bsp->children[side])) return;
 		if (horizon && !thingsOnly && HorizonChildHidden(bsp->children[side], bsp->bbox[side])) thingsOnly = true;
 
 		node = bsp->children[side];

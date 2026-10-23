@@ -26,6 +26,18 @@
 **     light that changes alike for them (a day/night cycle) is followed
 **     exactly; surfaces whose light changes on its own (a flickering sector)
 **     follow their draw's representative instead.
+**   - Sectors whose floor or ceiling moves away from where it was snapshotted
+**     (a lift, a raising bridge) take their parts out of the model, and the
+**     walls that depend on their height with them: better nothing than a
+**     copy in the wrong place. They come back when the sector is back where it
+**     was. Sectors marked nolod in UDMF are never in the model.
+**     worldlod_rebuild / Level.RebuildWorldLOD() take a new snapshot.
+**   - Sectors marked lodonly in UDMF (and the walls between them and their
+**     neighbours) are in the model whether outdoor or not, and drawn from it
+**     at any distance, not just past the cull distance. The BSP walk skips
+**     every subtree that is entirely lodonly; elsewhere their lines only
+**     clip. The sky behind everything is one backdrop around the camera, so
+**     skipped lines need no sky walls of their own (and culled lines neither).
 **   - Where the line cull closes the view (a culled line facing an outdoor
 **     sector), the sky is drawn at the far plane instead of on the line, so
 **     the model shows in front of it.
@@ -72,6 +84,7 @@
 #include "image.h"
 #include "bitmap.h"
 #include "palutil.h"
+#include "vm.h"
 #include "c_dispatch.h"
 
 // On/off. Needs a line cull distance (r_distance_cull_type > 0).
@@ -82,6 +95,9 @@ CVAR(Int, gl_worldlod_chunk, 4096, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, gl_worldlod_bias, 128.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // Past this many times the line cull distance, the colour model replaces the textured one. 1 or less: textures all the way.
 CVAR(Float, gl_worldlod_colordist, 2.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Testing switch for UDMF lodonly: off draws lodonly sectors like any other; the model is rebuilt when it changes
+// (see FWorldLOD::Matches). TODO: remove before committing.
+CVAR(Bool, gl_worldlod_lodonly, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // How often light, colour and fog are looked up again, in game tics (35 per second). 0: every frame.
 CVAR(Int, gl_worldlod_envupdatetic, 1, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
@@ -289,6 +305,7 @@ struct FLodMaterial
 	int kind;					// LOD_*
 	int clamp;					// walls: HWF_CLAMPX | HWF_CLAMPY
 	bool masked;				// drawn in the masked pass (two-sided middle textures and 3D-floor sides with holes)
+	bool lodonly;				// lodonly sector or line: drawn at any distance, not just past the cull distance
 	bool m2s;					// two-sided middle texture (clamped vertically like HWWall does)
 	bool ext;					// wall with its own texture effects
 	TextureManipulation fx;
@@ -325,6 +342,7 @@ struct FLodGroup
 	unsigned firstRange, numRanges;
 	bool masked;
 	bool wall;
+	bool lodonly;
 };
 
 struct FLodChunk
@@ -332,6 +350,7 @@ struct FLodChunk
 	float x1 = FLT_MAX, x2 = -FLT_MAX, y1 = FLT_MAX, y2 = -FLT_MAX, z1 = FLT_MAX, z2 = -FLT_MAX;
 	bool texVisible = false;		// this frame: textured model in view here
 	bool colorVisible = false;		// this frame: colour model in view here
+	bool nearVisible = false;		// this frame: lodonly pieces of the textured model in view here (any distance)
 };
 
 struct FWorldLOD
@@ -352,7 +371,28 @@ struct FWorldLOD
 	TArray<FLodRange> ranges;
 	TArray<FLodSlot> slots;
 	unsigned numVertices = 0, numColors = 0;
-	int outdoorSectors = 0, fixedLights = 0;
+	int outdoorSectors = 0, fixedLights = 0, nolodSectors = 0;
+
+	// Moving sectors. Every piece of the model (an entry: one wall part or one section of a plane) knows where its
+	// vertices are in the buffer and which sectors' heights it depends on. A sector whose planes are no longer where
+	// they were snapshotted hides the pieces depending on it (their vertices are zeroed in the buffer); they are put
+	// back from the CPU copy of the textured vertices when it returns.
+	TArray<double> planes;			// per sector: floor D, floor normal Z, ceiling D, ceiling normal Z, as snapshotted
+	TArray<int> watched;			// sectors that pieces depend on
+	TArray<int> depStart, depEntries;	// per sector: the pieces depending on its height
+	TArray<unsigned> entryTex, entryColor, entryCount;	// per piece: its vertices in the textured and colour model (~0u: none)
+	TArray<int> entryTexel;			// per piece: its colour texel (colour model)
+	TArray<unsigned> entryDepFirst, entryDepCount;
+	TArray<int> entryDeps;
+	TArray<uint8_t> sectorMoved, entryHidden;
+	TArray<FModelVertex> texVerts;	// CPU copy of the textured model's vertices, for putting hidden pieces back
+	int movedSectors = 0, hiddenPieces = 0;
+	int checkedTic = INT_MIN;		// game tic of the last moving-sector check
+
+	// lodonly: BSP subtrees entirely in lodonly sectors (skipped by the walk)
+	bool lodOnlyMode = false;		// gl_worldlod_lodonly when built
+	TArray<uint8_t> subLodOnly, nodeLodOnly;
+	int lodOnlySectors = 0, lodOnlyNodes = 0;
 	FModelVertexBuffer *vb = nullptr;
 	FGameTexture *palette = nullptr;	// the colour model's texture (owned by the texture manager)
 
@@ -361,10 +401,13 @@ struct FWorldLOD
 	bool Matches(FLevelLocals *Level) const
 	{
 		return sectorsData == Level->sectors.Data() && numSectors == Level->sectors.Size() && numSides == Level->sides.Size()
-			&& chunkSize == clamp<int>(gl_worldlod_chunk, 512, 65536) && seamless == !!gl_seamless;
+			&& chunkSize == clamp<int>(gl_worldlod_chunk, 512, 65536) && seamless == !!gl_seamless && lodOnlyMode == !!gl_worldlod_lodonly;
 	}
 
 	void Build(FLevelLocals *Level);
+	void CheckMoved(FLevelLocals *Level);
+	void RequestRebuild() { sectorsData = nullptr; }
+	bool LodOnly(const sector_t *sec) const { return lodOnlyMode && HWSectorLodOnly(sec); }	// rebuilt by UpdateWorldLOD before the next frame is drawn
 };
 
 void DeleteWorldLOD(FWorldLOD *lod)
@@ -422,9 +465,19 @@ void FWorldLOD::Build(FLevelLocals *Level)
 	ranges.Clear();
 	slots.Clear();
 	numVertices = numColors = 0;
-	outdoorSectors = fixedLights = 0;
+	outdoorSectors = fixedLights = nolodSectors = 0;
+	movedSectors = hiddenPieces = 0;
+	checkedTic = INT_MIN;
+	planes.Clear(); watched.Clear(); depStart.Clear(); depEntries.Clear();
+	entryTex.Clear(); entryColor.Clear(); entryCount.Clear(); entryTexel.Clear();
+	entryDepFirst.Clear(); entryDepCount.Clear(); entryDeps.Clear();
+	sectorMoved.Clear(); entryHidden.Clear(); texVerts.Clear();
 	envTic = INT_MIN;
 	palette = nullptr;
+	lodOnlyMode = gl_worldlod_lodonly;
+	lodOnlySectors = lodOnlyNodes = 0;
+	subLodOnly.Clear();
+	nodeLodOnly.Clear();
 	sectorsData = Level->sectors.Data();
 	numSectors = Level->sectors.Size();
 	numSides = Level->sides.Size();
@@ -439,12 +492,17 @@ void FWorldLOD::Build(FLevelLocals *Level)
 	outdoor.Resize(numSectors);
 	for (unsigned i = 0; i < numSectors; i++)
 	{
-		outdoor[i] = HWSectorOutdoor(&Level->sectors[i]);
+		const bool nolod = !!(Level->sectors[i].MoreFlags & SECMF_NOLOD);
+		nolodSectors += nolod;
+		outdoor[i] = !nolod && HWSectorOutdoor(&Level->sectors[i]);
 		outdoorSectors += outdoor[i];
 	}
 
 	// Triangles go into temp, each piece noted with its material, light source and chunk; sorted into groups at the end.
-	struct Entry { int material, chunk; FLodLightSource source; unsigned first, count; };
+	struct Entry { int material, chunk; FLodLightSource source; unsigned first, count; unsigned depFirst, depCount; };
+	TArray<int> curDeps;			// sectors whose height the pieces being made depend on
+	bool curLodOnly = false;		// the pieces being made belong to a lodonly sector or line
+	auto addDep = [&](sector_t *s) { if (s && curDeps.Find(s->Index()) == curDeps.Size()) curDeps.Push(s->Index()); };
 	TArray<Entry> entries;
 	TArray<FModelVertex> temp;
 	TMap<uint64_t, int> chunkMap;
@@ -565,7 +623,9 @@ void FWorldLOD::Build(FLevelLocals *Level)
 			ch.y1 = min(ch.y1, mv.z); ch.y2 = max(ch.y2, mv.z);	// map Y
 			ch.z1 = min(ch.z1, mv.y); ch.z2 = max(ch.z2, mv.y);	// height
 		}
-		entries.Push({ material, c, src, first, n });
+		const unsigned depFirst = entryDeps.Size();
+		for (int d : curDeps) entryDeps.Push(d);
+		entries.Push({ material, c, src, first, n, depFirst, curDeps.Size() });
 	};
 	auto pushVertex = [&](float x, float z, float y, float u, float v, const FVector3 &n)
 	{
@@ -587,8 +647,13 @@ void FWorldLOD::Build(FLevelLocals *Level)
 	{
 		side_t *side = &Level->sides[si];
 		if (side->sector == nullptr || side->linedef == nullptr) continue;
-		if (!outdoor[side->sector->Index()]) continue;
 		if (side->Flags & WALLF_POLYOBJ) continue;
+		// Nothing between a nolod sector and its neighbours either (those walls only exist because of it).
+		line_t *ln = side->linedef;
+		if ((ln->frontsector && (ln->frontsector->MoreFlags & SECMF_NOLOD)) || (ln->backsector && (ln->backsector->MoreFlags & SECMF_NOLOD))) continue;
+		// Lines touching a lodonly sector are always in (both sides): nothing else draws them.
+		curLodOnly = LodOnly(ln->frontsector) || LodOnly(ln->backsector);
+		if (!outdoor[side->sector->Index()] && !curLodOnly) continue;
 		if (side->numsegs <= 0 || side->segs == nullptr) continue;
 		seg_t *seg = side->segs[0];
 		if (seg == nullptr || seg->sidedef != side || seg->Subsector == nullptr || seg->frontsector == nullptr) continue;
@@ -596,6 +661,15 @@ void FWorldLOD::Build(FLevelLocals *Level)
 		sector_t *front = seg->frontsector;
 		sector_t *back = seg->backsector;
 		if (back && back->sectornum == front->sectornum) back = front;
+
+		// The wall's shape depends on the heights of the sectors on both sides and of their 3D floors' control sectors.
+		curDeps.Clear();
+		for (sector_t *s : { ln->frontsector, ln->backsector })
+		{
+			if (s == nullptr) continue;
+			addDep(s);
+			for (auto *ff : s->e->XFloor.ffloors) addDep(ff->model);
+		}
 
 		mh.list.Clear();
 		mh.translucent.Clear();
@@ -629,6 +703,7 @@ void FWorldLOD::Build(FLevelLocals *Level)
 			memset((void *)&m, 0, sizeof(m));
 			m.texture = w.texture;
 			m.kind = LOD_WALL;
+			m.lodonly = curLodOnly;
 			m.clamp = w.flags & 3;
 			m.m2s = w.type == RENDERWALL_M2S;
 			m.masked = (m.m2s || w.type == RENDERWALL_FFBLOCK) && w.texture->isMasked();
@@ -706,6 +781,7 @@ void FWorldLOD::Build(FLevelLocals *Level)
 				memset((void *)&m, 0, sizeof(m));
 				m.texture = tex;
 				m.kind = LOD_WALL;
+				m.lodonly = curLodOnly;
 				FLodLightSource src;
 				memset((void *)&src, 0, sizeof(src));
 				src.kind = LOD_FILL;
@@ -741,6 +817,7 @@ void FWorldLOD::Build(FLevelLocals *Level)
 		memset((void *)&m, 0, sizeof(m));
 		m.texture = tex;
 		m.kind = kind;
+		m.lodonly = curLodOnly;
 		m.offsX = (float)model->GetXOffset(modelPlane);
 		m.offsY = (float)model->GetYOffset(modelPlane);
 		m.scaleX = (float)model->GetXScale(modelPlane);
@@ -791,11 +868,14 @@ void FWorldLOD::Build(FLevelLocals *Level)
 
 	for (unsigned s = 0; s < numSectors; s++)
 	{
-		if (!outdoor[s]) continue;
 		sector_t *sec = &Level->sectors[s];
+		curLodOnly = LodOnly(sec);
+		if (!outdoor[s] && !curLodOnly) continue;
 		FLodLightSource src;
 		memset((void *)&src, 0, sizeof(src));
 		src.sector = s;
+		curDeps.Clear();
+		addDep(sec);
 		if (sec->Portals[sector_t::floor] == 0)
 		{
 			src.kind = LOD_FLOOR;
@@ -828,6 +908,10 @@ void FWorldLOD::Build(FLevelLocals *Level)
 				src.kind = LOD_3D;
 				src.fixed = false;
 				src.ffloor = k;
+				curDeps.Clear();
+				addDep(sec);
+				addDep(rover->model);
+				addDep(pr.model);
 				src.bottom = !!bottom;
 				bakePlane(sec, *pr.plane, pr.vindex, LOD_3D, !bottom, pr.model, pr.isceiling, *pr.texture, src, 0);
 			}
@@ -911,6 +995,17 @@ void FWorldLOD::Build(FLevelLocals *Level)
 		v += count;
 	};
 
+	entryTex.Resize(entries.Size());
+	entryColor.Resize(entries.Size());
+	entryCount.Resize(entries.Size());
+	entryTexel.Resize(entries.Size());
+	for (unsigned i = 0; i < entries.Size(); i++)
+	{
+		entryTex[i] = entryColor[i] = ~0u;
+		entryCount[i] = entries[i].count;
+		entryTexel[i] = materialColor[entries[i].material];
+	}
+
 	// Textured model: by material (opaque first, masked last), then chunk.
 	{
 		TArray<int> order;
@@ -937,12 +1032,15 @@ void FWorldLOD::Build(FLevelLocals *Level)
 				g.firstRange = ranges.Size();
 				g.masked = m.masked;
 				g.wall = m.kind == LOD_WALL;
+				g.lodonly = m.lodonly;
 				texGroups.Push(g);
 			}
+			entryTex[i] = v;
 			memcpy(&vertices[v], &temp[e.first], e.count * sizeof(FModelVertex));
 			addRange(texGroups.Last(), e.chunk, e.count);
 		}
 	}
+	const unsigned numTexVertices = v;
 
 	// Colour model: by light as snapshotted (walls and flats alike), then chunk. Masked walls are left out.
 	{
@@ -974,6 +1072,7 @@ void FWorldLOD::Build(FLevelLocals *Level)
 				colorGroups.Push(g);
 			}
 			auto &g = colorGroups.Last();
+			entryColor[i] = v;
 			const int texel = materialColor[e.material];
 			const float u = texelU(texel), tv = texelV(texel);
 			for (unsigned k = 0; k < e.count; k++)
@@ -987,6 +1086,90 @@ void FWorldLOD::Build(FLevelLocals *Level)
 		}
 	}
 	numVertices = v;
+
+	// Moving sectors: who depends on whom, and where everything was.
+	{
+		entryDepFirst.Resize(entries.Size());
+		entryDepCount.Resize(entries.Size());
+		depStart.Resize(numSectors + 1);
+		for (auto &d : depStart) d = 0;
+		for (unsigned i = 0; i < entries.Size(); i++)
+		{
+			entryDepFirst[i] = entries[i].depFirst;
+			entryDepCount[i] = entries[i].depCount;
+			for (unsigned d = 0; d < entries[i].depCount; d++) depStart[entryDeps[entries[i].depFirst + d] + 1]++;
+		}
+		for (unsigned s = 0; s < numSectors; s++)
+		{
+			if (depStart[s + 1] > 0) watched.Push(s);
+			depStart[s + 1] += depStart[s];
+		}
+		depEntries.Resize(depStart[numSectors]);
+		TArray<int> fill;
+		fill.Resize(numSectors);
+		for (unsigned s = 0; s < numSectors; s++) fill[s] = depStart[s];
+		for (unsigned i = 0; i < entries.Size(); i++)
+		{
+			for (unsigned d = 0; d < entries[i].depCount; d++) depEntries[fill[entryDeps[entries[i].depFirst + d]]++] = i;
+		}
+		planes.Resize(numSectors * 4);
+		for (unsigned s = 0; s < numSectors; s++)
+		{
+			const sector_t *sec = &Level->sectors[s];
+			planes[s * 4 + 0] = sec->floorplane.fD();
+			planes[s * 4 + 1] = sec->floorplane.Normal().Z;
+			planes[s * 4 + 2] = sec->ceilingplane.fD();
+			planes[s * 4 + 3] = sec->ceilingplane.Normal().Z;
+		}
+		sectorMoved.Resize(numSectors);
+		for (auto &m : sectorMoved) m = 0;
+		entryHidden.Resize(entries.Size());
+		for (auto &h : entryHidden) h = 0;
+		texVerts.Resize(numTexVertices);
+		if (numTexVertices > 0) memcpy(texVerts.Data(), vertices.Data(), numTexVertices * sizeof(FModelVertex));
+	}
+
+	// lodonly subtrees: a subsector is lodonly if its sector (and the sector its planes are drawn from) is and it holds
+	// no polyobject; a node if both its children are.
+	for (unsigned s = 0; s < numSectors; s++) lodOnlySectors += LodOnly(&Level->sectors[s]);
+	if (lodOnlySectors > 0 && Level->nodes.Size() > 0)
+	{
+		subLodOnly.Resize(Level->subsectors.Size());
+		for (unsigned i = 0; i < Level->subsectors.Size(); i++)
+		{
+			const subsector_t &sub = Level->subsectors[i];
+			subLodOnly[i] = sub.polys == nullptr && LodOnly(sub.sector) && (sub.render_sector == nullptr || LodOnly(sub.render_sector));
+		}
+		nodeLodOnly.Resize(Level->nodes.Size());
+		for (auto &n : nodeLodOnly) n = 0;
+		auto childLodOnly = [&](void *child) -> bool
+		{
+			if ((size_t)child & 1) return subLodOnly[((subsector_t *)((uint8_t *)child - 1))->Index()];
+			return nodeLodOnly[((node_t *)child)->Index()];
+		};
+		// Children before parents.
+		TArray<int> stack;
+		TArray<uint8_t> expanded;
+		expanded.Resize(Level->nodes.Size());
+		for (auto &e : expanded) e = 0;
+		stack.Push(Level->HeadNode()->Index());
+		while (stack.Size())
+		{
+			const int n = stack.Last();
+			node_t *node = &Level->nodes[n];
+			if (!expanded[n])
+			{
+				expanded[n] = 1;
+				for (int i = 0; i < 2; i++) if (!((size_t)node->children[i] & 1)) stack.Push(((node_t *)node->children[i])->Index());
+			}
+			else
+			{
+				stack.Pop();
+				nodeLodOnly[n] = childLodOnly(node->children[0]) && childLodOnly(node->children[1]);
+				lodOnlyNodes += nodeLodOnly[n];
+			}
+		}
+	}
 
 	if (numVertices > 0)
 	{
@@ -1005,6 +1188,85 @@ void FWorldLOD::Build(FLevelLocals *Level)
 	}
 	else delete img;
 	lodBuildMS = (I_nsTime() - startTime) / 1e6;
+}
+
+//==========================================================================
+//
+// Moving sectors, once per game tic: hide the pieces depending on a sector
+// whose floor or ceiling has left the height it was snapshotted at, and put
+// them back when it returns.
+//
+//==========================================================================
+
+void FWorldLOD::CheckMoved(FLevelLocals *Level)
+{
+	if (vb == nullptr) return;
+	IVertexBuffer *buf = vb->vertexBuffer();
+	static TArray<FModelVertex> scratch;
+	for (int s : watched)
+	{
+		const sector_t *sec = &Level->sectors[s];
+		const double *p = &planes[s * 4];
+		const bool moved = sec->floorplane.fD() != p[0] || sec->floorplane.Normal().Z != p[1]
+			|| sec->ceilingplane.fD() != p[2] || sec->ceilingplane.Normal().Z != p[3];
+		if (moved == !!sectorMoved[s]) continue;
+		sectorMoved[s] = moved;
+		movedSectors += moved ? 1 : -1;
+		for (int k = depStart[s]; k < depStart[s + 1]; k++)
+		{
+			const int e = depEntries[k];
+			bool hide = false;
+			for (unsigned d = 0; d < entryDepCount[e] && !hide; d++) hide = !!sectorMoved[entryDeps[entryDepFirst[e] + d]];
+			if (hide == !!entryHidden[e]) continue;
+			entryHidden[e] = hide;
+			hiddenPieces += hide ? 1 : -1;
+			const unsigned n = entryCount[e];
+			const size_t bytes = n * sizeof(FModelVertex);
+			if (hide)
+			{
+				// All vertices at one point: the triangles have no area and draw nothing.
+				scratch.Resize(n);
+				memset((void *)scratch.Data(), 0, bytes);
+				if (entryTex[e] != ~0u) buf->SetSubData(entryTex[e] * sizeof(FModelVertex), bytes, scratch.Data());
+				if (entryColor[e] != ~0u) buf->SetSubData(entryColor[e] * sizeof(FModelVertex), bytes, scratch.Data());
+			}
+			else if (entryTex[e] != ~0u)
+			{
+				buf->SetSubData(entryTex[e] * sizeof(FModelVertex), bytes, &texVerts[entryTex[e]]);
+				if (entryColor[e] != ~0u && entryTexel[e] >= 0)
+				{
+					scratch.Resize(n);
+					const float u = ((entryTexel[e] % LOD_PALETTE_SIZE) + 0.5f) / (float)LOD_PALETTE_SIZE;
+					const float tv = ((entryTexel[e] / LOD_PALETTE_SIZE) + 0.5f) / (float)LOD_PALETTE_SIZE;
+					for (unsigned j = 0; j < n; j++)
+					{
+						scratch[j] = texVerts[entryTex[e] + j];
+						scratch[j].u = u;
+						scratch[j].v = tv;
+					}
+					buf->SetSubData(entryColor[e] * sizeof(FModelVertex), bytes, scratch.Data());
+				}
+			}
+		}
+	}
+}
+
+// Take a new snapshot of the whole map before the next frame (console: worldlod_rebuild, ZScript: Level.RebuildWorldLOD()).
+static void RebuildWorldLOD(FLevelLocals *Level)
+{
+	if (Level->WorldLOD) Level->WorldLOD->RequestRebuild();
+}
+
+CCMD(worldlod_rebuild)
+{
+	for (auto Level : AllLevels()) RebuildWorldLOD(Level);
+}
+
+DEFINE_ACTION_FUNCTION(FLevelLocals, RebuildWorldLOD)
+{
+	PARAM_SELF_STRUCT_PROLOGUE(FLevelLocals);
+	RebuildWorldLOD(self);
+	return 0;
 }
 
 //==========================================================================
@@ -1034,6 +1296,11 @@ void UpdateWorldLOD(FLevelLocals *Level)
 		if (Level->maptime < 2) return;
 		lod->Build(Level);
 	}
+	if (lod->checkedTic != Level->maptime)
+	{
+		lod->checkedTic = Level->maptime;
+		lod->CheckMoved(Level);
+	}
 	lod->frame++;
 }
 
@@ -1041,13 +1308,68 @@ void UpdateWorldLOD(FLevelLocals *Level)
 void HWDrawInfo::SetupWorldLOD()
 {
 	worldLOD = nullptr;
+	lodOnly = false;
+	worldLODBackdrop = false;
 	FWorldLOD *lod = Level->WorldLOD;
 	if (gl_worldlod && r_distance_cull_type > 0 && Viewpoint.culldistsq > 0 && lod && lod->built && lod->vb && lod->Matches(Level)
 		&& outer == nullptr && mCurrentPortal == nullptr && !Viewpoint.bDoOob && !Viewpoint.bDoOrtho && !isNoLineCullMode())
 	{
 		worldLOD = lod;
+		lodOnly = lod->lodOnlyMode && lod->lodOnlySectors > 0;
+		AddWorldLODBackdrop();
 	}
 }
+
+// Is this BSP child (node or subsector) entirely in lodonly sectors, drawn by the world LOD model?
+bool HWDrawInfo::LodOnlyChild(void *child) const
+{
+	if (!lodOnly) return false;
+	const FWorldLOD *lod = worldLOD;
+	if ((size_t)child & 1)
+	{
+		const unsigned i = ((subsector_t *)((uint8_t *)child - 1))->Index();
+		return i < lod->subLodOnly.Size() && lod->subLodOnly[i];
+	}
+	const unsigned i = ((node_t *)child)->Index();
+	return i < lod->nodeLodOnly.Size() && lod->nodeLodOnly[i];
+}
+
+// The sky behind the world LOD: one box of sky walls around the camera, drawn at the far plane (HWSkyPortal with
+// backdrop set), with caps above and below. It only shows where nothing else is drawn, so it is safe everywhere,
+// and lines the walk skips (lodonly) or culls by distance need no sky walls of their own. Not for skybox skies.
+void HWDrawInfo::AddWorldLODBackdrop()
+{
+	sector_t *sec = Viewpoint.sector;
+	if (sec == nullptr) return;
+	FSectorPortal *sportal = sec->ValidatePortal(sector_t::ceiling);
+	if (sportal != nullptr && !(sportal->mFlags & PORTSF_INSKYBOX) && sportal->mType == PORTS_SKYVIEWPOINT) return;
+
+	HWSkyInfo skyinfo;
+	skyinfo.init(this, sec, sector_t::ceiling, sec->skytransfer, sec->Colormap.FadeColor);
+	skyinfo.backdrop = true;
+	HWWallDispatcher disp(this);
+	const float R = 8192.f, cx = (float)Viewpoint.Pos.X, cy = (float)Viewpoint.Pos.Y;
+	const float xs[5] = { cx - R, cx + R, cx + R, cx - R, cx - R };
+	const float ys[5] = { cy - R, cy - R, cy + R, cy + R, cy - R };
+	for (int i = 0; i < 4; i++)
+	{
+		HWWall wall;
+		memset((void *)&wall, 0, sizeof(wall));
+		wall.glseg.x1 = xs[i]; wall.glseg.y1 = ys[i];
+		wall.glseg.x2 = xs[i + 1]; wall.glseg.y2 = ys[i + 1];
+		wall.glseg.fracleft = 0; wall.glseg.fracright = 1;
+		wall.ztop[0] = wall.ztop[1] = 32768.f;
+		wall.zbottom[0] = wall.zbottom[1] = -32768.f;
+		wall.flags = HWWall::HWF_NOSPLIT;
+		wall.Colormap = sec->Colormap;
+		wall.sky = &skyinfo;
+		wall.MakeVertices(true);
+		// The first two walls also turn on the portal's caps (above and below the box).
+		wall.PutPortal(&disp, PORTALTYPE_SKY, i == 0 ? sector_t::ceiling : i == 1 ? sector_t::floor : -1);
+	}
+	worldLODBackdrop = true;
+}
+
 
 // pass 0: opaque (textured model, then the colour model), 1: masked (textured model only; alpha test already set up by RenderScene).
 void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
@@ -1072,9 +1394,11 @@ void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
 			const double nx = eye.X < c.x1 ? c.x1 - eye.X : eye.X > c.x2 ? eye.X - c.x2 : 0.;
 			const double ny = eye.Y < c.y1 ? c.y1 - eye.Y : eye.Y > c.y2 ? eye.Y - c.y2 : 0.;
 			const double farthest = fx * fx + fy * fy, nearest = nx * nx + ny * ny;
-			c.texVisible = c.colorVisible = false;
-			if (farthest <= D2 || !Frustum.MapBoxVisible(c.x1, c.x2, c.y1, c.y2, c.z1, c.z2)) continue;
-			c.texVisible = !colorModel || nearest < C2;
+			c.texVisible = c.colorVisible = c.nearVisible = false;
+			if (!Frustum.MapBoxVisible(c.x1, c.x2, c.y1, c.y2, c.z1, c.z2)) continue;
+			c.nearVisible = !colorModel || nearest < C2;
+			if (farthest <= D2) continue;
+			c.texVisible = c.nearVisible;
 			c.colorVisible = colorModel && farthest > C2;
 			lodStatTexChunks += c.texVisible;
 			lodStatColorChunks += c.colorVisible;
@@ -1120,7 +1444,7 @@ void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
 		state.SetAddColor(L.addColor);
 	};
 	// Runs of consecutive chunks in view are one draw.
-	auto drawGroup = [&](const FLodGroup &g, bool color, const std::function<void()> &setup) -> int
+	auto drawGroup = [&](const FLodGroup &g, bool color, const std::function<void()> &setup) -> int	// color: colour model
 	{
 		int draws = 0;
 		bool set = false;
@@ -1143,7 +1467,7 @@ void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
 		{
 			const FLodRange &range = lod->ranges[g.firstRange + r];
 			const FLodChunk &c = lod->chunks[range.chunk];
-			if (!(color ? c.colorVisible : c.texVisible)) { flush(); continue; }
+			if (!(color ? c.colorVisible : g.lodonly ? c.nearVisible : c.texVisible)) { flush(); continue; }
 			if (runCount == 0) runFirst = range.first;
 			runCount += range.count;	// ranges of a group are consecutive in the buffer
 		}
@@ -1152,11 +1476,19 @@ void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
 	};
 
 	// Textured model: from the cull distance to where the colour model takes over.
-	state.SetLodCutoff((float)eye.X, (float)eye.Y, (float)D2, (float)C2);
+	// lodonly groups have no inner limit (nothing else draws them) and no depth bias (nothing to give way to).
+	int cutoffMode = -1;
 	for (auto &g : lod->texGroups)
 	{
 		if ((g.masked ? 1 : 0) != pass) continue;
 		if (g.wall ? !gl_render_walls : !gl_render_flats) continue;
+		if (cutoffMode != (int)g.lodonly)
+		{
+			cutoffMode = g.lodonly;
+			state.SetLodCutoff((float)eye.X, (float)eye.Y, g.lodonly ? 0.f : (float)D2, (float)C2);
+			if (g.lodonly) state.ClearDepthBias();
+			else state.SetDepthBias(1.f, gl_worldlod_bias);
+		}
 		FLodMaterial &m = lod->materials[g.material];
 		lodStatTexDraws += drawGroup(g, false, [&]()
 		{
@@ -1185,6 +1517,7 @@ void HWDrawInfo::DrawWorldLOD(FRenderState &state, int pass)
 	if (colorModel && pass == 0)
 	{
 		state.SetLodCutoff((float)eye.X, (float)eye.Y, (float)C2, 0.f);
+		state.SetDepthBias(1.f, gl_worldlod_bias);
 		bool materialSet = false;
 		for (auto &g : lod->colorGroups)
 		{
@@ -1230,10 +1563,10 @@ ADD_STAT(worldlod)
 	}
 	int liveSlots = 0;
 	for (auto &slot : lod->slots) liveSlots += !slot.source.fixed;
-	out.Format("World LOD: %d outdoor sectors, %u vertices, %u chunks, built in %.0f ms\n"
+	out.Format("World LOD: %d outdoor sectors (%d nolod, %d lodonly in %d skipped BSP nodes%s), %u vertices, %u chunks, built in %.0f ms | %d sectors moved, %d pieces hidden\n"
 		"Textured: %u groups, %d draws in %d chunks | Colour: %u colours, %u groups, %d draws in %d chunks | %d surfaces with fixed light\n"
 		"Drawing: %.2f ms | light, colour and fog looked up every %d tics, last lookup %.3f ms (%d since last shown); %d of %u light slots live",
-		lod->outdoorSectors, lod->numVertices, lod->chunks.Size(), lodBuildMS,
+		lod->outdoorSectors, lod->nolodSectors, lod->lodOnlySectors, lod->lodOnlyNodes, lod->lodOnlyMode ? "" : ", gl_worldlod_lodonly 0", lod->numVertices, lod->chunks.Size(), lodBuildMS, lod->movedSectors, lod->hiddenPieces,
 		lod->texGroups.Size(), lodStatTexDraws, lodStatTexChunks, lod->numColors, lod->colorGroups.Size(), lodStatColorDraws, lodStatColorChunks,
 		lod->fixedLights, lodDrawTime.TimeMS(), max<int>(0, gl_worldlod_envupdatetic), lodEnvMS, lodStatEnvUpdates,
 		liveSlots, lod->slots.Size());

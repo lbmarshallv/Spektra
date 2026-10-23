@@ -497,6 +497,8 @@ enum
 	SECMF_LIFT				= 2048,	// For MBF monster AI
 	SECMF_HURTMONSTERS		= 4096, // Monsters in this sector are hurt like players.
 	SECMF_HARMINAIR			= 8192, // Actors in this sector are also hurt mid-air.
+	SECMF_NOLOD				= 16384,	// Never part of the world LOD model (UDMF nolod; hw_worldlod.cpp)
+	SECMF_LODONLY			= 32768,	// Drawn only by the world LOD model, at any distance; the BSP walk only clips with it (UDMF lodonly)
 };
 
 enum

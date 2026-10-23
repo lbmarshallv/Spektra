@@ -264,9 +264,10 @@ void HWWall::SkyNormal(HWWallDispatcher *di, sector_t * fs,vertex_t * v1,vertex_
 //
 //==========================================================================
 
-bool HWWall::SkyBackdrop(HWWallDispatcher *di, sector_t *fs)
+bool HWWall::SkyBackdrop(HWWallDispatcher *di, sector_t *fs, bool force)
 {
-	if (di->di == nullptr || di->di->worldLOD == nullptr || !HWSectorOutdoor(fs)) return false;
+	if (di->di == nullptr || di->di->worldLOD == nullptr || (!force && !HWSectorOutdoor(fs))) return false;
+	if (di->di->worldLODBackdrop) return true;	// the sky behind everything is already there (HWDrawInfo::AddWorldLODBackdrop)
 	FSectorPortal *sportal = fs->ValidatePortal(sector_t::ceiling);
 	if (sportal != nullptr && !(sportal->mFlags & PORTSF_INSKYBOX) && !(gl_noskyboxes && sportal->mType == PORTS_SKYVIEWPOINT)) return false;
 

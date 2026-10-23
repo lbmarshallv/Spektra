@@ -1875,6 +1875,14 @@ public:
 					Flag(sec->MoreFlags, SECMF_NOSKYWALLS, key);
 					break;
 
+				case NAME_NoLOD:
+					Flag(sec->MoreFlags, SECMF_NOLOD, key);
+					break;
+
+				case NAME_LODOnly:
+					Flag(sec->MoreFlags, SECMF_LODONLY, key);
+					break;
+
 				case NAME_colorization_floor:
 					sec->SetTextureFx(sector_t::floor, TexMan.GetTextureManipulation(CheckString(key)));
 					break;

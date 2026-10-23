@@ -2265,7 +2265,11 @@ void HWWall::Process(HWWallDispatcher *di, seg_t *seg, sector_t * frontsector, s
 
 	if (isculled)
 	{
-		if (SkyBackdrop(di, frontsector)) return;	// the world LOD shows past it (hw_worldlod.cpp)
+		// The world LOD shows past it (hw_worldlod.cpp). A lodonly line is drawn by the world LOD at any distance:
+		// only the sky backdrop behind it, never the culled line's cap.
+		const bool lodLine = di->di && di->di->lodOnly && HWLineLodOnly(seg->linedef);
+		if (SkyBackdrop(di, frontsector, lodLine)) return;
+		if (lodLine) return;
 		if (frontsector->GetTexture(sector_t::ceiling) == skyflatnum)
 		{
 			SkyNormal(di, frontsector, v1, v2);

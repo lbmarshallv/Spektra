@@ -244,7 +244,7 @@ public:
 	void SkyPlane(HWWallDispatcher* di, sector_t* sector, int plane, bool allowmirror);
 	void SkyLine(HWWallDispatcher* di, sector_t* sec, line_t* line);
 	void SkyNormal(HWWallDispatcher* di, sector_t* fs, vertex_t* v1, vertex_t* v2);
-	bool SkyBackdrop(HWWallDispatcher* di, sector_t* fs);
+	bool SkyBackdrop(HWWallDispatcher* di, sector_t* fs, bool force = false);
 	void SkyTop(HWWallDispatcher* di, seg_t* seg, sector_t* fs, sector_t* bs, vertex_t* v1, vertex_t* v2);
 	void SkyBottom(HWWallDispatcher* di, seg_t* seg, sector_t* fs, sector_t* bs, vertex_t* v1, vertex_t* v2);
 

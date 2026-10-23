@@ -253,6 +253,7 @@ void DeleteTerrainBatches(FTerrainBatches *batches)
 static bool FloorBatchable(sector_t *sec)
 {
 	if (sec->GetTexture(sector_t::ceiling) != skyflatnum) return false;	// outdoors only: indoors the BSP's occlusion matters
+	if (HWSectorLodOnly(sec)) return false;	// UDMF lodonly: drawn by the world LOD model (or by the BSP when that is off)
 	if (sec->GetTexture(sector_t::floor) == skyflatnum) return false;
 	if (sec->Portals[sector_t::floor] != 0 || sec->GetReflect(sector_t::floor) != 0) return false;
 	if (sec->GetHeightSec() || sec->e->XFloor.ffloors.Size() || sec->e->XFloor.attached.Size()) return false;
