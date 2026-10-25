@@ -80,7 +80,7 @@ struct FFoliageType
 	float alpha;
 	bool translucent;		// blended near the viewer (r_foliagetranslucentdist), drawn opaque beyond it
 	bool allowLights;		// can receive per-pixel dynamic lights near the viewer (r_foliagelightdist)
-	bool hasSpriteLOD;		// uses a LODModel "Sprite" level (not supported for foliage yet; treated as hidden)
+	bool hasSpriteLOD;		// uses a LODModel "Sprite" level without +LODSPRITE (no sprite to show; treated as hidden)
 	float lightRadius;		// bounding sphere used to find touching dynamic lights
 	float centerHeight;		// sphere center above the plant's origin
 };
@@ -104,6 +104,9 @@ struct FFoliageInstance
 	uint16_t type;			// index into FFoliageSystem::Types
 	uint8_t lodLevel;		// last picked level of detail (renderer only, for hysteresis)
 	uint8_t padding;
+	float yaw;				// radians, map convention (counterclockwise), SpriteRotation included: picks the LOD sprite's angle
+	float spriteScaleXY;	// scale relative to the class scale, for the LOD sprite's size
+	float spriteScaleZ;
 };
 
 struct FFoliageSystem

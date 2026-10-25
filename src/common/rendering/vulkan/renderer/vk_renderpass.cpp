@@ -94,12 +94,12 @@ VkRenderPassSetup *VkRenderPassManager::GetRenderPass(const VkRenderPassKey &key
 	return item.get();
 }
 
-int VkRenderPassManager::GetVertexFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs)
+int VkRenderPassManager::GetVertexFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs, unsigned instancedBindings)
 {
 	for (size_t i = 0; i < VertexFormats.size(); i++)
 	{
 		const auto &f = VertexFormats[i];
-		if (f.Attrs.size() == (size_t)numAttributes && f.NumBindingPoints == numBindingPoints && f.Stride == stride)
+		if (f.Attrs.size() == (size_t)numAttributes && f.NumBindingPoints == numBindingPoints && f.Stride == stride && f.InstancedBindings == instancedBindings)
 		{
 			bool matches = true;
 			for (int j = 0; j < numAttributes; j++)
@@ -120,6 +120,7 @@ int VkRenderPassManager::GetVertexFormat(int numBindingPoints, int numAttributes
 	fmt.NumBindingPoints = numBindingPoints;
 	fmt.Stride = stride;
 	fmt.UseVertexData = 0;
+	fmt.InstancedBindings = instancedBindings;
 	for (int j = 0; j < numAttributes; j++)
 	{
 		if (attrs[j].location == VATTR_COLOR)
@@ -260,7 +261,7 @@ std::unique_ptr<VulkanPipeline> VkRenderPassSetup::CreatePipeline(const VkPipeli
 	const VkVertexFormat &vfmt = *fb->GetRenderPassManager()->GetVertexFormat(key.VertexFormat);
 
 	for (int i = 0; i < vfmt.NumBindingPoints; i++)
-		builder.AddVertexBufferBinding(i, vfmt.Stride);
+		builder.AddVertexBufferBinding(i, vfmt.Stride, ((vfmt.InstancedBindings >> i) & 1) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX);
 
 	const static VkFormat vkfmts[] = {
 		VK_FORMAT_R32G32B32A32_SFLOAT,

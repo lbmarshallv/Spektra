@@ -40,12 +40,15 @@ TMap<const PClass*, FSpriteModelFrame> BaseSpriteModelFrames;
 
 /////////////////////////////////////////////////////////////////////////////
 
+void DeleteSortedModels();	// hw_modelsort.cpp: the pre-sorted SEMITRANSPARENT index lists live on the GPU too
+
 void FlushModels()
 {
 	for (int i = Models.Size() - 1; i >= 0; i--)
 	{
 		Models[i]->DestroyVertexBuffer();
 	}
+	DeleteSortedModels();
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -35,6 +35,45 @@ void main()
 	parmTexCoord = aTexCoord;
 	parmPosition = boneResult.Position;
 
+	// LOD sprites (hw_lodsprites.cpp): each vertex is one corner of a sprite that faces the view plane, like a Doom sprite.
+	// aPosition: the sprite's base (renderer coordinates); aTexCoord: the corner (0 or 1 across, 0 top or 1 bottom);
+	// aLightmap.xy: the corner's offset to the right and up, in map units; aLightmap.z: the thing's yaw (radians).
+	// The texture holds 8 frames side by side, frame k showing the model from k * 45 degrees counterclockwise of its front
+	// (Doom rotation k + 1). Sprites outside the distance window in uSpriteLod1.xy are collapsed.
+	bool spriteLodHidden = false;
+	if (uSpriteLod0.w > 0.0)
+	{
+		vec3 spriteBase = aPosition.xyz;
+		vec3 toEye = uSpriteLod0.xyz - spriteBase;
+		float eyeDistSq = dot(toEye, toEye);
+		spriteLodHidden = eyeDistSq < uSpriteLod1.x || (uSpriteLod1.y > 0.0 && eyeDistSq >= uSpriteLod1.y);
+		float rel = atan(toEye.z, toEye.x) - aLightmap.z;
+		float spriteFrame = mod(floor(rel * (8.0 / 6.28318530718) + 0.5), 8.0);
+		parmTexCoord = vec2((spriteFrame + aTexCoord.x) * 0.125, aTexCoord.y);
+		parmPosition = vec4(spriteBase.x + uSpriteLod1.w * aLightmap.x, spriteBase.y + aLightmap.y, spriteBase.z - uSpriteLod1.z * aLightmap.x, 1.0);
+	}
+	else if (uSpriteLod0.w < 0.0)
+	{
+		// LOD sprite planes (hw_lodsprites.cpp): 4 planes through the thing, 8 one-sided quads, each showing the frame
+		// for the direction it faces. Drawn instanced: binding 0 is the class's plane mesh (aPosition: corner in the
+		// class's own space, aTexCoord: atlas position, aLightmap.xz: the side's facing); binding 1 is the thing
+		// (aVertex2.xyz: where that space's origin is, then 9 numbers of the matrix that turns and scales it like the
+		// model: aVertex2.w, aNormal2, aBoneWeight). Every side turned less than uSpriteLod1.z (radians) from the eye
+		// is shown, solid: the planes cross and hide each other by depth, which gives the tree some volume.
+		mat3 thingMat = mat3(vec3(aVertex2.w, aNormal2.x, aNormal2.y), vec3(aNormal2.z, aNormal2.w, aBoneWeight.x), aBoneWeight.yzw);
+		vec3 thingBase = aVertex2.xyz;
+		vec3 toEye = uSpriteLod0.xyz - thingBase;
+		float eyeDistSq = dot(toEye, toEye);
+		spriteLodHidden = eyeDistSq < uSpriteLod1.x || (uSpriteLod1.y > 0.0 && eyeDistSq >= uSpriteLod1.y);
+		vec3 thingUp = normalize(thingMat * vec3(0.0, 1.0, 0.0));
+		vec3 sideFacing = normalize(thingMat * vec3(aLightmap.x, 0.0, aLightmap.z));
+		vec3 flatToEye = toEye - dot(toEye, thingUp) * thingUp;
+		float flatLen = length(flatToEye);
+		float facing = flatLen > 0.0001 ? dot(flatToEye / flatLen, sideFacing) : 0.0;
+		if (acos(clamp(facing, -1.0, 1.0)) >= uSpriteLod1.z) spriteLodHidden = true;
+		parmPosition = vec4(thingBase + thingMat * aPosition.xyz, 1.0);
+	}
+
 	// Instanced models fetch their per-instance model/normal matrix pair from the bone buffer.
 	mat4 modelMatrix = ModelMatrix;
 	mat4 normalModelMatrix = NormalModelMatrix;
@@ -65,7 +104,7 @@ void main()
 	#endif
 
 	#ifndef SIMPLE
-		vLightmap = aLightmap;
+		vLightmap = uSpriteLod0.w != 0.0 ? vec3(0.0, 0.0, -1.0) : aLightmap;	// LOD sprites: no lightmap
 
 		pixelpos.xyz = worldcoord.xyz;
 		pixelpos.w = -eyeCoordPos.z/eyeCoordPos.w;
@@ -114,6 +153,8 @@ void main()
 	#ifdef VULKAN_COORDINATE_SYSTEM
 	gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 	#endif
+
+	if (spriteLodHidden) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);	// behind the far plane: the whole sprite is clipped
 
 	if (uClipHeightDirection != 0.0) // clip planes used for reflective flats
 	{

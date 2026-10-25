@@ -833,6 +833,13 @@ vec3 AmbientOcclusionColor()
 //
 //===========================================================================
 
+// 4x4 ordered dither value for this pixel, in (0, 1).
+float LodDitherValue()
+{
+	const float BAYER4[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+	return (BAYER4[(int(gl_FragCoord.y) & 3) * 4 + (int(gl_FragCoord.x) & 3)] + 0.5) / 16.0;
+}
+
 void main()
 {
 #ifdef NO_CLIPDISTANCE_SUPPORT
@@ -846,6 +853,17 @@ void main()
 		float lodd2 = dot(lodd, lodd);
 		if (lodd2 < uLodCutoff.z || (uLodCutoff.w > 0.0 && lodd2 >= uLodCutoff.w)) discard;
 	}
+
+	// LOD sprites (hw_lodsprites.cpp): screen-door cross-fade between a model and its sprite. Across the band, the model
+	// keeps the pixels whose dither value is at least the fade amount and the sprite the others, so where both cover a
+	// pixel exactly one of them is seen.
+	if (uLodFade0.w != 0.0)
+	{
+		float fadeAmount = clamp((distance(pixelpos.xyz, uLodFade0.xyz) - uLodFade1.x) / max(uLodFade1.y - uLodFade1.x, 1.0), 0.0, 1.0);
+		float ditherValue = LodDitherValue();
+		if (uLodFade0.w > 0.0 ? ditherValue < fadeAmount : ditherValue >= fadeAmount) discard;
+	}
+
 
 #ifndef LEGACY_USER_SHADER
 	Material material;
@@ -865,6 +883,29 @@ void main()
 	Material material = ProcessMaterial();
 #endif
 	vec4 frag = material.Base;
+
+	// LOD sprites and SEMITRANSPARENT models: mipmaps average thin parts (pine needles) towards transparent, so they'd fall
+	// under the alpha cutoff and show the sky through. Alpha is raised per mipmap level to keep them as dense as up close.
+	float mipAlphaGain = abs(uSpriteLod0.w) > 1.0 ? abs(uSpriteLod0.w) - 1.0 : uSemiParams.x;
+	float testAlpha = frag.a;
+	if (mipAlphaGain > 0.0)
+	{
+		vec2 texelPos = vTexCoord.st * vec2(textureSize(tex, 0));
+		vec2 dx = dFdx(texelPos), dy = dFdy(texelPos);
+		float mipLevel = max(0.0, 0.5 * log2(max(dot(dx, dx), dot(dy, dy))));
+		testAlpha = min(1.0, frag.a * (1.0 + mipLevel * mipAlphaGain));
+	}
+	if (uSemiParams.z > 0.0)
+	{
+		// SEMITRANSPARENT, blended pass: only the pixels the solid pass left out (tested the same way). Solid parts
+		// such as the trunk are never painted again, so soft needles in front of them always stay in front.
+		if (testAlpha >= uSemiParams.z) discard;
+	}
+	else frag.a = testAlpha;
+
+	// SEMITRANSPARENT models, blended pass: this renderer blends in gamma space, which shows soft pixels much darker
+	// than editors that mix in linear light (GIMP 2.10). Raising alpha to 1 / gamma matches them over dark backgrounds.
+	if (uSemiParams.y > 0.0) frag.a = pow(frag.a, uSemiParams.y);
 
 #ifndef NO_ALPHATEST
 	if (frag.a <= uAlphaThreshold) discard;

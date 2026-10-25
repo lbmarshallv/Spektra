@@ -99,6 +99,7 @@ public:
 	size_t Stride;
 	std::vector<FVertexBufferAttribute> Attrs;
 	int UseVertexData;
+	unsigned InstancedBindings = 0;	// bit n: binding n advances per instance
 };
 
 enum class WhichDepthStencil;
@@ -151,7 +152,7 @@ public:
 	void RenderBuffersReset();
 
 	VkRenderPassSetup *GetRenderPass(const VkRenderPassKey &key);
-	int GetVertexFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs);
+	int GetVertexFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs, unsigned instancedBindings = 0);
 	VkVertexFormat *GetVertexFormat(int index);
 	VulkanPipelineLayout* GetPipelineLayout(int numLayers);
 

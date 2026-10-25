@@ -32,6 +32,26 @@ struct FBspZBounds;	// hw_bsp.cpp
 struct HWHorizon;	// hw_horizon.h
 struct FTerrainBatches;	// hw_terrainbatch.cpp
 struct FWorldLOD;	// hw_worldlod.cpp
+struct FLodSprites;	// hw_lodsprites.cpp
+class PClassActor;
+
+// LOD sprites (hw_lodsprites.cpp): sector classes, for the distance window of LODSPRITE things.
+enum
+{
+	LODSPRITE_SEC_LODONLY = 1,	// UDMF lodonly sector
+	LODSPRITE_SEC_MODEL = 2,	// in the world LOD model (outdoor, not nolod): seen past the line cull distance
+};
+constexpr double LODSPRITE_NEVER = 1e30;	// a distance that is never reached
+
+// Where a LODSPRITE class is drawn how in one view, in map units from the eye (LODSPRITE_NEVER: never / no limit).
+struct FLodSpriteWindow
+{
+	double modelEnd;		// the model is drawn nearer than this
+	double spriteStart;		// the sprite from here on (nearer than modelEnd while the two cross-fade)
+	double outer;			// neither from here on
+	float fadeFrom, fadeTo;	// per-pixel cross-fade band (main.fp); equal: no fade, the switch is at modelEnd
+	bool Fades() const { return fadeTo > fadeFrom; }
+};
 
 // Outdoor: sky ceiling, or a closed sector next to one (hw_worldlod.cpp).
 bool HWSectorOutdoor(const sector_t *sec);
@@ -142,6 +162,8 @@ struct FFoliageTranslucentItem
 	float distSq;			// for back-to-front sorting
 	uint8_t level;			// level of detail
 	uint8_t fade;			// 0 = fully translucent ... FOLIAGE_FADE_STEPS = fully opaque
+	uint8_t semi;			// SEMITRANSPARENT plant drawn opaque: this is the blended pass of its soft pixels
+	uint8_t sortDir;		// semi: pre-sorted triangle order to draw (hw_modelsort.cpp)
 };
 
 constexpr int FOLIAGE_FADE_STEPS = 15;
@@ -210,6 +232,9 @@ struct HWDrawInfo
 	FWorldLOD *worldLOD = nullptr;	// set by RenderBSP when the world LOD is drawn past the line cull distance (main view)
 	bool lodOnly = false;			// this view: lodonly sectors are drawn by the world LOD, and the BSP walk skips them
 	bool worldLODBackdrop = false;	// this view: one sky backdrop around the camera replaces the culled lines' own
+	bool lodSprites = false;		// this view draws LODSPRITE things as generated 2D sprites (main perspective view; SetupLodSprites)
+	double lodSpriteCull = 0;		// this view: the line cull distance (0: none)
+	double lodSpriteScale = 1;		// this view: r_lod
 	bool thingsOnly = false;
 	int horizonHiddenCount = 0;	// subsectors hidden by the horizon in this view (decides whether it keeps running)	// walking a subtree hidden behind the horizon: actors, particles and foliage only
 	float bspZPad = 0;
@@ -316,6 +341,14 @@ public:
 	bool LodOnlyChild(void *child) const;	// BSP child entirely in lodonly sectors (skipped by the walk)
 	void AddWorldLODBackdrop();
 	void DrawWorldLOD(FRenderState &state, int pass);	// 0 opaque, 1 masked
+	void SetupLodSprites();
+	// LODSPRITE things: where the model ends, the sprite starts and both stop, and the cross-fade band between them.
+	void LodSpriteWindow(PClassActor *cls, int sectorClass, FLodSpriteWindow &w) const;
+	// The same for one class in one sector, if this view draws LOD sprites and the class has one (false: draw the model as usual).
+	bool LodSpriteRange(PClassActor *cls, const sector_t *sec, FLodSpriteWindow &w) const;
+	void DrawLodSprites(FRenderState &state);
+	void LodFarModelWindow(PClassActor *cls, int sectorClass, double &start, double &outer) const;
+	void DrawFarFoliage(FRenderState &state);	// LODPLANE plants past the cull distance (hw_foliage.cpp)
 	bool HorizonHides(void *child, const float *bbox);
 	bool HorizonChildHidden(void *child, const float *bbox);
 	void HorizonAdd(subsector_t *sub);
@@ -494,3 +527,15 @@ extern FTerrainStats terrainStats;
 
 void UpdateWorldLOD(FLevelLocals *Level);	// hw_worldlod.cpp
 void ResetWorldLODStats();
+
+void UpdateLodSprites(FLevelLocals *Level);	// hw_lodsprites.cpp
+void ResetLodSpriteStats();
+bool LodSpriteTypeInBatch(FLevelLocals *Level, unsigned foliageType);	// that foliage type's plants are in the LOD sprite batch
+const uint8_t *LodSpriteSectorClasses(FLevelLocals *Level);
+bool LodFarModelType(FLevelLocals *Level, unsigned foliageType);
+const TArray<uint32_t> *LodFarModelPlants(FLevelLocals *Level);	// per sector, LODSPRITE_SEC_* (only while lodSprites is set in a view)
+
+// Foliage lighting, shared with the LOD sprites (hw_foliage.cpp). Groups are only valid until the next reset.
+void ResetFoliageLightGroups(FLevelLocals *Level);
+int FoliageLightGroup(HWDrawInfo *di, sector_t *sec, const FVector3 &pos);
+void ApplyFoliageLightGroup(HWDrawInfo *di, FRenderState &state, int group);

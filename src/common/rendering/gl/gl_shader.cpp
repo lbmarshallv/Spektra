@@ -332,6 +332,11 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 
 		uniform vec4 uDetailParms;
 		uniform vec4 uLodCutoff;
+		uniform vec4 uSpriteLod0;
+		uniform vec4 uSpriteLod1;
+		uniform vec4 uLodFade0;
+		uniform vec4 uLodFade1;
+		uniform vec4 uSemiParams;
 		// Lighting + Fog
 		uniform vec4 uLightAttr;
 		#define uLightLevel uLightAttr.a
@@ -737,6 +742,11 @@ bool FShader::Load(const char * name, const char * vert_prog_lump, const char * 
 	muSplitTopPlane.Init(hShader, "uSplitTopPlane");
 	muDetailParms.Init(hShader, "uDetailParms");
 	muLodCutoff.Init(hShader, "uLodCutoff");
+	muSpriteLod0.Init(hShader, "uSpriteLod0");
+	muSpriteLod1.Init(hShader, "uSpriteLod1");
+	muLodFade0.Init(hShader, "uLodFade0");
+	muLodFade1.Init(hShader, "uLodFade1");
+	muSemiParams.Init(hShader, "uSemiParams");
 #ifdef NPOT_EMULATION
 	muNpotEmulation.Init(hShader, "uNpotEmulation");
 #endif

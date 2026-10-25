@@ -341,6 +341,9 @@ void FLevelLocals::ClearLevelData(bool fullgc)
 	TerrainBatches = nullptr;
 	DeleteWorldLOD(WorldLOD);
 	WorldLOD = nullptr;
+	DeleteLodSprites(LodSprites);
+	LodSprites = nullptr;
+	LodSpriteActors.Clear();
 	ACSThinker = nullptr;
 	ClientSideACSThinker = nullptr;
 	FraggleScriptThinker = nullptr;

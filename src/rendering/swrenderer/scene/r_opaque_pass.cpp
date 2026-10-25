@@ -96,7 +96,7 @@ CUSTOM_CVARD(Int, r_cull_fps_target, 90, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Targ
 	}
 }
 
-CVARD(Float, r_line_distance_cull, 4000.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Fixed culling distance. Active only when r_distance_cull_type == 1 or 2.")
+CVARD(Float, r_line_distance_cull, 8000.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Fixed culling distance. Active only when r_distance_cull_type == 1 or 2.")
 
 namespace swrenderer
 {

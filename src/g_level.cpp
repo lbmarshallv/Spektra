@@ -1928,6 +1928,7 @@ FLevelLocals::~FLevelLocals()
 	DeleteBspZBounds(BspZBounds);
 	DeleteTerrainBatches(TerrainBatches);
 	DeleteWorldLOD(WorldLOD);
+	DeleteLodSprites(LodSprites);
 }
 
 //==========================================================================

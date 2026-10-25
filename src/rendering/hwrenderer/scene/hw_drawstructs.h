@@ -381,6 +381,9 @@ public:
 	FSpriteModelFrame * modelframe;
 	int modelframeflags;
 	int lodModelID;		// level-of-detail replacement for model index 0, -1 = none
+	float lodFadeFrom, lodFadeTo;	// LODSPRITE actors: cross-fade band with their sprite (equal: none)
+	bool semiPass;		// SEMITRANSPARENT model: this is the blended second pass (translucent list) of its soft pixels
+	bool semiSolid;		// SEMITRANSPARENT model with a blended pass: its solid pass only draws nearly opaque pixels
 	bool hasModelMatrix;	// modelMatrix was computed this frame for the frustum test and is reused for drawing
 	VSMatrix modelMatrix;
 	FRenderStyle RenderStyle;

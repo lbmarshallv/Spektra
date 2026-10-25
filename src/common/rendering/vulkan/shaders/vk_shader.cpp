@@ -239,7 +239,11 @@ static const char *shaderBindings = R"(
 		vec4 uDetailParms;
 		vec4 uNpotEmulation;
 		vec4 uLodCutoff;
-		vec4 padding2, padding3;
+		vec4 uSpriteLod0;
+		vec4 uSpriteLod1;
+		vec4 uLodFade0;
+		vec4 uLodFade1;
+		vec4 uSemiParams;
 	};
 
 	layout(set = 1, binding = 2, std140) uniform readonly StreamUBO {
@@ -346,6 +350,11 @@ static const char *shaderBindings = R"(
 	#define uDetailParms data[uDataIndex].uDetailParms
 	#define uNpotEmulation data[uDataIndex].uNpotEmulation
 	#define uLodCutoff data[uDataIndex].uLodCutoff
+	#define uSpriteLod0 data[uDataIndex].uSpriteLod0
+	#define uSpriteLod1 data[uDataIndex].uSpriteLod1
+	#define uLodFade0 data[uDataIndex].uLodFade0
+	#define uLodFade1 data[uDataIndex].uLodFade1
+	#define uSemiParams data[uDataIndex].uSemiParams
 
 	#define SUPPORTS_SHADOWMAPS
 	#define VULKAN_COORDINATE_SYSTEM

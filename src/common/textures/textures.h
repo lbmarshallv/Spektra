@@ -283,6 +283,11 @@ public:
 	virtual FBitmap GetBgraBitmap(const PalEntry *remap, int *trans = nullptr);
 
 	static bool SmoothEdges(unsigned char * buffer,int w, int h);
+	static void BleedAlpha(unsigned char * buffer, int w, int h);
+
+	// Skins of SEMITRANSPARENT models: before upload, fully transparent texels take the colour of their visible
+	// neighbours, so filtering and mipmaps don't pull black into the soft edges (BleedAlpha).
+	bool bAlphaBleed = false;
 
 
 	virtual void ResolvePatches() {}

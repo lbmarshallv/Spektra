@@ -56,6 +56,7 @@ enum
 	MDL_CORRECTPIXELSTRETCH			= 1<<13,	// ensure model does not distort with pixel stretch when pitch/roll is applied
 	MDL_FORCECULLBACKFACES			= 1<<14,
 	MDL_FIXROTATING					= 1<<15,
+	MDL_SEMITRANSPARENT				= 1<<16,	// use the skin's alpha fully: solid parts alpha-tested (keeping their density at a distance), soft parts blended in a second pass
 };
 
 FSpriteModelFrame * FindModelFrame(AActor * thing, int sprite, int frame, bool dropped);

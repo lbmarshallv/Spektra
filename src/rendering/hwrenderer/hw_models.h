@@ -37,7 +37,12 @@ class FHWModelRenderer : public FModelRenderer
 	int boneIndexBase = -1;
 	HWDrawInfo *di;
 	FRenderState &state;
+	FModel *currentModel = nullptr;
+	unsigned currentFrame = 0;
+	IIndexBuffer *modelIndexBuffer = nullptr;
+	bool DrawSorted(bool arrays, unsigned first, unsigned count);
 public:
+	int sortDirection = -1;	// SEMITRANSPARENT blended pass: which pre-sorted triangle order to draw (-1: the model's own)
 	FHWModelRenderer(HWDrawInfo *d, FRenderState &st, int mli) : modellightindex(mli), di(d), state(st)
 	{}
 	ModelRendererType GetType() const override { return GLModelRendererType; }

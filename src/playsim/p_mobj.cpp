@@ -434,6 +434,34 @@ void AActor::Serialize(FSerializer &arc)
 //
 //==========================================================================
 
+//==========================================================================
+//
+// LODSPRITE actors are listed per level so the renderer can draw their
+// generated sprites without walking the BSP (hw_lodsprites.cpp). Listed on
+// spawn and after loading a savegame, removed on destruction.
+//
+//==========================================================================
+
+void AActor::LinkLodSprite()
+{
+	if (!(perfFlags & PERF_LODSPRITE) || LodSpriteSlot != 0 || Level == nullptr || (ObjectFlags & OF_EuthanizeMe)) return;
+	LodSpriteSlot = Level->LodSpriteActors.Push(this) + 1;
+}
+
+void AActor::UnlinkLodSprite()
+{
+	if (LodSpriteSlot == 0) return;
+	const unsigned slot = LodSpriteSlot - 1;
+	LodSpriteSlot = 0;
+	if (Level == nullptr) return;
+	auto &list = Level->LodSpriteActors;
+	if (slot >= list.Size() || list[slot] != this) return;	// the list was cleared with the level
+	AActor *last = list.Last();
+	list[slot] = last;
+	last->LodSpriteSlot = slot + 1;
+	list.Pop();
+}
+
 void AActor::MakeClusterProxy()
 {
 	perfFlags |= PERF_CLUSTERPROXY;
@@ -457,6 +485,8 @@ void AActor::PostSerialize()
 	LinkToWorld(nullptr, false, Sector);
 
 	AddToHash();
+	LodSpriteSlot = 0;
+	LinkLodSprite();
 	if (player)
 	{
 		if (Level->PlayerInGame(player) &&
@@ -5985,6 +6015,7 @@ AActor *AActor::StaticSpawn(FLevelLocals *Level, PClassActor *type, const DVecto
 	}
 
 	ConstructActor(actor, pos, SpawningMapThing);
+	actor->LinkLodSprite();
 	return actor;
 }
 
@@ -6310,6 +6341,7 @@ void AActor::OnDestroy ()
 
 	// [RH] Unlink from tid chain
 	RemoveFromHash ();
+	UnlinkLodSprite();
 
 	// unlink from sector and block lists
 	UnlinkFromWorld (nullptr);

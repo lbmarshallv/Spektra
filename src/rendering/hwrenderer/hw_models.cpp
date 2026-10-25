@@ -33,6 +33,7 @@
 #include "hw_bonebuffer.h"
 #include "hw_models.h"
 #include "actor.h"
+#include "hw_modelsort.h"
 
 CVAR(Bool, gl_light_models, true, CVAR_ARCHIVE)
 
@@ -112,13 +113,27 @@ void FHWModelRenderer::SetMaterial(FGameTexture *skin, bool clampNoFilter, FTran
 	state.SetLightIndex(modellightindex);
 }
 
+// SEMITRANSPARENT blended pass: the pre-sorted triangle order for this draw call, if there is one (hw_modelsort.cpp).
+bool FHWModelRenderer::DrawSorted(bool arrays, unsigned first, unsigned count)
+{
+	IIndexBuffer *ib;
+	unsigned start;
+	if (sortDirection < 0 || currentModel == nullptr || !ModelSortedDraw(currentModel, currentFrame, arrays, first, count, sortDirection, ib, start)) return false;
+	state.SetIndexBuffer(ib);
+	state.DrawIndexed(DT_Triangles, (int)start, int(count - count % 3));
+	state.SetIndexBuffer(modelIndexBuffer);	// models may make several draws per SetupFrame
+	return true;
+}
+
 void FHWModelRenderer::DrawArrays(int start, int count)
 {
+	if (DrawSorted(true, start, count)) return;
 	state.Draw(DT_Triangles, start, count);
 }
 
 void FHWModelRenderer::DrawElements(int numIndices, size_t offset)
 {
+	if (DrawSorted(false, unsigned(offset / sizeof(unsigned int)), numIndices)) return;
 	state.DrawIndexed(DT_Triangles, int(offset / sizeof(unsigned int)), numIndices);
 }
 
@@ -133,9 +148,13 @@ void FHWModelRenderer::SetupFrame(FModel *model, unsigned int frame1, unsigned i
 	auto mdbuff = static_cast<FModelVertexBuffer*>(model->GetVertexBuffer(GetType()));
 	//boneIndexBase = boneStartIndex;//boneStartIndex >= 0 ? boneStartIndex : screen->mBones->UploadBones(bones);
 	state.SetBoneIndexBase(boneStartIndex);
+	currentModel = model;
+	currentFrame = frame1;
+	modelIndexBuffer = nullptr;
 	if (mdbuff)
 	{
 		state.SetVertexBuffer(mdbuff->vertexBuffer(), frame1, frame2);
+		modelIndexBuffer = mdbuff->indexBuffer();
 		if (mdbuff->indexBuffer()) state.SetIndexBuffer(mdbuff->indexBuffer());
 	}
 }

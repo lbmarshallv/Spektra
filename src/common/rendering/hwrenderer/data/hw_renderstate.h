@@ -219,7 +219,11 @@ struct StreamData
 	FVector4 uDetailParms;
 	FVector4 uNpotEmulation;
 	FVector4 uLodCutoff;	// world LOD: x, y (map), squared inner and outer distance; pixels outside that ring are discarded (0: no limit)
-	FVector4 padding2, padding3;
+	FVector4 uSpriteLod0;	// LOD sprites: eye position (renderer coordinates), w = 1 turns the billboard vertex path on
+	FVector4 uSpriteLod1;	// LOD sprites: squared inner and outer distance (0 outer: no limit), cos and sin of the view yaw
+	FVector4 uLodFade0;		// LOD sprite cross-fade: eye position (renderer coordinates), w = +1 model fading out, -1 sprite fading in, 0 off
+	FVector4 uLodFade1;		// LOD sprite cross-fade: x, y = distance band (pixels from the eye); z, w unused
+	FVector4 uSemiParams;	// SEMITRANSPARENT models: x = alpha added per mipmap level, y = exponent on alpha (0: none), z = blended pass: pixels at least this opaque (after x) are left to the solid pass (0: none)
 };
 
 class FRenderState
@@ -325,6 +329,11 @@ public:
 		mStreamData.uDynLightColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 		mStreamData.uDetailParms = { 0.0f, 0.0f, 0.0f, 0.0f };
 		mStreamData.uLodCutoff = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uSpriteLod0 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uSpriteLod1 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uLodFade0 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uLodFade1 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uSemiParams = { 0.0f, 0.0f, 0.0f, 0.0f };
 #ifdef NPOT_EMULATION
 		mStreamData.uNpotEmulation = { 0,0,0,0 };
 #endif
@@ -506,6 +515,59 @@ public:
 		mStreamData.uLodCutoff = { x, y, innersq, outersq };
 	}
 
+	// LOD sprites (hw_lodsprites.cpp): vertices are camera-facing sprite corners (see main.vp). A sprite whose base
+	// is nearer than sqrt(innersq) or at least sqrt(outersq) (if > 0) map units from the eye is not drawn.
+	// mipAlpha: alpha added per mipmap level, so thin parts (leaves, needles) don't vanish in the distance.
+	// planes: the vertices are LOD sprite planes (instanced, see main.vp) instead of camera-facing corners.
+	// With planes, viewCos holds the largest angle (radians) at which a side is still shown instead; viewSin is unused.
+	void SetSpriteLod(const FVector3 &eyeMap, float innersq, float outersq, float viewCos, float viewSin, float mipAlpha = 0.f, bool planes = false)
+	{
+		mStreamData.uSpriteLod0 = { eyeMap.X, eyeMap.Z, eyeMap.Y, (planes ? -1.0f : 1.0f) * (1.0f + mipAlpha) };
+		mStreamData.uSpriteLod1 = { innersq, outersq, viewCos, viewSin };
+	}
+
+	// Screen-door cross-fade between a LODSPRITE model and its sprite (main.fp): pixels between 'from' and 'to' map units
+	// from the eye are dithered, the model's away and the sprite's in on complementary pixels.
+	void SetLodFade(const FVector3 &eyeMap, bool sprite, float from, float to)
+	{
+		mStreamData.uLodFade0 = { eyeMap.X, eyeMap.Z, eyeMap.Y, sprite ? -1.0f : 1.0f };
+		mStreamData.uLodFade1.X = from;
+		mStreamData.uLodFade1.Y = to;
+	}
+
+	void ClearLodFade()
+	{
+		mStreamData.uLodFade0 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uLodFade1.X = mStreamData.uLodFade1.Y = 0.0f;
+	}
+
+	// SEMITRANSPARENT models (main.fp): alpha added per mipmap level before the alpha test, so thin parts (needles,
+	// leaves) keep their density at a distance instead of being cut away. 0 = off.
+	void SetModelMipAlpha(float perLevel)
+	{
+		mStreamData.uSemiParams.X = perLevel;
+	}
+
+	// SEMITRANSPARENT models, blended pass: skip pixels at least this opaque (measured like the solid pass, mip alpha
+	// included). The solid pass drew them, so the blended pass never paints over a solid part (the trunk) out of order. 0 = off.
+	void SetModelSoftCutoff(float cutoff)
+	{
+		mStreamData.uSemiParams.Z = cutoff;
+	}
+
+	// SEMITRANSPARENT models, blended pass (main.fp): alpha = pow(alpha, exponent) before blending. 1 / 2.2 makes
+	// gamma-space blending look like an image editor's linear-light blending. 0 = off.
+	void SetModelAlphaExponent(float exponent)
+	{
+		mStreamData.uSemiParams.Y = exponent;
+	}
+
+	void ClearSpriteLod()
+	{
+		mStreamData.uSpriteLod0 = { 0.0f, 0.0f, 0.0f, 0.0f };
+		mStreamData.uSpriteLod1 = { 0.0f, 0.0f, 0.0f, 0.0f };
+	}
+
 	void SetDetailParms(float xscale, float yscale, float bias)
 	{
 		mStreamData.uDetailParms = { xscale, yscale, bias, 0 };
@@ -613,6 +675,11 @@ public:
 	void SetRenderStyle(FRenderStyle rs)
 	{
 		mRenderStyle = rs;
+	}
+
+	FRenderStyle GetRenderStyle() const
+	{
+		return mRenderStyle;
 	}
 
 	void SetRenderStyle(ERenderStyle rs)

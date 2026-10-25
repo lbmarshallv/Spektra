@@ -134,6 +134,11 @@ bool FGLRenderState::ApplyShader()
 	activeShader->muTextureBlendColor.Set(mStreamData.uTextureBlendColor);
 	activeShader->muDetailParms.Set(&mStreamData.uDetailParms.X);
 	activeShader->muLodCutoff.Set(&mStreamData.uLodCutoff.X);
+	activeShader->muSpriteLod0.Set(&mStreamData.uSpriteLod0.X);
+	activeShader->muSpriteLod1.Set(&mStreamData.uSpriteLod1.X);
+	activeShader->muLodFade0.Set(&mStreamData.uLodFade0.X);
+	activeShader->muLodFade1.Set(&mStreamData.uLodFade1.X);
+	activeShader->muSemiParams.Set(&mStreamData.uSemiParams.X);
 #ifdef NPOT_EMULATION
 	activeShader->muNpotEmulation.Set(&mStreamData.uNpotEmulation.X);
 #endif

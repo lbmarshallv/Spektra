@@ -295,8 +295,94 @@ bool FTexture::SmoothEdges(unsigned char* buffer, int w, int h)
 //
 //===========================================================================
 
+//===========================================================================
+//
+// Alpha bleeding: gives every fully transparent texel the colour of the
+// visible texels nearest to it (weighted by their alpha), growing outwards
+// a few texels; whatever is left gets the image's average colour. Image
+// editors usually save transparent texels as black, and the GPU's
+// filtering and mipmaps average colours without regard to alpha, so that
+// black darkens every semi-transparent edge. Visible texels don't change.
+//
+//===========================================================================
+
+void FTexture::BleedAlpha(unsigned char* buffer, int w, int h)
+{
+	if (w <= 0 || h <= 0) return;
+	const int size = w * h;
+	uint8_t *px = buffer;	// BGRA (or RGBA): the colour channels are treated alike
+	TArray<uint8_t> known(size, true);
+	double sum[3] = { 0, 0, 0 }, weight = 0;
+	int unknown = 0;
+	for (int i = 0; i < size; i++)
+	{
+		const int a = px[i * 4 + MSB];
+		known[i] = a != 0;
+		if (a == 0) { unknown++; continue; }
+		for (int c = 0; c < 3; c++) sum[c] += px[i * 4 + (MSB == 3 ? c : c + 1)] * double(a);
+		weight += a;
+	}
+	if (unknown == 0) return;
+	if (weight == 0) return;	// nothing visible at all
+
+	TArray<int> next;
+	TArray<uint8_t> newColor;
+	for (int pass = 0; pass < 16 && unknown > 0; pass++)
+	{
+		next.Clear();
+		newColor.Clear();
+		for (int y = 0; y < h; y++)
+		{
+			for (int x = 0; x < w; x++)
+			{
+				const int i = y * w + x;
+				if (known[i]) continue;
+				double s[3] = { 0, 0, 0 }, wt = 0;
+				for (int dy = -1; dy <= 1; dy++)
+				{
+					const int yy = y + dy;
+					if (yy < 0 || yy >= h) continue;
+					for (int dx = -1; dx <= 1; dx++)
+					{
+						const int xx = x + dx;
+						if ((dx == 0 && dy == 0) || xx < 0 || xx >= w) continue;
+						const int j = yy * w + xx;
+						if (!known[j]) continue;
+						const double nw = known[j] == 1 ? max(1, (int)px[j * 4 + MSB]) : 1.;	// filled texels weigh as little as the faintest visible one
+						for (int c = 0; c < 3; c++) s[c] += px[j * 4 + (MSB == 3 ? c : c + 1)] * nw;
+						wt += nw;
+					}
+				}
+				if (wt == 0) continue;
+				next.Push(i);
+				for (int c = 0; c < 3; c++) newColor.Push((uint8_t)clamp(int(s[c] / wt + 0.5), 0, 255));
+			}
+		}
+		if (next.Size() == 0) break;
+		// Apply after the scan, so a pass only grows by one texel.
+		for (unsigned k = 0; k < next.Size(); k++)
+		{
+			const int i = next[k];
+			for (int c = 0; c < 3; c++) px[i * 4 + (MSB == 3 ? c : c + 1)] = newColor[k * 3 + c];
+			known[i] = 2;
+			unknown--;
+		}
+	}
+	if (unknown > 0)
+	{
+		uint8_t avg[3];
+		for (int c = 0; c < 3; c++) avg[c] = (uint8_t)clamp(int(sum[c] / weight + 0.5), 0, 255);
+		for (int i = 0; i < size; i++)
+		{
+			if (known[i]) continue;
+			for (int c = 0; c < 3; c++) px[i * 4 + (MSB == 3 ? c : c + 1)] = avg[c];
+		}
+	}
+}
+
 bool FTexture::ProcessData(unsigned char* buffer, int w, int h, bool ispatch)
 {
+	if (bAlphaBleed) BleedAlpha(buffer, w, h);
 	if (Masked)
 	{
 		Masked = SmoothEdges(buffer, w, h);

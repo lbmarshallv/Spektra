@@ -241,7 +241,7 @@ void VkHardwareBuffer::Unlock()
 
 void VkHardwareVertexBuffer::SetFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs)
 {
-	VertexFormat = fb->GetRenderPassManager()->GetVertexFormat(numBindingPoints, numAttributes, stride, attrs);
+	VertexFormat = fb->GetRenderPassManager()->GetVertexFormat(numBindingPoints, numAttributes, stride, attrs, InstancedBindings);
 }
 
 /////////////////////////////////////////////////////////////////////////////

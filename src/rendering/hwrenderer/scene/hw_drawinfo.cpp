@@ -602,7 +602,9 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	screen->mBones->Map();
 	drawlists[GLDL_MODELS].Draw(this, state, false);
 	DrawFoliage(state);
+	DrawFarFoliage(state);	// LODPLANE plants (treelines) past the line cull distance
 	screen->mBones->Unmap();
+	DrawLodSprites(state);
 
 	state.SetRenderStyle(STYLE_Translucent);
 

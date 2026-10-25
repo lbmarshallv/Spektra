@@ -713,6 +713,7 @@ set( FASTMATH_SOURCES
 	rendering/hwrenderer/scene/hw_foliage.cpp
 	rendering/hwrenderer/scene/hw_terrainbatch.cpp
 	rendering/hwrenderer/scene/hw_worldlod.cpp
+	rendering/hwrenderer/scene/hw_lodsprites.cpp
 	rendering/hwrenderer/scene/hw_hidethings.cpp
 	rendering/hwrenderer/scene/hw_spritelight.cpp
 	rendering/hwrenderer/scene/hw_walls.cpp
@@ -916,6 +917,7 @@ set (PCH_SOURCES
 	rendering/hwrenderer/doom_aabbtree.cpp
 	rendering/hwrenderer/doom_levelmesh.cpp
 	rendering/hwrenderer/hw_models.cpp
+	rendering/hwrenderer/hw_modelsort.cpp
 	rendering/hwrenderer/hw_precache.cpp
 	rendering/hwrenderer/scene/hw_lighting.cpp
 	rendering/hwrenderer/scene/hw_drawlistadd.cpp

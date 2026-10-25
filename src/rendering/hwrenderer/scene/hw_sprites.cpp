@@ -54,6 +54,7 @@
 #include "quaternion.h"
 
 #include "p_visualthinker.h"
+#include "hw_modelsort.h"
 
 extern TArray<spritedef_t> sprites;
 extern TArray<spriteframe_t> SpriteFrames;
@@ -140,6 +141,12 @@ EXTERN_CVAR(Float, r_actorspriteshadowalpha)
 EXTERN_CVAR(Float, r_actorspriteshadowfadeheight)
 EXTERN_CVAR(Int, r_distance_cull_type)
 EXTERN_CVAR(Float, r_lod)
+CVARD(Float, r_semitransparent_range, 4096.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "SEMITRANSPARENT models: within this distance their soft (partly transparent) pixels are blended in a second pass; beyond it they're only alpha-tested. 0 = at any distance.")
+CVARD(Float, r_semitransparent_mipalpha, 0.25f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "SEMITRANSPARENT models: alpha added per mipmap level before the alpha test, so needles and leaves don't thin out in the distance. 0 = off.")
+CVARD(Float, r_semitransparent_gamma, 2.2f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "SEMITRANSPARENT models: soft pixels are blended as if mixed in linear light, like GIMP 2.10 shows them (2.2). 1 = plain alpha blending, as in most engines.")
+CVARD(Float, r_semitransparent_cutoff, 0.5f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "SEMITRANSPARENT models within r_semitransparent_range: pixels at least this opaque are drawn fully solid (and hide what's behind them); fainter ones are blended. Lower = more solid, fewer sorting errors.")
+CVARD(Int, r_semitransparent_debug, 0, 0, "SEMITRANSPARENT models: 1 = draw only the solid (alpha-tested) pass, 2 = only the blended pass of the soft pixels")
+CVARD(Float, r_semitransparent_minalpha, 0.02f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "SEMITRANSPARENT models: pixels with less alpha than this are skipped in the blended pass.")
 CVARD(Float, r_lod_hysteresis, 0.1f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Width of the band around each LODModel distance where the current level is kept, as a fraction of that distance (0.1 = +/-5%). Stops models flickering between levels.")
 
 //==========================================================================
@@ -231,6 +238,12 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 		else if (RenderStyle.BlendOp == STYLEOP_Add && RenderStyle.DestAlpha == STYLEALPHA_One)
 		{
 			additivefog = true;
+		}
+		if (semiPass)
+		{
+			// SEMITRANSPARENT, second pass: everything but the faintest pixels, blended. The solid pixels drawn by the
+			// first pass are drawn again at the same depth (DF_LEqual) with the same colour, so they don't change.
+			state.AlphaFunc(Alpha_Greater, clamp<float>(r_semitransparent_minalpha, 0.f, 1.f));
 		}
 	}
 	else if (modelframe == nullptr)
@@ -391,7 +404,40 @@ void HWSprite::DrawSprite(HWDrawInfo *di, FRenderState &state, bool translucent)
 			}
 
 			FHWModelRenderer renderer(di, state, dynlightindex);
-			RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac), lodModelID, hasModelMatrix ? &modelMatrix : nullptr);
+			if (semiPass && actor)
+			{
+				// pre-sorted triangle order for the direction it's seen from (hw_modelsort.cpp)
+				const DVector3 &eye = di->Viewpoint.bDoOob ? di->Viewpoint.OffPos : di->Viewpoint.Pos;
+				renderer.sortDirection = ModelSortDirection(eye, DVector3(x, y, z + actor->Height * 0.5), (actor->Angles.Yaw + actor->SpriteRotation).Radians());
+			}
+			const bool lodFade = lodFadeTo > lodFadeFrom;
+			if (lodFade)
+			{
+				const DVector3 &eye = di->Viewpoint.bDoOob ? di->Viewpoint.OffPos : di->Viewpoint.Pos;
+				state.SetLodFade(FVector3((float)eye.X, (float)eye.Y, (float)eye.Z), false, lodFadeFrom, lodFadeTo);	// LODSPRITE cross-fade
+			}
+			// SEMITRANSPARENT, first (alpha-tested) pass: keep thin parts solid at a distance.
+			// The blended pass measures alpha the same way, to skip exactly the pixels the solid pass drew.
+			const bool mipAlpha = (semiPass || (!translucent && (modelframeflags & MDL_SEMITRANSPARENT))) && r_semitransparent_mipalpha > 0;
+			if (mipAlpha) state.SetModelMipAlpha(r_semitransparent_mipalpha);
+			const bool alphaExp = semiPass && r_semitransparent_gamma > 0 && r_semitransparent_gamma != 1;
+			if (alphaExp) state.SetModelAlphaExponent(1.f / r_semitransparent_gamma);
+			if (semiPass) state.SetModelSoftCutoff(max(0.001f, clamp<float>(r_semitransparent_cutoff, 0.f, 1.f)));
+			// SEMITRANSPARENT with a blended pass: only nearly opaque pixels are drawn solid; the rest are blended later.
+			if (semiSolid && !translucent) state.AlphaFunc(Alpha_GEqual, clamp<float>(r_semitransparent_cutoff, 0.f, 1.f));
+			// SEMITRANSPARENT, solid pass: write the pixels opaque. The normal style blends by the texel's alpha, which
+			// let what's behind (the trunk) show through and darkened the needles.
+			const bool solidWrite = !translucent && !semiPass && (modelframeflags & MDL_SEMITRANSPARENT);
+			const FRenderStyle savedStyle = state.GetRenderStyle();
+			if (solidWrite) state.SetRenderStyle(LegacyRenderStyles[STYLE_Source]);
+			if (!(r_semitransparent_debug == 2 && solidWrite))
+				RenderModel(&renderer, x, y, z, modelframe, actor, Net_ModifyObjectFrac(actor, di->Viewpoint.TicFrac), lodModelID, hasModelMatrix ? &modelMatrix : nullptr);
+			if (solidWrite) state.SetRenderStyle(savedStyle);
+			if (semiSolid && !translucent) state.AlphaFunc(Alpha_GEqual, gl_mask_threshold);
+			if (mipAlpha) state.SetModelMipAlpha(0.f);
+			if (alphaExp) state.SetModelAlphaExponent(0.f);
+			if (semiPass) state.SetModelSoftCutoff(0.f);
+			if (lodFade) state.ClearLodFade();
 			state.SetVertexBuffer(screen->mVertexData);
 		}
 	}
@@ -873,6 +919,8 @@ void HWSprite::PerformSpriteClipAdjustment(AActor *thing, const DVector2 &thingp
 
 void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t in_area, int thruportal, bool isSpriteShadow)
 {
+	semiPass = semiSolid = false;
+	lodFadeFrom = lodFadeTo = 0;
 	sector_t rs;
 	sector_t * rendersector;
 
@@ -970,6 +1018,25 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 	modelframe = isPicnumOverride ? nullptr : FindModelFrame(thing, spritenum, thing->frame, !!(thing->flags & MF_DROPPED));
 	modelframeflags = modelframe ? modelframe->getFlags(thing->modelData) : 0;
 
+	// LODSPRITE actors past their sprite distance are drawn as generated 2D sprites by DrawLodSprites (hw_lodsprites.cpp),
+	// which makes the same test with the same position, so exactly one of the two draws the actor.
+	const bool lodSpriteActor = modelframe != nullptr && (thing->perfFlags & PERF_LODSPRITE);
+	lodFadeFrom = lodFadeTo = 0;
+	if (lodSpriteActor && thruportal == 0)
+	{
+		FLodSpriteWindow w;
+		if (di->LodSpriteRange(thing->GetClass(), thing->Sector, w))
+		{
+			if ((thingpos - (vp.bDoOob ? vp.OffPos : vp.Pos)).LengthSquared() >= w.modelEnd * w.modelEnd) return;
+			if (w.Fades())
+			{
+				// cross-fading with its sprite (gl_lodsprite_fade)
+				lodFadeFrom = w.fadeFrom;
+				lodFadeTo = w.fadeTo;
+			}
+		}
+	}
+
 	// Level of detail. This only picks what to draw; the actor's own model data is never touched.
 	lodModelID = -1;
 	if (modelframe && thing->hasLODs())
@@ -988,6 +1055,17 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 					lodModelID = lod->modelID;	// -1 (model not found) falls back to the normal model
 					break;
 				case LOD_Sprite:
+					if (lodSpriteActor)
+					{
+						// Its generated sprite is drawn by DrawLodSprites. Here (hysteresis just short of the sprite
+						// distance in the main view) the last model level is drawn; in other views, nothing.
+						if (!di->lodSprites) return;
+						for (const LODmodel *m = thing->GetLODmodels(); m != nullptr && m != lod; m = m->Next)
+						{
+							if (m->type == LOD_Model) lodModelID = m->modelID;
+						}
+						break;
+					}
 					modelframe = nullptr;		// draw the actor's sprite frame instead
 					modelframeflags = 0;
 					break;
@@ -1505,6 +1583,17 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		hw_styleflags = STYLEHW_NoAlphaTest;
 	}
 
+	// SEMITRANSPARENT models with a translucent style at full alpha draw like normal ones: the solid pass plus the
+	// blended pass for the soft pixels. (Otherwise every model with a non-default style is blended as a whole, unsorted.)
+	if (modelframe && (modelframeflags & MDL_SEMITRANSPARENT) && trans >= 1.f - FLT_EPSILON && RenderStyle.BlendOp == STYLEOP_Add
+		&& (RenderStyle.SrcAlpha == STYLEALPHA_Src || RenderStyle.SrcAlpha == STYLEALPHA_One)
+		&& (RenderStyle.DestAlpha == STYLEALPHA_InvSrc || RenderStyle.DestAlpha == STYLEALPHA_Zero) && !(RenderStyle.Flags & STYLEF_RedIsAlpha))
+	{
+		RenderStyle.SrcAlpha = STYLEALPHA_One;
+		RenderStyle.DestAlpha = STYLEALPHA_Zero;
+		hw_styleflags = STYLEHW_Solid;
+	}
+
 	if (enhancedvision && gl_enhanced_nightvision)
 	{
 		if (RenderStyle.BlendOp == STYLEOP_Shadow)
@@ -1584,7 +1673,27 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 		lightlist = nullptr;
 	}
 
+	// SEMITRANSPARENT models: the solid pixels are alpha-tested with the opaque models (depth written, so the mesh's own
+	// faces hide each other correctly whatever order they're in). Within r_semitransparent_range only nearly opaque
+	// pixels count as solid (semiSolid), and all the others are blended over that in the translucent pass, sorted with
+	// the other translucent things.
+	semiPass = semiSolid = false;
+	bool soft = false;
+	if (modelframe && hw_styleflags == STYLEHW_Solid && (modelframeflags & MDL_SEMITRANSPARENT) && !isSpriteShadow && r_semitransparent_debug != 1)
+	{
+		const double range = r_semitransparent_range;
+		soft = range <= 0 || (thingpos - vp.Pos).LengthSquared() < range * range;
+	}
+	semiSolid = soft;
 	PutSprite(di, hw_styleflags != STYLEHW_Solid);
+	if (soft)
+	{
+		HWSprite softPass = *this;
+		softPass.semiPass = true;
+		softPass.semiSolid = false;
+		softPass.RenderStyle = LegacyRenderStyles[STYLE_Translucent];
+		di->AddSprite(&softPass, true);	// same light list as the first pass
+	}
 	rendered_sprites++;
 }
 
@@ -1597,6 +1706,8 @@ void HWSprite::Process(HWDrawInfo *di, AActor* thing, sector_t * sector, area_t 
 
 void HWSprite::ProcessParticle(HWDrawInfo *di, particle_t *particle, sector_t *sector, DVisualThinker *spr)//, int shade, int fakeside)
 {
+	semiPass = semiSolid = false;
+	lodFadeFrom = lodFadeTo = 0;
 	if (!particle || particle->alpha <= 0)
 		return;
 

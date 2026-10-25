@@ -90,6 +90,7 @@ enum ModelRendererType
 	GLModelRendererType,
 	SWModelRendererType,
 	PolyModelRendererType,
+	CaptureModelRendererType,	// CPU copy of a model's triangles, for generating LOD sprites (hw_lodsprites.cpp)
 	NumModelRendererTypes
 };
 

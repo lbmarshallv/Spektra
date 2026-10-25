@@ -226,6 +226,9 @@ void GLVertexBuffer::SetFormat(int numBindingPoints, int numAttributes, size_t s
 void GLVertexBuffer::Bind(int *offsets)
 {
 	int i = 0;
+	// Per-instance attributes (SetInstancedBindings). The divisor is global GL state, so it's tracked and reset for
+	// buffers that don't use it.
+	static uint8_t currentDivisor[VATTR_MAX] = {};
 
 	// This is what gets called from RenderState.Apply. It shouldn't be called anywhere else if the render state is in use
 	GLBuffer::Bind();
@@ -238,6 +241,12 @@ void GLVertexBuffer::Bind(int *offsets)
 		else
 		{
 			glEnableVertexAttribArray(i);
+			const uint8_t divisor = (InstancedBindings >> attrinf.bindingpoint) & 1;
+			if (currentDivisor[i] != divisor)
+			{
+				glVertexAttribDivisor(i, divisor);
+				currentDivisor[i] = divisor;
+			}
 			size_t ofs = offsets == nullptr ? attrinf.offset : attrinf.offset + mStride * offsets[attrinf.bindingpoint];
 			if (!attrinf.integerType)
 				glVertexAttribPointer(i, attrinf.size, attrinf.format, attrinf.normalize, (GLsizei)mStride, (void*)(intptr_t)ofs);

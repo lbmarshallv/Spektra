@@ -112,6 +112,8 @@ struct FTerrainBatches;
 void DeleteTerrainBatches(FTerrainBatches *batches);	// hw_terrainbatch.cpp
 struct FWorldLOD;
 void DeleteWorldLOD(FWorldLOD *lod);	// hw_worldlod.cpp
+struct FLodSprites;
+void DeleteLodSprites(FLodSprites *sprites);	// hw_lodsprites.cpp
 
 struct FLevelLocals
 {
@@ -809,6 +811,8 @@ public:
 	struct FBspZBounds *BspZBounds = nullptr;	// renderer: height ranges of BSP nodes for frustum culling (hw_bsp.cpp)
 	struct FTerrainBatches *TerrainBatches = nullptr;	// renderer: batched outdoor floors (hw_terrainbatch.cpp)
 	struct FWorldLOD *WorldLOD = nullptr;	// renderer: static model of the outdoor level past the line cull distance (hw_worldlod.cpp)
+	struct FLodSprites *LodSprites = nullptr;	// renderer: generated sprites of LODSPRITE foliage and actors (hw_lodsprites.cpp)
+	TArray<AActor *> LodSpriteActors;	// actors with +LODSPRITE (AActor::LinkLodSprite); not saved, relinked by PostSerialize
 
 	//==========================================================================
 	//

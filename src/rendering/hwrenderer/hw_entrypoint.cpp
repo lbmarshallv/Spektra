@@ -56,6 +56,7 @@ void CleanSWDrawer()
 #include "g_levellocals.h"
 #include "a_dynlight.h"
 #include "p_foliage.h"
+#include "hw_modelsort.h"
 
 
 void CollectLights(FLevelLocals* Level)
@@ -318,12 +319,15 @@ sector_t* RenderView(player_t* player)
 	ResetFrustumStats();
 	ResetTerrainStats();
 	ResetWorldLODStats();
+	ResetLodSpriteStats();
+	UpdateSortedModels();	// SEMITRANSPARENT models: triangle orders sorted once from 10 directions (first frame only)
 	for (auto Level : AllLevels())
 	{
 		if (Level->Foliage) Level->Foliage->RebuildIfDirty(Level);	// plants spawned by script since the last frame
 		UpdateBspZBounds(Level);	// moving floors and ceilings since the last frame
 		UpdateTerrainBatches(Level);	// batched outdoor floors that changed since they were built fall back to normal rendering
 		UpdateWorldLOD(Level);	// static model of the outdoor level, snapshotted on the first frame
+		UpdateLodSprites(Level);	// 2D sprites of LODSPRITE foliage and actors (after the foliage index is rebuilt)
 	}
 	hw_postprocess.SetTonemapMode(level.info ? level.info->tonemap : ETonemapMode::None);
 

@@ -257,6 +257,11 @@ class FShader
 	FUniform4f muSplitTopPlane;
 	FUniform4f muDetailParms;
 	FUniform4f muLodCutoff;
+	FUniform4f muSpriteLod0;
+	FUniform4f muSpriteLod1;
+	FUniform4f muLodFade0;
+	FUniform4f muLodFade1;
+	FUniform4f muSemiParams;
 	FBufferedUniform1f muInterpolationFactor;
 	FBufferedUniform1f muAlphaThreshold;
 	FBufferedUniform2f muSpecularMaterial;

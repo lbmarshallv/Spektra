@@ -1852,6 +1852,7 @@ void HWDrawInfo::RenderBSP(void *node, bool drawpsprites)
 	validcount++;	// used for processing sidedefs only once by the renderer.
 	SetupTerrainBatches();
 	SetupWorldLOD();
+	SetupLodSprites();	// after the world LOD: sprites are only drawn past the cull distance where it is
 
 	// Height ranges for the 3D frustum test and the horizon: need this frame's ranges and a perspective view.
 	zBounds = nullptr;

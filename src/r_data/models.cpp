@@ -700,6 +700,49 @@ void ParseModelDefLump(int Lump);
 
 //===========================================================================
 //
+// SEMITRANSPARENT models: their skins (MODELDEF skins, surface skins and the
+// models' own) get alpha bleeding when uploaded (FTexture::BleedAlpha), so
+// their soft edges keep their colour when filtered and mipmapped.
+//
+//===========================================================================
+
+static void MarkSemiTransparentSkins()
+{
+	TArray<uint8_t> hit(TexMan.NumTextures(), true);
+	memset(hit.Data(), 0, hit.Size());
+	bool any = false;
+	for (auto &smf : SpriteModelFrames)
+	{
+		if (!(smf.getFlags(nullptr) & MDL_SEMITRANSPARENT)) continue;
+		for (unsigned i = 0; i < smf.modelsAmount; i++)
+		{
+			if (i < smf.skinIDs.Size() && smf.skinIDs[i].isValid()) hit[smf.skinIDs[i].GetIndex()] = 1;
+			const int id = i < smf.modelIDs.Size() ? smf.modelIDs[i] : -1;
+			if (id >= 0 && id < (int)Models.Size())
+			{
+				Models[id]->AddSkins(hit.Data(), (i * MD3_MAX_SURFACES) < smf.surfaceskinIDs.Size() ? &smf.surfaceskinIDs[i * MD3_MAX_SURFACES] : nullptr);
+			}
+			any = true;
+		}
+	}
+	if (!any) return;
+	int frames = 0, skins = 0;
+	for (auto &smf : SpriteModelFrames) frames += !!(smf.getFlags(nullptr) & MDL_SEMITRANSPARENT);
+	for (unsigned i = 0; i < hit.Size(); i++)
+	{
+		if (!hit[i]) continue;
+		FGameTexture *tex = TexMan.GameByIndex(i);
+		if (tex && tex->GetTexture())
+		{
+			tex->GetTexture()->bAlphaBleed = true;
+			skins++;
+		}
+	}
+	Printf("SEMITRANSPARENT: %d model frames, %d skins\n", frames, skins);
+}
+
+//===========================================================================
+//
 // Looks up the models named by LODModel actor properties. This runs once
 // here, on the main thread, because FindModel may load the file and must
 // never be called from the renderer. A name containing a '/' is a full
@@ -813,6 +856,7 @@ void InitModels()
 	}
 
 	ResolveLODModels();
+	MarkSemiTransparentSkins();
 
 	Printf("InitModels complete");
 
@@ -1212,6 +1256,10 @@ void ParseModelDefLump(int Lump)
 				else if (sc.Compare("forcecullbackfaces"))
 				{
 					smf.flags |= MDL_FORCECULLBACKFACES;
+				}
+				else if (sc.Compare("semitransparent"))
+				{
+					smf.flags |= MDL_SEMITRANSPARENT;
 				}
 				else
 				{

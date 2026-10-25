@@ -516,6 +516,8 @@ enum ActorPerfFlag
 	PERF_FOLIAGERANDOMYAW	= 0x0002,	// foliage: random (but repeatable) yaw per placed thing
 	PERF_FOLIAGEALIGNSLOPE	= 0x0004,	// foliage: tilt to match the floor slope it stands on
 	PERF_NOLODHYSTERESIS	= 0x0008,	// switch LODModel levels exactly at their distances (ignore r_lod_hysteresis)
+	PERF_LODPLANE			= 0x0020,	// foliage: keep drawing its own model past the line cull distance (cheap models such as treelines; hw_foliage.cpp)
+	PERF_LODSPRITE			= 0x0010,	// drawn as a generated 8-angle sprite of its model past the line cull distance and from its LODModel "Sprite" distance (hw_lodsprites.cpp)
 
 	// Internal, set by the engine only (not exposed to DECORATE/ZScript):
 	PERF_CLUSTERPROXY		= 0x10000,	// solid FOLIAGE thing: a foliage cluster draws it; this actor only provides collision and never ticks
@@ -1194,6 +1196,8 @@ public:
 	// Returns nullptr for the actor's normal model. Updates LODLevel for hysteresis.
 	const LODmodel *SelectLOD(double distance, double hysteresis);
 	void MakeClusterProxy();	// flags a solid foliage actor as a collision-only proxy and drops it from the render lists
+	void LinkLodSprite();		// LODSPRITE actors: add to / remove from Level->LodSpriteActors (the renderer's list of them)
+	void UnlinkLodSprite();
 
 // info for drawing
 	AActor			*snext, **sprev;	// links in sector (if needed)
@@ -1784,6 +1788,7 @@ public:
 
 	bool				hasmodel;
 	uint8_t				LODLevel;	// last level of detail picked by the renderer (0 = normal model); not serialized
+	int					LodSpriteSlot;	// LODSPRITE actors: index + 1 in Level->LodSpriteActors, 0 = not listed; not serialized
 
 	void initCollisions();
 	ActorCollisionFlags collisionFlags;

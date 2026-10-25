@@ -111,6 +111,11 @@ class IVertexBuffer : virtual public IBuffer
 {
 public:
 	virtual void SetFormat(int numBindingPoints, int numAttributes, size_t stride, const FVertexBufferAttribute *attrs) = 0;
+
+	// Binding points whose attributes advance once per instance instead of once per vertex (bit n = binding n).
+	// Must be set before SetFormat. OpenGL and Vulkan only.
+	void SetInstancedBindings(unsigned mask) { InstancedBindings = mask; }
+	unsigned InstancedBindings = 0;
 };
 
 // This merely exists to have a dedicated type for index buffers to inherit from.

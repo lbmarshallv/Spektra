@@ -23,6 +23,7 @@
 */
 
 #include <algorithm>
+#include <float.h>
 #include "p_foliage.h"
 #include "actor.h"
 #include "info.h"
@@ -50,16 +51,24 @@
 #include "hwrenderer/scene/hw_drawstructs.h"
 #include "hwrenderer/scene/hw_portal.h"
 #include "flatvertices.h"
+#include "hw_modelsort.h"
 
 EXTERN_CVAR(Float, r_lod)
 EXTERN_CVAR(Float, r_lod_hysteresis)
 EXTERN_CVAR(Int, r_distance_cull_type)
 EXTERN_CVAR(Bool, gl_frustum_cull)
 EXTERN_CVAR(Bool, r_foliageclusters)
+EXTERN_CVAR(Bool, gl_render_things)
 EXTERN_CVAR(Float, gl_mask_sprite_threshold)
 EXTERN_CVAR(Float, gl_mask_threshold)
 CVARD(Bool, gl_render_foliage, true, 0, "Draw foliage clusters (like gl_render_things, but only for foliage; other actors stay visible)")
 CVARD(Float, r_foliagerangescale, 1.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Scales every foliage class's FoliageLightRange and FoliageTranslucentRange. 0 = no dynamic lights or translucency on foliage.")
+EXTERN_CVAR(Float, r_semitransparent_range)
+EXTERN_CVAR(Float, r_semitransparent_mipalpha)
+EXTERN_CVAR(Float, r_semitransparent_minalpha)
+EXTERN_CVAR(Float, r_semitransparent_gamma)
+EXTERN_CVAR(Int, r_semitransparent_debug)
+EXTERN_CVAR(Float, r_semitransparent_cutoff)
 CVARD(Float, r_foliagealphathreshold, 0.1f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG, "Near translucent foliage: pixels with less alpha than this are skipped entirely, so they don't hide things drawn behind them later.")
 
 static const unsigned MAX_INSTANCES_PER_DRAW = 4096;
@@ -78,7 +87,9 @@ static struct FFoliageStats
 	int visibleSubsectors;
 	int considered;			// plants in visible subsectors
 	int drawn;
-	int hiddenByLOD;		// LODModel "None" (or "Sprite", which foliage doesn't support yet)
+	int hiddenByLOD;		// LODModel "None" (or "Sprite" without +LODSPRITE, or outside the main view)
+	int lodSprites;			// LODSPRITE plants left to the LOD sprite batch (hw_lodsprites.cpp)
+	int farModels;			// LODPLANE plants drawn past the cull distance (DrawFarFoliage)
 	int culledByDistance;	// DistanceCheck / r_distance_cull_type
 	int lit;				// plants drawn with dynamic lights
 	int lightLists;			// distinct light lists uploaded
@@ -93,7 +104,7 @@ static struct FFoliageStats
 
 void ResetFoliageStats()
 {
-	foliageStats.visibleSubsectors = foliageStats.considered = foliageStats.drawn = foliageStats.hiddenByLOD = foliageStats.culledByDistance = 0;
+	foliageStats.visibleSubsectors = foliageStats.considered = foliageStats.drawn = foliageStats.hiddenByLOD = foliageStats.culledByDistance = foliageStats.lodSprites = foliageStats.farModels = 0;
 	foliageStats.lit = foliageStats.lightLists = foliageStats.translucent = 0;
 	foliageStats.groups = foliageStats.instancedDraws = foliageStats.singleDraws = 0;
 	foliageStats.time.Reset();
@@ -115,9 +126,13 @@ class FHWFoliageModelRenderer : public FModelRenderer
 	int instances;
 	int lightIndex;
 	bool culled = false;
+	int sortDirection;			// SEMITRANSPARENT blended pass: which pre-sorted triangle order to draw (-1: the model's own)
+	FModel *currentModel = nullptr;
+	unsigned currentFrame = 0;
+	IIndexBuffer *modelIndexBuffer = nullptr;
 
 public:
-	FHWFoliageModelRenderer(HWDrawInfo *d, FRenderState &st, PClass *c, int n, int light) : di(d), state(st), cls(c), instances(n), lightIndex(light) {}
+	FHWFoliageModelRenderer(HWDrawInfo *d, FRenderState &st, PClass *c, int n, int light, int sortDir = -1) : di(d), state(st), cls(c), instances(n), lightIndex(light), sortDirection(sortDir) {}
 
 	ModelRendererType GetType() const override { return GLModelRendererType; }
 
@@ -166,8 +181,23 @@ public:
 		state.SetLightIndex(lightIndex);
 	}
 
+	// The pre-sorted triangle order for this draw call, if it has one: drawn from the shared sorted index buffer.
+	bool DrawSorted(bool arrays, unsigned first, unsigned count)
+	{
+		IIndexBuffer *ib;
+		unsigned start;
+		if (sortDirection < 0 || currentModel == nullptr || !ModelSortedDraw(currentModel, currentFrame, arrays, first, count, sortDirection, ib, start)) return false;
+		state.SetIndexBuffer(ib);
+		const int n = int(count - count % 3);
+		if (instances > 1) state.DrawIndexedInstanced(DT_Triangles, (int)start, n, instances);
+		else state.DrawIndexed(DT_Triangles, (int)start, n);
+		state.SetIndexBuffer(modelIndexBuffer);	// models may make several draws per SetupFrame
+		return true;
+	}
+
 	void DrawArrays(int start, int count) override
 	{
+		if (DrawSorted(true, start, count)) return;
 		if (instances > 1) state.DrawInstanced(DT_Triangles, start, count, instances);
 		else state.Draw(DT_Triangles, start, count);
 	}
@@ -175,6 +205,7 @@ public:
 	void DrawElements(int numIndices, size_t offset) override
 	{
 		const int first = int(offset / sizeof(unsigned int));
+		if (DrawSorted(false, first, numIndices)) return;
 		if (instances > 1) state.DrawIndexedInstanced(DT_Triangles, first, numIndices, instances);
 		else state.DrawIndexed(DT_Triangles, first, numIndices);
 	}
@@ -183,9 +214,13 @@ public:
 	{
 		auto mdbuff = static_cast<FModelVertexBuffer*>(model->GetVertexBuffer(GetType()));
 		state.SetBoneIndexBase(boneStartIndex);
+		currentModel = model;
+		currentFrame = frame1;
+		modelIndexBuffer = nullptr;
 		if (mdbuff)
 		{
 			state.SetVertexBuffer(mdbuff->vertexBuffer(), frame1, frame2);
+			modelIndexBuffer = mdbuff->indexBuffer();
 			if (mdbuff->indexBuffer()) state.SetIndexBuffer(mdbuff->indexBuffer());
 		}
 	}
@@ -214,6 +249,7 @@ struct FFoliageGroup
 	int lodModelID;			// replacement for model index 0, -1 = the MODELDEF model
 	int lightGroup;
 	int lightIndex;			// dynamic light list, -1 = none
+	bool soft;				// SEMITRANSPARENT plants that also get the blended pass: only nearly opaque pixels are drawn here
 	TArray<VSMatrix> matrices;	// pairs of (model matrix, normal matrix)
 };
 
@@ -231,6 +267,13 @@ struct FFoliageTypeFrameInfo
 	double fadeEndSq;	// -1 = never translucent
 	bool cullable;		// bounds below are known: every model the plant can draw has been built and isn't skinned
 	FVector3 cullMins, cullMaxs;	// object space, all submodels and LOD models together
+	bool semi;			// MODELDEF SEMITRANSPARENT: opaque plants nearer than semiRangeSq get a blended pass for their soft pixels
+	double semiRangeSq;
+	bool lodSprite;		// +LODSPRITE with a generated sprite, in a view that draws them: the batch draws it from spriteFromSq on
+	double spriteFromSq[4];	// per sector class (LodSpriteSectorClass): where the model ends, squared, 1 unit early (see below)
+	float fadeFrom, fadeTo;	// cross-fade band with the sprite (equal: none)
+	bool farModel;		// LODPLANE in a view that draws them: DrawFarFoliage draws it from farStartSq on
+	double farStartSq[4];	// per sector class
 };
 
 // Object-space bounds covering every model a foliage type can draw, at any level of detail.
@@ -353,14 +396,13 @@ static int GetSectorLightGroup(HWDrawInfo *di, sector_t *sec)
 //
 //==========================================================================
 
-static int GetLightGroup(HWDrawInfo *di, const FFoliageInstance &inst)
+static int GetLightGroupAt(HWDrawInfo *di, sector_t *sec, const FVector3 &pos)
 {
-	sector_t *sec = inst.sector;
 	auto &list = sec->e->XFloor.lightlist;
 	if (list.Size() == 0 || di->isFullbrightScene()) return GetSectorLightGroup(di, sec);
 
-	const DVector2 xy(inst.pos.X, inst.pos.Y);
-	const double z = inst.pos.Z + 1.;
+	const DVector2 xy(pos.X, pos.Y);
+	const double z = pos.Z + 1.;
 	unsigned slice = 0;
 	while (slice + 1 < list.Size() && z < list[slice + 1].plane.ZatPoint(xy)) slice++;
 	if (slice == 0 && list[0].caster == nullptr) return GetSectorLightGroup(di, sec);	// above every light-casting 3D floor
@@ -391,6 +433,11 @@ static int GetLightGroup(HWDrawInfo *di, const FFoliageInstance &inst)
 	return group;
 }
 
+static int GetLightGroup(HWDrawInfo *di, const FFoliageInstance &inst)
+{
+	return GetLightGroupAt(di, inst.sector, inst.pos);
+}
+
 static void ApplyLightGroup(HWDrawInfo *di, FRenderState &state, const FFoliageLightKey &key, float alpha, bool additivefog)
 {
 	const int rel = getExtraLight();
@@ -401,6 +448,22 @@ static void ApplyLightGroup(HWDrawInfo *di, FRenderState &state, const FFoliageL
 	SetColor(state, di->Level, di->lightmode, key.lightlevel, rel, fullbright, key.colormap, alpha);
 	const int foglevel = key.colormap.FadeColor.isBlack() ? key.lightlevel : key.foglevel;
 	SetFog(state, di->Level, di->lightmode, foglevel, rel, fullbright, &key.colormap, additivefog);
+}
+
+// Shared with the LOD sprites (hw_lodsprites.cpp), which are lit like foliage: sector (or 3D-floor slice) light only.
+void ResetFoliageLightGroups(FLevelLocals *Level)
+{
+	ResetLightGroups(Level);
+}
+
+int FoliageLightGroup(HWDrawInfo *di, sector_t *sec, const FVector3 &pos)
+{
+	return GetLightGroupAt(di, sec, pos);
+}
+
+void ApplyFoliageLightGroup(HWDrawInfo *di, FRenderState &state, int group)
+{
+	ApplyLightGroup(di, state, lightGroups[group], 1.f, false);
 }
 
 //==========================================================================
@@ -496,10 +559,10 @@ static int GetPlantLightIndex(const FFoliageInstance &inst, const FFoliageType &
 //
 //==========================================================================
 
-static FFoliageGroup &FindGroup(int type, int level, int lightGroup, int lightIndex, int lodModelID)
+static FFoliageGroup &FindGroup(int type, int level, int lightGroup, int lightIndex, int lodModelID, bool soft = false)
 {
-	// type: 16 bits, level: 5 bits, light group: 16 bits, light index + 1: 27 bits
-	const uint64_t key = (uint64_t(type) << 48) | (uint64_t(level) << 43) | (uint64_t(lightGroup & 0xffff) << 27) | uint64_t((lightIndex + 1) & 0x7ffffff);
+	// type: 16 bits, level: 5 bits, light group: 16 bits, soft: 1 bit, light index + 1: 26 bits
+	const uint64_t key = (uint64_t(type) << 48) | (uint64_t(level) << 43) | (uint64_t(lightGroup & 0xffff) << 27) | (uint64_t(soft) << 26) | uint64_t((lightIndex + 1) & 0x3ffffff);
 	unsigned *found = groupMap.CheckKey(key);
 	if (found) return groups[*found];
 
@@ -510,6 +573,7 @@ static FFoliageGroup &FindGroup(int type, int level, int lightGroup, int lightIn
 	g.lodModelID = lodModelID;
 	g.lightGroup = lightGroup;
 	g.lightIndex = lightIndex;
+	g.soft = soft;
 	g.matrices.Clear();
 	groupMap[key] = numGroups++;
 	return g;
@@ -522,9 +586,9 @@ static FFoliageGroup &FindGroup(int type, int level, int lightGroup, int lightIn
 //
 //==========================================================================
 
-static void DrawFoliageModel(HWDrawInfo *di, FRenderState &state, const FFoliageType &type, FRenderStyle style, int lodModelID, int lightIndex, const VSMatrix &matrix, int instanceBase, int instances)
+static void DrawFoliageModel(HWDrawInfo *di, FRenderState &state, const FFoliageType &type, FRenderStyle style, int lodModelID, int lightIndex, const VSMatrix &matrix, int instanceBase, int instances, int sortDirection = -1)
 {
-	FHWFoliageModelRenderer renderer(di, state, type.cls, instances, lightIndex);
+	FHWFoliageModelRenderer renderer(di, state, type.cls, instances, lightIndex, sortDirection);
 	FSpriteModelFrame *smf = type.smf;
 	const FTranslationID translation = (type.smfFlags & MDL_IGNORETRANSLATION) ? NO_TRANSLATION : GetDefaultByType(type.cls)->Translation;
 
@@ -549,13 +613,13 @@ static void DrawFoliageModel(HWDrawInfo *di, FRenderState &state, const FFoliage
 
 // Draws 'count' plants whose matrix pairs are in 'matrices' starting at 'first', instanced if possible.
 static void DrawFoliageBatch(HWDrawInfo *di, FRenderState &state, const FFoliageType &type, FRenderStyle style, int lodModelID, int lightIndex,
-	const TArray<VSMatrix> &matrices, unsigned first, unsigned count, bool instancing)
+	const TArray<VSMatrix> &matrices, unsigned first, unsigned count, bool instancing, int sortDirection = -1)
 {
 	if (!instancing || count == 1)
 	{
 		for (unsigned i = 0; i < count; i++)
 		{
-			DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, matrices[(first + i) * 2], -1, 1);
+			DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, matrices[(first + i) * 2], -1, 1, sortDirection);
 		}
 		foliageStats.singleDraws += count;
 		return;
@@ -579,7 +643,7 @@ static void DrawFoliageBatch(HWDrawInfo *di, FRenderState &state, const FFoliage
 
 		if (base >= 0)
 		{
-			DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, identity, base, num);
+			DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, identity, base, num, sortDirection);
 			foliageStats.instancedDraws++;
 		}
 		else
@@ -587,7 +651,7 @@ static void DrawFoliageBatch(HWDrawInfo *di, FRenderState &state, const FFoliage
 			// The bone buffer is full for this frame: draw these plants one at a time.
 			for (unsigned i = 0; i < num; i++)
 			{
-				DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, matrices[(first + start + i) * 2], -1, 1);
+				DrawFoliageModel(di, state, type, style, lodModelID, lightIndex, matrices[(first + start + i) * 2], -1, 1, sortDirection);
 			}
 			foliageStats.singleDraws += num;
 		}
@@ -672,7 +736,41 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 		ti.fadeEnd = ai->FoliageFadeEnd * rangescale;
 		ti.fadeEndSq = (foliage->Types[t].translucent && ti.fadeEnd > 0) ? ti.fadeEnd * ti.fadeEnd : -1.;
 		ti.cullable = GetFoliageTypeBounds(foliage->Types[t], ti, ti.cullMins, ti.cullMaxs);
+		ti.semi = !!(foliage->Types[t].smfFlags & MDL_SEMITRANSPARENT);
+		// SEMITRANSPARENT plants at full alpha are drawn solid plus a blended pass for their soft pixels, even with a
+		// translucent render style; only real translucency (alpha < 1) keeps the near translucent pass.
+		if (ti.semi && foliage->Types[t].alpha >= 1.f) ti.fadeEndSq = -1.;
+		ti.semiRangeSq = r_semitransparent_range > 0 ? double(r_semitransparent_range) * r_semitransparent_range : DBL_MAX;
+
+		// LODSPRITE plants past their sprite distance are drawn by the LOD sprite batch (DrawLodSprites), which works
+		// out the same distance per plant on the GPU. The model stops 1 unit short of it, so float rounding there can
+		// never draw both.
+		// With a cross-fade (gl_lodsprite_fade) the sprite starts before the model ends, and the shader dithers the two
+		// on complementary pixels.
+		ti.lodSprite = lodSprites && LodSpriteTypeInBatch(Level, t);
+		ti.fadeFrom = ti.fadeTo = 0;
+		ti.farModel = lodSprites && LodFarModelType(Level, t);
+		if (ti.farModel)
+		{
+			for (int c = 0; c < 4; c++)
+			{
+				double start, outer;
+				LodFarModelWindow(cls, c, start, outer);
+				ti.farStartSq[c] = start >= LODSPRITE_NEVER ? DBL_MAX : start * start;
+			}
+		}
+		if (ti.lodSprite)
+		{
+			for (int c = 0; c < 4; c++)
+			{
+				FLodSpriteWindow w;
+				LodSpriteWindow(cls, c, w);
+				ti.spriteFromSq[c] = w.modelEnd >= LODSPRITE_NEVER ? DBL_MAX : max(0., w.modelEnd - 1.) * max(0., w.modelEnd - 1.);
+				if (c == 0 && w.Fades()) { ti.fadeFrom = w.fadeFrom; ti.fadeTo = w.fadeTo; }	// the same for every sector class a model is drawn in
+			}
+		}
 	}
+	const uint8_t *lodSpriteSectorClass = lodSprites ? LodSpriteSectorClasses(Level) : nullptr;	// set whenever lodSprites is
 	const bool frustumCull = gl_frustum_cull && Frustum.valid && !Viewpoint.bDoOob;
 
 	const DVector3 &viewpos = Viewpoint.bDoOob ? Viewpoint.OffPos : Viewpoint.Pos;
@@ -715,6 +813,12 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 			const double dx = inst.pos.X - viewpos.X, dy = inst.pos.Y - viewpos.Y, dz = inst.pos.Z - viewpos.Z;
 			const double distsq = dx * dx + dy * dy + dz * dz;
 			const FFoliageTypeFrameInfo &ti = typeInfo[inst.type];
+			if (ti.farModel && distsq >= ti.farStartSq[lodSpriteSectorClass[inst.sector->Index()]]) continue;	// DrawFarFoliage has it
+			if (ti.lodSprite && distsq >= ti.spriteFromSq[lodSpriteSectorClass[inst.sector->Index()]])
+			{
+				foliageStats.lodSprites++;	// a 2D sprite now (or hidden past its "None" distance), drawn by DrawLodSprites
+				continue;
+			}
 			if ((culldistsq > 0 && distsq >= culldistsq) || (ti.maxDistSq >= 0 && distsq >= ti.maxDistSq))
 			{
 				foliageStats.culledByDistance++;
@@ -732,6 +836,11 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 			{
 				level = PickFoliageLevel(ti, sqrt(distsq) * lodscale, ti.noHysteresis ? 0. : hysteresis, inst.lodLevel);
 				inst.lodLevel = (uint8_t)level;
+				if (ti.lodSprite && level > 0 && ti.levels[level - 1]->type == LOD_Sprite)
+				{
+					// Hysteresis kept the sprite level a little nearer than the sprite distance: stay on the last model.
+					while (level > 0 && ti.levels[level - 1]->type != LOD_Model) level--;
+				}
 			}
 			if (level > 0 && ti.levels[level - 1]->type != LOD_Model)
 			{
@@ -781,14 +890,32 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 					item.distSq = (float)distsq;
 					item.level = (uint8_t)level;
 					item.fade = (uint8_t)fade;
+					item.semi = 0;
+					item.sortDir = 0;
 					FoliageTranslucent.Push(item);
 					continue;
 				}
 			}
 
-			FFoliageGroup &g = FindGroup(inst.type, level, GetLightGroup(this, inst), lightIndex, LODModelForLevel(inst.type, level));
+			const bool soft = ti.semi && distsq < ti.semiRangeSq && r_semitransparent_debug != 1;
+			FFoliageGroup &g = FindGroup(inst.type, level, GetLightGroup(this, inst), lightIndex, LODModelForLevel(inst.type, level), soft);
 			g.matrices.Push(inst.matrix);
 			g.matrices.Push(inst.normalMatrix);
+
+			if (soft)
+			{
+				// SEMITRANSPARENT: the solid pixels are alpha-tested here; the soft ones are blended in the translucent pass.
+				FFoliageTranslucentItem item;
+				item.instance = i;
+				item.lightIndex = lightIndex;
+				item.distSq = (float)distsq;
+				item.level = (uint8_t)level;
+				item.fade = FOLIAGE_FADE_STEPS;
+				item.semi = 1;
+				// pre-sorted triangle order for the direction it's seen from (hw_modelsort.cpp)
+				item.sortDir = (uint8_t)ModelSortDirection(viewpos, DVector3(inst.pos.X, inst.pos.Y, inst.pos.Z + type.centerHeight), inst.yaw);
+				FoliageTranslucent.Push(item);
+			}
 		}
 	}
 
@@ -796,6 +923,13 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 
 	// Draw: one group at a time, instanced where possible. Translucent plants beyond their FoliageTranslucentRange are drawn opaque here.
 	int currentLight = -1;
+	bool fadeSet = false;
+	int currentSoft = -1;
+	const float maskThreshold = clamp<float>(gl_mask_threshold, 0.f, 1.f);
+	const float solidThreshold = clamp<float>(r_semitransparent_cutoff, 0.f, 1.f);
+	const FRenderStyle savedStyle = state.GetRenderStyle();
+	int currentSolidWrite = -1;
+	const FVector3 eyeF((float)viewpos.X, (float)viewpos.Y, (float)viewpos.Z);
 	for (unsigned gi = 0; gi < numGroups; gi++)
 	{
 		FFoliageGroup &g = groups[gi];
@@ -808,10 +942,145 @@ void HWDrawInfo::DrawFoliage(FRenderState &state)
 			ApplyLightGroup(this, state, lightGroups[g.lightGroup], 1.f, false);
 			currentLight = g.lightGroup;
 		}
+		const FFoliageTypeFrameInfo &gti = typeInfo[g.type];
+		if ((int)g.soft != currentSoft)
+		{
+			// SEMITRANSPARENT plants with a blended pass: only nearly opaque pixels here; the rest are blended later.
+			state.AlphaFunc(Alpha_GEqual, g.soft ? solidThreshold : maskThreshold);
+			currentSoft = g.soft;
+		}
+		state.SetModelMipAlpha(gti.semi ? max(0.f, *r_semitransparent_mipalpha) : 0.f);	// SEMITRANSPARENT: thin parts stay solid at a distance
+		if (gti.lodSprite && gti.fadeTo > gti.fadeFrom)
+		{
+			state.SetLodFade(eyeF, false, gti.fadeFrom, gti.fadeTo);	// dithered away as its sprite comes in
+			fadeSet = true;
+		}
+		else if (fadeSet)
+		{
+			state.ClearLodFade();
+			fadeSet = false;
+		}
+		if (gti.semi && r_semitransparent_debug == 2) continue;	// debug: blended pass only
+		if ((int)gti.semi != currentSolidWrite)
+		{
+			// SEMITRANSPARENT: write the alpha-tested pixels opaque. The normal style blends by the texel's alpha, which
+			// let what's behind (the trunk) show through and darkened the needles.
+			state.SetRenderStyle(gti.semi ? FRenderStyle(LegacyRenderStyles[STYLE_Source]) : savedStyle);
+			currentSolidWrite = gti.semi;
+		}
 		DrawFoliageBatch(this, state, foliage->Types[g.type], DefaultRenderStyle(), g.lodModelID, g.lightIndex, g.matrices, 0, count, foliageStats.instancing);
 	}
+	if (fadeSet) state.ClearLodFade();
+	state.SetModelMipAlpha(0.f);
+	if (currentSoft == 1) state.AlphaFunc(Alpha_GEqual, maskThreshold);
+	state.SetRenderStyle(savedStyle);
 
 	// Leave the state the way the sprite drawer does.
+	state.SetObjectColor(0xffffffff);
+	state.SetAddColor(0);
+	state.SetDynLight(0, 0, 0);
+	state.SetLightIndex(-1);
+	state.EnableTexture(true);
+	state.SetVertexBuffer(screen->mVertexData);
+	foliageStats.time.Unclock();
+}
+
+//==========================================================================
+//
+// LODPLANE plants (treelines and other cheap stand-in models): past the
+// line cull distance, where the BSP walk doesn't reach, their own model is
+// drawn from the level's list of them (no BSP), frustum-tested one by one,
+// grouped by model, LOD level and sector light, and drawn instanced. They
+// get sector light, colour and fog, but no dynamic lights. Nearer, the
+// normal path above draws them; the two use the same distance test.
+//
+//==========================================================================
+
+void HWDrawInfo::DrawFarFoliage(FRenderState &state)
+{
+	FFoliageSystem *foliage = Level->Foliage;
+	const TArray<uint32_t> *plants = lodSprites ? LodFarModelPlants(Level) : nullptr;
+	if (foliage == nullptr || plants == nullptr || plants->Size() == 0 || !gl_render_foliage || !gl_render_things) return;
+	const uint8_t *sectorClass = LodSpriteSectorClasses(Level);
+	foliageStats.time.Clock();
+
+	struct FFarType
+	{
+		bool ready = false;
+		double startSq[4], outerSq[4];
+	};
+	static TArray<FFarType> farTypes;
+	static TArray<FFoliageTypeFrameInfo> farTypeInfo;
+	farTypes.Resize(foliage->Types.Size());
+	farTypeInfo.Resize(foliage->Types.Size());
+	for (auto &ft : farTypes) ft.ready = false;
+
+	const DVector3 &viewpos = Viewpoint.bDoOob ? Viewpoint.OffPos : Viewpoint.Pos;
+	const double lodscale = clamp<double>(r_lod, 0., 1000.);
+	const double hysteresis = clamp<double>(r_lod_hysteresis, 0., 1.);
+	const bool frustumCull = gl_frustum_cull && Frustum.valid && !Viewpoint.bDoOob;
+
+	ResetLightGroups(Level);
+	numGroups = 0;
+	groupMap.Clear();
+	for (uint32_t i : *plants)
+	{
+		FFoliageInstance &inst = foliage->Instances[i];
+		FFarType &ft = farTypes[inst.type];
+		FFoliageTypeFrameInfo &ti = farTypeInfo[inst.type];
+		if (!ft.ready)
+		{
+			ft.ready = true;
+			PClassActor *cls = foliage->Types[inst.type].cls;
+			for (int c = 0; c < 4; c++)
+			{
+				double start, outer;
+				LodFarModelWindow(cls, c, start, outer);
+				ft.startSq[c] = start >= LODSPRITE_NEVER ? DBL_MAX : start * start;
+				ft.outerSq[c] = outer >= LODSPRITE_NEVER ? DBL_MAX : outer * outer;
+			}
+			ti.numLevels = 0;
+			for (const LODmodel *m = cls->ActorInfo()->LODmodels; m != nullptr && ti.numLevels < MAX_FOLIAGE_LODS; m = m->Next) ti.levels[ti.numLevels++] = m;
+			ti.noHysteresis = !!(GetDefaultByType(cls)->perfFlags & PERF_NOLODHYSTERESIS);
+			ti.cullable = GetFoliageTypeBounds(foliage->Types[inst.type], ti, ti.cullMins, ti.cullMaxs);
+		}
+
+		const int c = sectorClass[inst.sector->Index()];
+		const double dx = inst.pos.X - viewpos.X, dy = inst.pos.Y - viewpos.Y, dz = inst.pos.Z - viewpos.Z;
+		const double distsq = dx * dx + dy * dy + dz * dz;
+		if (distsq < ft.startSq[c] || distsq >= ft.outerSq[c]) continue;
+		if (frustumCull && ti.cullable && !Frustum.ObjectBoxVisible(inst.matrix, ti.cullMins, ti.cullMaxs, 2.)) continue;
+
+		int level = 0;
+		if (ti.numLevels > 0 && lodscale > 0)
+		{
+			level = PickFoliageLevel(ti, sqrt(distsq) * lodscale, ti.noHysteresis ? 0. : hysteresis, inst.lodLevel);
+			inst.lodLevel = (uint8_t)level;
+			if (level > 0 && ti.levels[level - 1]->type != LOD_Model) continue;	// "None" (a "Sprite" level means nothing here)
+		}
+		const int lodModelID = level > 0 ? ti.levels[level - 1]->modelID : -1;
+		FFoliageGroup &g = FindGroup(inst.type, level, GetLightGroup(this, inst), -1, lodModelID);
+		g.matrices.Push(inst.matrix);
+		g.matrices.Push(inst.normalMatrix);
+		foliageStats.farModels++;
+	}
+
+	const bool instancing = state.SupportsModelInstancing();
+	int currentLight = -1;
+	for (unsigned gi = 0; gi < numGroups; gi++)
+	{
+		FFoliageGroup &g = groups[gi];
+		const unsigned count = g.matrices.Size() / 2;
+		if (count == 0) continue;
+		foliageStats.groups++;
+		if (g.lightGroup != currentLight)
+		{
+			ApplyLightGroup(this, state, lightGroups[g.lightGroup], 1.f, false);
+			currentLight = g.lightGroup;
+		}
+		DrawFoliageBatch(this, state, foliage->Types[g.type], DefaultRenderStyle(), g.lodModelID, -1, g.matrices, 0, count, instancing);
+	}
+
 	state.SetObjectColor(0xffffffff);
 	state.SetAddColor(0);
 	state.SetDynLight(0, 0, 0);
@@ -865,13 +1134,52 @@ void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 		{
 			const FFoliageTranslucentItem &item = FoliageTranslucent[j];
 			const FFoliageInstance &inst = foliage->Instances[item.instance];
-			if (inst.type != inst0.type || item.level != first.level || item.fade != first.fade || item.lightIndex != first.lightIndex || GetLightGroup(this, inst) != lightGroup) break;
+			if (inst.type != inst0.type || item.level != first.level || item.fade != first.fade || item.semi != first.semi || item.sortDir != first.sortDir || item.lightIndex != first.lightIndex || GetLightGroup(this, inst) != lightGroup) break;
 			runMatrices.Push(inst.matrix);
 			runMatrices.Push(inst.normalMatrix);
 			j++;
 		}
 
 		const FFoliageType &type = foliage->Types[inst0.type];
+		foliageStats.groups++;
+		if (first.semi)
+		{
+			// SEMITRANSPARENT, second pass: blend everything but the faintest pixels over what the opaque pass drew. Its
+			// solid pixels are drawn again at the same depth with the same colour, so they don't change; depth isn't
+			// written, so soft pixels never hide what's behind them. Culled like the opaque pass (default style).
+			state.SetDepthMask(false);
+			state.SetRenderStyle(STYLE_Translucent);
+			state.SetTextureMode(TM_NORMAL);
+			state.AlphaFunc(Alpha_Greater, clamp<float>(r_semitransparent_minalpha, 0.f, 1.f));
+			ApplyLightGroup(this, state, lightGroups[lightGroup], 1.f, false);
+			// Plants cross-fading with their LOD sprite keep the same dither as their opaque pass.
+			bool fade = false;
+			if (lodSprites && LodSpriteTypeInBatch(Level, inst0.type))
+			{
+				FLodSpriteWindow w;
+				LodSpriteWindow(type.cls, 0, w);
+				if (w.Fades())
+				{
+					const DVector3 &eye = Viewpoint.bDoOob ? Viewpoint.OffPos : Viewpoint.Pos;
+					state.SetLodFade(FVector3((float)eye.X, (float)eye.Y, (float)eye.Z), false, w.fadeFrom, w.fadeTo);
+					fade = true;
+				}
+			}
+			const bool alphaExp = r_semitransparent_gamma > 0 && r_semitransparent_gamma != 1;	// linear-light look for the soft pixels
+			if (alphaExp) state.SetModelAlphaExponent(1.f / r_semitransparent_gamma);
+			// Only the pixels the solid pass left out, measured the same way (mip alpha included): solid parts such as
+			// the trunk are never painted again over soft needles in front of them.
+			state.SetModelMipAlpha(max(0.f, *r_semitransparent_mipalpha));
+			state.SetModelSoftCutoff(max(0.001f, clamp<float>(r_semitransparent_cutoff, 0.f, 1.f)));
+			DrawFoliageBatch(this, state, type, DefaultRenderStyle(), LODModelForLevel(inst0.type, first.level), first.lightIndex, runMatrices, 0, j - i, instancing, first.sortDir);
+			state.SetModelSoftCutoff(0.f);
+			state.SetModelMipAlpha(0.f);
+			if (alphaExp) state.SetModelAlphaExponent(0.f);
+			if (fade) state.ClearLodFade();
+			state.SetDepthMask(true);
+			i = j;
+			continue;
+		}
 		state.SetRenderStyle(type.style);
 		state.SetTextureMode(type.style);
 		// Fade toward the opaque look: alpha toward 1 and the alpha cutoff toward the opaque pass's.
@@ -879,8 +1187,11 @@ void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 		state.AlphaFunc(Alpha_GEqual, nearThreshold + (farThreshold - nearThreshold) * f);
 		const bool additivefog = type.style.BlendOp == STYLEOP_Add && type.style.DestAlpha == STYLEALPHA_One;
 		ApplyLightGroup(this, state, lightGroups[lightGroup], type.alpha + (1.f - type.alpha) * f, additivefog);
-		foliageStats.groups++;
+		// SEMITRANSPARENT plants that really are translucent (alpha < 1) still get the linear-light look.
+		const bool alphaExp = (type.smfFlags & MDL_SEMITRANSPARENT) && r_semitransparent_gamma > 0 && r_semitransparent_gamma != 1;
+		if (alphaExp) state.SetModelAlphaExponent(1.f / r_semitransparent_gamma);
 		DrawFoliageBatch(this, state, type, type.style, LODModelForLevel(inst0.type, first.level), first.lightIndex, runMatrices, 0, j - i, instancing);
+		if (alphaExp) state.SetModelAlphaExponent(0.f);
 		i = j;
 	}
 
@@ -908,10 +1219,10 @@ void HWDrawInfo::DrawFoliageTranslucent(FRenderState &state)
 ADD_STAT(foliage)
 {
 	FString out;
-	out.Format("Foliage: %d plants in %d visible subsectors, %d drawn (%d translucent, %d lit by %d light lists), %d hidden by LOD, %d distance-culled\n"
+	out.Format("Foliage: %d plants in %d visible subsectors, %d drawn (%d translucent, %d lit by %d light lists), %d hidden by LOD, %d left to LOD sprites, %d distance-culled, %d far models\n"
 		"%d groups, %d instanced draws, %d single draws, instancing %s, %.3f ms",
 		foliageStats.considered, foliageStats.visibleSubsectors, foliageStats.drawn, foliageStats.translucent, foliageStats.lit, foliageStats.lightLists,
-		foliageStats.hiddenByLOD, foliageStats.culledByDistance,
+		foliageStats.hiddenByLOD, foliageStats.lodSprites, foliageStats.culledByDistance, foliageStats.farModels,
 		foliageStats.groups, foliageStats.instancedDraws, foliageStats.singleDraws, foliageStats.instancing ? "on" : "off", foliageStats.time.TimeMS());
 	return out;
 }
@@ -980,7 +1291,9 @@ CCMD(dumpfoliage)
 			}
 			Printf(", %d drawn last frame%s%s", total, levels.IsEmpty() ? "" : " -", levels.GetChars());
 		}
-		if (type.hasSpriteLOD) Printf(TEXTCOLOR_YELLOW " (\"Sprite\" LOD level is hidden)");
+		if (type.hasSpriteLOD) Printf(TEXTCOLOR_YELLOW " (\"Sprite\" LOD level is hidden: no +LODSPRITE)");
+		if (type.smfFlags & MDL_SEMITRANSPARENT) Printf(", SEMITRANSPARENT%s", type.alpha < 1.f ? " (alpha < 1: blended as a whole up close)" : "");
+		if (GetDefaultByType(type.cls)->perfFlags & PERF_LODSPRITE) Printf(", LODSPRITE%s", primaryLevel && LodSpriteTypeInBatch(primaryLevel, t) ? "" : TEXTCOLOR_YELLOW " (no sprite generated, see stat lodsprites)" TEXTCOLOR_NORMAL);
 		Printf("\n");
 	}
 

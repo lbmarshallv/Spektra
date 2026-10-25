@@ -111,11 +111,11 @@ int FFoliageSystem::FindOrAddType(PClassActor *cls, FSpriteModelFrame *smf, FRen
 	t.lightRadius = (float)max(info->radius, info->Height * 0.5);
 	for (const LODmodel *m = cls->ActorInfo()->LODmodels; m != nullptr; m = m->Next)
 	{
-		if (m->type == LOD_Sprite) t.hasSpriteLOD = true;
+		if (m->type == LOD_Sprite && !(info->perfFlags & PERF_LODSPRITE)) t.hasSpriteLOD = true;
 	}
 	if (t.hasSpriteLOD && Finalized)
 	{
-		Printf(TEXTCOLOR_ORANGE "Foliage: %s has a \"Sprite\" LODModel level. Sprite stand-ins aren't supported for foliage yet; that level is hidden.\n", cls->TypeName.GetChars());
+		Printf(TEXTCOLOR_ORANGE "Foliage: %s has a \"Sprite\" LODModel level but not +LODSPRITE; that level is hidden.\n", cls->TypeName.GetChars());
 	}
 	return Types.Push(t);
 }
@@ -235,6 +235,9 @@ FFoliageSystem::EAddResult FFoliageSystem::Place(FLevelLocals *Level, PClassActo
 	inst.type = (uint16_t)typeIndex;
 	inst.lodLevel = 0;
 	inst.padding = 0;
+	inst.yaw = (float)(yaw * (M_PI / 180.));
+	inst.spriteScaleXY = info->Scale.X != 0 ? (float)fabs(out.scale.X / info->Scale.X) : 1.f;
+	inst.spriteScaleZ = info->Scale.Y != 0 ? (float)fabs(out.scale.Y / info->Scale.Y) : 1.f;
 	const uint32_t instanceIndex = Instances.Push(inst);
 
 	// Which render subsectors make it visible: like actors, max(radius, RenderRadius) reaches into neighbouring
@@ -408,7 +411,7 @@ void FFoliageSystem::Finalize(FLevelLocals *Level)
 	{
 		if (t.hasSpriteLOD)
 		{
-			Printf(TEXTCOLOR_ORANGE "Foliage: %s has a \"Sprite\" LODModel level. Sprite stand-ins aren't supported for foliage yet; that level is hidden.\n", t.cls->TypeName.GetChars());
+			Printf(TEXTCOLOR_ORANGE "Foliage: %s has a \"Sprite\" LODModel level but not +LODSPRITE; that level is hidden.\n", t.cls->TypeName.GetChars());
 		}
 	}
 	if (Instances.Size() > 0)
